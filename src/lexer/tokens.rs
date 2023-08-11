@@ -1,6 +1,15 @@
+use std::fmt::{self, Display, Formatter};
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub line: usize,
+    pub column: usize,
+}
+
 /// Tokens for the lexer
-#[derive(Debug, PartialEq)]
-pub enum Token {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TokenKind {
     // Keywords
     Let,
     If,
@@ -79,26 +88,45 @@ pub enum Token {
     Illegal(String),
 }
 
-impl Token {
-    pub fn is_keyword(string: &str) -> Option<Token> {
+impl TokenKind {
+    pub fn is_keyword(string: &str) -> Option<TokenKind> {
         match string {
-            "let" => Some(Token::Let),
-            "if" => Some(Token::If),
-            "else" => Some(Token::Else),
-            "while" => Some(Token::While),
-            "for" => Some(Token::For),
-            "in" => Some(Token::In),
-            "return" => Some(Token::Return),
-            "break" => Some(Token::Break),
-            "continue" => Some(Token::Continue),
-            "fn" => Some(Token::Fn),
-            "struct" => Some(Token::Struct),
-            "enum" => Some(Token::Enum),
-            "match" => Some(Token::Match),
-            "as" => Some(Token::As),
-            "True" => Some(Token::True),
-            "False" => Some(Token::False),
+            "let" => Some(TokenKind::Let),
+            "if" => Some(TokenKind::If),
+            "else" => Some(TokenKind::Else),
+            "while" => Some(TokenKind::While),
+            "for" => Some(TokenKind::For),
+            "in" => Some(TokenKind::In),
+            "return" => Some(TokenKind::Return),
+            "break" => Some(TokenKind::Break),
+            "continue" => Some(TokenKind::Continue),
+            "fn" => Some(TokenKind::Fn),
+            "struct" => Some(TokenKind::Struct),
+            "enum" => Some(TokenKind::Enum),
+            "match" => Some(TokenKind::Match),
+            "as" => Some(TokenKind::As),
+            "true" => Some(TokenKind::True),
+            "false" => Some(TokenKind::False),
             _ => None,
         }
+    }
+}
+
+impl Display for TokenKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            TokenKind::Identifier(string) => write!(f, "Ident({})", string),
+            TokenKind::Illegal(string) => write!(f, "Illegal({})", string),
+            TokenKind::Number(number) => write!(f, "Number({})", number),
+            TokenKind::String(string) => write!(f, "String({})", string),
+            TokenKind::Char(char) => write!(f, "Char({})", char),
+            _ => write!(f, "{:?}", self),
+        }
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.kind)
     }
 }

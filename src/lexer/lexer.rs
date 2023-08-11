@@ -1,10 +1,13 @@
-use super::tokens::Token;
+use super::tokens::{Token, TokenKind};
 
+#[derive(Debug)]
 pub struct Lexer {
     input: String,
     position: usize,
     read_position: usize,
     ch: char,
+    line: usize,
+    column: usize,
 }
 
 /// Implement the Lexer struct
@@ -28,18 +31,32 @@ impl Lexer {
     /// );
     /// let lexer = Lexer::new(input);
     /// ```
-    pub fn new(input: String) -> Lexer {
+    pub fn new<T: AsRef<str>>(input: T) -> Lexer {
+        let input = input.as_ref().to_string();
         let mut l = Lexer {
             input,
             position: 0,
             read_position: 0,
             ch: '\0',
+            line: 1,
+            column: 0,
         };
         l.read_char();
         l
     }
 
     fn read_char(&mut self) {
+        // Update line and column
+        match self.ch {
+            '\n' => {
+                self.line += 1;
+                self.column = 0;
+            }
+            '\t' => self.column += 4,
+            '\r' => self.column = 0,
+            _ => self.column += 1,
+        }
+
         if self.read_position >= self.input.len() {
             self.ch = '\0';
         } else {
@@ -93,94 +110,6 @@ impl Lexer {
     /// This will skip whitespace and return the next token.
     /// If the end of the input string is reached, None
     /// will be returned.
-    ///
-    /// # Examples
-    /// ```
-    /// use interpreter::lexer::lexer::Lexer;
-    /// use interpreter::lexer::tokens::Token;
-    ///
-    /// let input = String::from("=+(){},;");
-    /// let mut lexer = Lexer::new(input);
-    /// let expected = vec![
-    ///     Some(Token::AssignEqual),
-    ///     Some(Token::Plus),
-    ///     Some(Token::LeftParen),
-    ///     Some(Token::RightParen),
-    ///     Some(Token::LeftSquirly),
-    ///     Some(Token::RightSquirly),
-    ///     Some(Token::Comma),
-    ///     Some(Token::Semicolon),
-    ///     None,
-    /// ];
-    /// for expected_token in expected {
-    ///    let token = lexer.next_token();
-    ///    assert_eq!(token, expected_token);
-    /// }
-    /// ```
-    ///
-    /// ```
-    /// use interpreter::lexer::lexer::Lexer;
-    /// use interpreter::lexer::tokens::Token;
-    ///
-    /// let input = String::from(
-    /// r#"let five = 5;
-    /// let ten = 10;
-    /// let add = fn(x, y) {
-    ///    x + y
-    /// };
-    /// let result = add(five, ten);
-    /// "#
-    /// );
-    ///
-    /// let mut lexer = Lexer::new(input);
-    /// let expected = vec![
-    ///     Some(Token::Let),
-    ///     Some(Token::Identifier(String::from("five"))),
-    ///     Some(Token::AssignEqual),
-    ///     Some(Token::Number(String::from("5"))),
-    ///     Some(Token::Semicolon),
-    ///     Some(Token::Let),
-    ///     Some(Token::Identifier(String::from("ten"))),
-    ///     Some(Token::AssignEqual),
-    ///     Some(Token::Number(String::from("10"))),
-    ///     Some(Token::Semicolon),
-    ///     Some(Token::Let),
-    ///     Some(Token::Identifier(String::from("add"))),
-    ///     Some(Token::AssignEqual),
-    ///     Some(Token::Fn),
-    ///     Some(Token::LeftParen),
-    ///     Some(Token::Identifier(String::from("x"))),
-    ///     Some(Token::Comma),
-    ///     Some(Token::Identifier(String::from("y"))),
-    ///     Some(Token::RightParen),
-    ///     Some(Token::LeftSquirly),
-    ///     Some(Token::Identifier(String::from("x"))),
-    ///     Some(Token::Plus),
-    ///     Some(Token::Identifier(String::from("y"))),
-    ///     Some(Token::RightSquirly),
-    ///     Some(Token::Semicolon),
-    ///     Some(Token::Let),
-    ///     Some(Token::Identifier(String::from("result"))),
-    ///     Some(Token::AssignEqual),
-    ///     Some(Token::Identifier(String::from("add"))),
-    ///     Some(Token::LeftParen),
-    ///     Some(Token::Identifier(String::from("five"))),
-    ///     Some(Token::Comma),
-    ///     Some(Token::Identifier(String::from("ten"))),
-    ///     Some(Token::RightParen),
-    ///     Some(Token::Semicolon),
-    ///     None,
-    ///     None,
-    /// ];
-    ///
-    /// for expected_token in expected {
-    ///    let token = lexer.next_token();
-    ///    println!("token: {:?}", token);
-    ///    assert_eq!(token, expected_token);
-    /// }
-    ///
-    ///
-    /// ```
     pub fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
 
@@ -188,70 +117,87 @@ impl Lexer {
             return None;
         }
 
-        let token = match self.ch {
+        let line = self.line;
+        let column = self.column;
+        let token_kind = match self.ch {
             '=' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Some(Token::CompareEqual)
+                    Some(TokenKind::CompareEqual)
                 } else {
-                    Some(Token::AssignEqual)
+                    Some(TokenKind::AssignEqual)
                 }
             }
-            ';' => Some(Token::Semicolon),
-            '(' => Some(Token::LeftParen),
-            ')' => Some(Token::RightParen),
-            ',' => Some(Token::Comma),
-            '+' => Some(Token::Plus),
-            '-' => Some(Token::Minus),
+            ';' => Some(TokenKind::Semicolon),
+            '(' => Some(TokenKind::LeftParen),
+            ')' => Some(TokenKind::RightParen),
+            ',' => Some(TokenKind::Comma),
+            '+' => Some(TokenKind::Plus),
+            '-' => Some(TokenKind::Minus),
             '!' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Some(Token::CompareNotEqual)
+                    Some(TokenKind::CompareNotEqual)
                 } else {
-                    Some(Token::Bang)
+                    Some(TokenKind::Bang)
                 }
             }
-            '/' => Some(Token::Slash),
-            '*' => Some(Token::Asterisk),
+            '/' => Some(TokenKind::Slash),
+            '*' => Some(TokenKind::Asterisk),
             '<' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Some(Token::CompareLessEqual)
+                    Some(TokenKind::CompareLessEqual)
                 } else {
-                    Some(Token::CompareLess)
+                    Some(TokenKind::CompareLess)
                 }
             }
+            '%' => Some(TokenKind::Percent),
             '>' => {
                 if self.peek_char() == '=' {
                     self.read_char();
-                    Some(Token::CompareGreaterEqual)
+                    Some(TokenKind::CompareGreaterEqual)
                 } else {
-                    Some(Token::CompareGreater)
+                    Some(TokenKind::CompareGreater)
                 }
             }
-            '{' => Some(Token::LeftSquirly),
-            '}' => Some(Token::RightSquirly),
-            '[' => Some(Token::LeftSquare),
-            ']' => Some(Token::RightSquare),
-            '\0' => Some(Token::EOF),
+            '{' => Some(TokenKind::LeftSquirly),
+            '}' => Some(TokenKind::RightSquirly),
+            '[' => Some(TokenKind::LeftSquare),
+            ']' => Some(TokenKind::RightSquare),
+            '\0' => Some(TokenKind::EOF),
             _ => {
                 if is_letter(self.ch) {
                     let literal = self.read_identifier();
-                    if let Some(keyword_token) = Token::is_keyword(&literal) {
+                    if let Some(keyword_token) = TokenKind::is_keyword(&literal) {
                         Some(keyword_token)
                     } else {
-                        Some(Token::Identifier(literal))
+                        Some(TokenKind::Identifier(literal))
                     }
                 } else if is_digit(self.ch) {
                     let literal = self.read_number();
-                    Some(Token::Number(literal))
+                    Some(TokenKind::Number(literal))
                 } else {
-                    Some(Token::Illegal(self.ch.to_string()))
+                    Some(TokenKind::Illegal(self.ch.to_string()))
                 }
             }
         };
+
         self.read_char();
-        return token;
+
+        if let Some(token_kind) = token_kind {
+            Some(Token {
+                kind: token_kind,
+                line,
+                column,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn lines(&self) -> Vec<String> {
+        self.input.lines().map(|s| s.to_string()).collect()
     }
 }
 
@@ -261,4 +207,12 @@ fn is_letter(ch: char) -> bool {
 
 fn is_digit(ch: char) -> bool {
     ch.is_digit(10)
+}
+
+impl Iterator for Lexer {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_token()
+    }
 }
