@@ -5,9 +5,23 @@ pub struct Token {
     pub kind: TokenKind,
     pub line: usize,
     pub column: usize,
+    pub length: usize,
+}
+
+impl Default for Token {
+    fn default() -> Self {
+        Self {
+            kind: TokenKind::EOF,
+            line: 1,
+            column: 0,
+            length: 0,
+        }
+    }
 }
 
 /// Tokens for the lexer
+// ignore the unused variants for now
+#[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
     // Keywords
@@ -40,9 +54,7 @@ pub enum TokenKind {
     Asterisk,
     Slash,
     Percent,
-    Caret,
-    Ampersand,
-    Pipe,
+    BitwiseXor,
     Tilde,
     Bang,
     Question,
@@ -50,6 +62,14 @@ pub enum TokenKind {
     Colon,
     Semicolon,
     Comma,
+
+    // Logical
+    LogicalAnd,
+    LogicalOr,
+
+    // Bitwise
+    BitwiseAnd,
+    BitwiseOr,
 
     // Assignment
     AssignEqual,
@@ -70,10 +90,6 @@ pub enum TokenKind {
     CompareGreater,
     CompareGreaterEqual,
 
-    // Logical
-    And,
-    Or,
-
     // Brackets
     LeftParen,
     RightParen,
@@ -86,6 +102,8 @@ pub enum TokenKind {
     Identifier(String),
     EOF,
     Illegal(String),
+    BitwiseRightShift,
+    BitwiseLeftShift,
 }
 
 impl TokenKind {
@@ -120,7 +138,7 @@ impl Display for TokenKind {
             TokenKind::Number(number) => write!(f, "Number({})", number),
             TokenKind::String(string) => write!(f, "String({})", string),
             TokenKind::Char(char) => write!(f, "Char({})", char),
-            _ => write!(f, "{:?}", self),
+            _ => write!(f, "{}", format!("{:?}", self).to_lowercase()),
         }
     }
 }

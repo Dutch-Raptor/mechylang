@@ -2,8 +2,7 @@ use std::io::{self, Write};
 
 use color_print::cprintln;
 
-use crate::lexer::lexer::Lexer;
-use crate::parser::parser::Parser;
+use crate::evaluator::{environment::Environment, eval::Evaluator};
 
 pub struct Repl;
 
@@ -13,6 +12,7 @@ impl Repl {
     }
 
     pub fn run(&mut self) {
+        let mut env = Environment::new();
         loop {
             print!(">> ");
             io::stdout().flush().unwrap();
@@ -20,30 +20,18 @@ impl Repl {
             let mut input = String::new();
             io::stdin().read_line(&mut input).unwrap();
 
-            let lexer = Lexer::new(input);
+            let evaluated = Evaluator::eval(input, &mut env);
 
-            let mut parser = Parser::new(lexer);
-
-            let program = parser.parse();
-
-            println!("");
-
-            println!("AST: {:#?}", program.statements);
-
-            if program.errors.len() > 0 {
-                cprintln!(
-                    "<red>Parsing completed with <strong>{}</strong> errors</red>",
-                    program.errors.len()
-                );
-                for (i, error) in program.errors.iter().enumerate() {
-                    cprintln!("<r>{}:</> {}", i + 1, error);
+            match evaluated {
+                Ok(evaluated) => {
+                    println!("Evaluated: {}", evaluated);
                 }
-                continue;
-            } else {
-                cprintln!("<green>Parsing completed successfully</green>");
+                Err(errors) => {
+                    for error in errors.iter() {
+                        cprintln!("{}", error);
+                    }
+                }
             }
-
-            println!("TEXT: {}", program);
         }
     }
 }

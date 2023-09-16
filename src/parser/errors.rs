@@ -16,34 +16,51 @@ pub struct Error {
 #[derive(Debug, PartialEq)]
 pub enum ErrorKind {
     UnexpectedToken,
-    ParseError,
     MissingPrecedence,
+    MissingPrefix,
+    MissingInfix,
+    InvalidIdentifier,
+    InvalidNumber,
+    TypeMismatch,
+    UnknownOperator,
+    IdentifierNotFound,
+    InvalidOperator,
+    TypeError,
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let blank = " ".repeat(match self.column {
+        let caret_pos = match self.column {
             0 => 0,
             _ => self.column - 1,
-        });
+        };
+
+        let pos = format!("{}:{}", self.line_nr, self.column);
+        let pos_len = pos.len();
+
+        let context = match &self.context {
+            Some(context) => "| Context: ".to_owned() + context,
+            None => "".to_owned(),
+        };
 
         write!(
             f,
-            "{}",
+            "{}\n{}\n{}",
             cformat!(
-                "<r>Error ({:?}):</> {} at line {}:{}\n{}\n{}^",
+                "{:pos_len$} | <r>Error: {:?}</r> {}",
+                "",
                 self.kind,
-                self.message,
-                self.line_nr,
-                self.column,
-                self.line,
-                blank
-            )
+                context
+            ),
+            cformat!("{} | {}", pos, self.line),
+            cformat!(
+                "{:pos_len$} | {:caret_pos$}<r>{}</> {}",
+                "",
+                "",
+                "^",
+                self.message
+            ),
         )?;
-
-        if let Some(context) = &self.context {
-            write!(f, "\nContext: {} \n", context)?;
-        }
 
         Ok(())
     }

@@ -12,19 +12,32 @@ pub fn defer<F: FnOnce()>(f: F) -> impl Drop {
 }
 
 static mut INDENT: usize = 0;
+const TRACE_ENABLED: bool = false;
+
+pub fn reset_trace() {
+    unsafe {
+        INDENT = 0;
+    }
+}
 
 pub fn start_trace(name: &str) -> &str {
+    if !TRACE_ENABLED {
+        return name;
+    }
     unsafe {
-        println!("{}Begin {}", " ".repeat(INDENT * 2), name);
+        eprintln!("{}Begin {}", " ".repeat(INDENT * 2), name);
         INDENT += 1;
     }
     return name;
 }
 
 pub fn stop_trace(name: &str) {
+    if !TRACE_ENABLED {
+        return;
+    }
     unsafe {
         INDENT -= 1;
-        println!("{}End {}", " ".repeat(INDENT * 2), name);
+        eprintln!("{}End {}", " ".repeat(INDENT * 2), name);
     }
 }
 

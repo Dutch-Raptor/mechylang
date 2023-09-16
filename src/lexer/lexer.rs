@@ -41,6 +41,7 @@ impl Lexer {
             line: 1,
             column: 0,
         };
+
         l.read_char();
         l
     }
@@ -52,7 +53,10 @@ impl Lexer {
                 self.line += 1;
                 self.column = 0;
             }
-            '\t' => self.column += 4,
+            '\t' => {
+                self.column += 4;
+                dbg!("tab");
+            }
             '\r' => self.column = 0,
             _ => self.column += 1,
         }
@@ -64,6 +68,29 @@ impl Lexer {
         }
         self.position = self.read_position;
         self.read_position += 1;
+    }
+
+    fn reverse_char(&mut self, n: usize) {
+        for _ in 0..n {
+            self.read_position = self.position;
+            self.position -= 1;
+            self.ch = self.input.chars().nth(self.position).unwrap();
+
+            // Update line and column
+            match self.ch {
+                '\n' => {
+                    self.line -= 1;
+                    // don't know how to get the column of the last char in the line
+                    self.column = 0;
+                }
+                '\t' => {
+                    self.column -= 4;
+                    dbg!("tab");
+                }
+                '\r' => self.column = 0,
+                _ => self.column -= 1,
+            }
+        }
     }
 
     fn skip_whitespace(&mut self) {
@@ -79,8 +106,7 @@ impl Lexer {
         }
         // Since we keep reading until we find a non-letter character, we need to
         // go back one character to get the last letter.
-        self.position -= 1;
-        self.read_position -= 1;
+        self.reverse_char(1);
         self.input[position..=self.position].to_string()
     }
 
@@ -92,8 +118,9 @@ impl Lexer {
         while is_digit(self.ch) || self.ch == '.' {
             self.read_char();
         }
-        self.position -= 1;
-        self.read_position -= 1;
+        // Since we keep reading until we find a non-digit character, we need to
+        // go back one character to get the last digit.
+        self.reverse_char(1);
         self.input[position..=self.position].to_string()
     }
 
@@ -119,6 +146,9 @@ impl Lexer {
 
         let line = self.line;
         let column = self.column;
+
+        let mut token_length = 1;
+
         let token_kind = match self.ch {
             '=' => {
                 if self.peek_char() == '=' {
@@ -148,6 +178,9 @@ impl Lexer {
                 if self.peek_char() == '=' {
                     self.read_char();
                     Some(TokenKind::CompareLessEqual)
+                } else if self.peek_char() == '<' {
+                    self.read_char();
+                    Some(TokenKind::BitwiseLeftShift)
                 } else {
                     Some(TokenKind::CompareLess)
                 }
@@ -157,10 +190,30 @@ impl Lexer {
                 if self.peek_char() == '=' {
                     self.read_char();
                     Some(TokenKind::CompareGreaterEqual)
+                } else if self.peek_char() == '>' {
+                    self.read_char();
+                    Some(TokenKind::BitwiseRightShift)
                 } else {
                     Some(TokenKind::CompareGreater)
                 }
             }
+            '&' => {
+                if self.peek_char() == '&' {
+                    self.read_char();
+                    Some(TokenKind::LogicalAnd)
+                } else {
+                    Some(TokenKind::BitwiseAnd)
+                }
+            }
+            '|' => {
+                if self.peek_char() == '|' {
+                    self.read_char();
+                    Some(TokenKind::LogicalOr)
+                } else {
+                    Some(TokenKind::BitwiseOr)
+                }
+            }
+            '^' => Some(TokenKind::BitwiseXor),
             '{' => Some(TokenKind::LeftSquirly),
             '}' => Some(TokenKind::RightSquirly),
             '[' => Some(TokenKind::LeftSquare),
@@ -169,6 +222,7 @@ impl Lexer {
             _ => {
                 if is_letter(self.ch) {
                     let literal = self.read_identifier();
+                    token_length = literal.len();
                     if let Some(keyword_token) = TokenKind::is_keyword(&literal) {
                         Some(keyword_token)
                     } else {
@@ -176,6 +230,7 @@ impl Lexer {
                     }
                 } else if is_digit(self.ch) {
                     let literal = self.read_number();
+                    token_length = literal.len();
                     Some(TokenKind::Number(literal))
                 } else {
                     Some(TokenKind::Illegal(self.ch.to_string()))
@@ -190,6 +245,7 @@ impl Lexer {
                 kind: token_kind,
                 line,
                 column,
+                length: token_length,
             })
         } else {
             None
