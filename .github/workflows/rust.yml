@@ -22,7 +22,11 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
-    - name: Clippy Action
+      
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
     - uses: dtolnay/rust-toolchain@stable
       with:
           components: clippy
