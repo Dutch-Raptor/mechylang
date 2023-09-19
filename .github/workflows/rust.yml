@@ -8,7 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-
+permissions:
+  checks: write
 jobs:
   build:
 
@@ -25,8 +26,7 @@ jobs:
       with:
           components: clippy
     - uses: auguwu/clippy-action@1.2.1
-          with:
-              token: ${{secrets.GITHUB_TOKEN}}
-          permissions:
-              checks: write
+      with:
+          token: ${{secrets.GITHUB_TOKEN}}
+    
   
