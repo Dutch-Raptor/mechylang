@@ -1,86 +1,150 @@
 use std::{
     collections::HashMap,
-    ops::{Deref, DerefMut},
-    rc::Rc,
+    fmt::Debug,
+    rc::{Rc, Weak},
+    sync::RwLock,
 };
 
 use super::objects::Object;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default)]
 pub struct Environment {
-    internal: Rc<InternalEnvironment>,
+    inner: Rc<RwLock<InnerEnvironment>>,
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        Self {
+            inner: Rc::new(RwLock::new(InnerEnvironment {
+                store: HashMap::new(),
+                outer: None,
+            })),
+        }
+    }
+
+    pub fn new_enclosed(outer: &Environment) -> Self {
+        Self {
+            inner: Rc::new(RwLock::new(InnerEnvironment {
+                store: HashMap::new(),
+                outer: Some(Rc::downgrade(&outer.inner)),
+            })),
+        }
+    }
+
+    /// Recursively get a value from the environment
+    ///
+    /// Keeps trying to get the value from the outer environment until it succeeds or there are no more outer
+    pub fn get(&self, name: impl Into<Rc<str>>) -> Option<Object> {
+        let name = name.into();
+        let env = self.inner.read().unwrap();
+        match env.store.get(&name) {
+            Some(obj) => Some(obj.clone()),
+            None => match &env.outer {
+                Some(outer) => Self::get_from_outer(outer, name),
+                None => None,
+            },
+        }
+    }
+
+    pub fn set(&mut self, name: impl Into<Rc<str>>, val: Object) {
+        let name = name.into();
+        let mut env = self.inner.write().unwrap();
+        env.store.insert(name, val);
+    }
+
+    pub fn mutate(&mut self, name: impl Into<Rc<str>>, val: Object) -> Result<(), String> {
+        let name = name.into();
+        let mut env = self.inner.write().unwrap();
+        match env.store.get_mut(&name) {
+            Some(obj) => *obj = val,
+            None => {
+                return match &env.outer {
+                    Some(outer) => Self::mutate_outer(outer, name, val),
+                    None => Err("Cannot mutate variable that does not exist".to_string()),
+                }
+            }
+        };
+
+        Ok(())
+    }
+
+    /// Recursively get a value from an outer environment
+    ///
+    /// Keeps trying to upgrade the weak reference until it succeeds or there are no more outer
+    fn get_from_outer(
+        outer: &Weak<RwLock<InnerEnvironment>>,
+        name: impl Into<Rc<str>>,
+    ) -> Option<Object> {
+        let name = name.into();
+        // Try to upgrade the weak reference
+        let outer_ref = outer.upgrade()?;
+
+        // Lock the outer environment
+        let outer_env = match outer_ref.read() {
+            Ok(env) => env,
+            Err(_) => return None,
+        };
+
+        // Get the value from the outer environment
+        match outer_env.store.get(&name) {
+            Some(obj) => Some(obj.clone()),
+            None => match &outer_env.outer {
+                Some(outer) => Self::get_from_outer(outer, name),
+                None => None,
+            },
+        }
+    }
+
+    fn mutate_outer(
+        outer: &Weak<RwLock<InnerEnvironment>>,
+        name: impl Into<Rc<str>>,
+        val: Object,
+    ) -> Result<(), String> {
+        let name = name.into();
+        // Try to upgrade the weak reference
+        let outer_ref = outer.upgrade().unwrap();
+
+        // Lock the outer environment
+        let mut outer_env = outer_ref.write().unwrap();
+
+        // Get the value from the outer environment
+        if let Some(obj) = outer_env.store.get_mut(&name) {
+            *obj = val;
+            return Ok(());
+        }
+
+        match &outer_env.outer {
+            Some(outer) => Self::mutate_outer(outer, name, val),
+            None => Err("Cannot mutate variable that does not exist".to_string()),
+        }
+    }
+}
+
+#[derive(Default)]
+struct InnerEnvironment {
+    store: HashMap<Rc<str>, Object>,
+    outer: Option<Weak<RwLock<InnerEnvironment>>>,
+}
+
+impl Debug for InnerEnvironment {
+    /// Debug implementation for InnerEnvironment
+    ///
+    /// Prints the store and whether or not there is an outer environment
+    /// does not print the outer environment, as that would cause an infinite loop
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let has_outer = self.outer.is_some();
+        write!(
+            f,
+            "InnerEnvironment {{ store: {{ {:?} }}, has_outer: {} }}",
+            self.store, has_outer
+        )
+    }
 }
 
 impl Clone for Environment {
     fn clone(&self) -> Self {
         Self {
-            internal: Rc::clone(&self.internal),
+            inner: Rc::clone(&self.inner),
         }
-    }
-}
-
-impl Environment {
-    pub(crate) fn new() -> Self {
-        Self {
-            internal: Rc::new(InternalEnvironment {
-                store: HashMap::new(),
-                outer: None,
-            }),
-        }
-    }
-
-    pub(crate) fn new_enclosed(outer: Environment) -> Self {
-        Self {
-            internal: Rc::new(InternalEnvironment {
-                store: HashMap::new(),
-                outer: Some(outer),
-            }),
-        }
-    }
-
-    pub fn strong_count(&self) -> usize {
-        Rc::strong_count(&self.internal)
-    }
-
-    pub fn outer_strong_count(&self) -> usize {
-        if let Some(outer) = &self.internal.outer {
-            outer.strong_count()
-        } else {
-            0
-        }
-    }
-}
-
-impl Deref for Environment {
-    type Target = InternalEnvironment;
-
-    fn deref(&self) -> &Self::Target {
-        &self.internal
-    }
-}
-
-impl DerefMut for Environment {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        Rc::make_mut(&mut self.internal)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct InternalEnvironment {
-    pub store: HashMap<Rc<str>, Object>,
-    outer: Option<Environment>,
-}
-
-impl InternalEnvironment {
-    pub(crate) fn get(&self, name: impl Into<Rc<str>>) -> Option<Object> {
-        let name = name.into();
-        self.store
-            .get(&name)
-            .cloned()
-            .or_else(|| self.outer.as_ref().and_then(|outer| outer.get(name)))
-    }
-
-    pub(crate) fn set(&mut self, name: impl Into<Rc<str>>, val: Object) {
-        self.store.insert(name.into(), val);
     }
 }

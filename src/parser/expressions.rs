@@ -34,6 +34,29 @@ pub enum Expression {
     Function(FunctionLiteral),
     Call(CallExpression),
     Block(BlockStatement),
+    StringLiteral(StringLiteral),
+}
+
+pub trait ExpressionToken {
+    fn token(&self) -> &Token;
+}
+
+impl ExpressionToken for Expression {
+    fn token(&self) -> &Token {
+        match self {
+            Expression::Identifier(ident) => &ident.token,
+            Expression::IntegerLiteral(lit) => &lit.token,
+            Expression::FloatLiteral(lit) => &lit.token,
+            Expression::Prefix(expr) => &expr.token,
+            Expression::Infix(expr) => &expr.token,
+            Expression::Boolean(boolean) => &boolean.token,
+            Expression::If(if_expr) => &if_expr.token,
+            Expression::Function(func) => &func.token,
+            Expression::Call(call) => &call.token,
+            Expression::Block(block) => &block.token,
+            Expression::StringLiteral(lit) => &lit.token,
+        }
+    }
 }
 
 impl Display for Expression {
@@ -49,6 +72,7 @@ impl Display for Expression {
             Expression::Function(func) => write!(f, "{}", func),
             Expression::Call(call) => write!(f, "{}", call),
             Expression::Block(block) => write!(f, "{}", block),
+            Expression::StringLiteral(lit) => write!(f, "{}", lit),
         }
     }
 }
@@ -102,6 +126,18 @@ pub struct BooleanLiteral {
 }
 
 impl Display for BooleanLiteral {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct StringLiteral {
+    pub token: Token,
+    pub value: Rc<str>,
+}
+
+impl Display for StringLiteral {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self.value)
     }
@@ -294,7 +330,7 @@ impl Display for FunctionLiteral {
 pub struct CallExpression {
     pub token: Token,
     pub function: Box<Expression>,
-    pub arguments: Vec<Expression>,
+    pub arguments: Rc<[Expression]>,
 }
 
 impl Display for CallExpression {

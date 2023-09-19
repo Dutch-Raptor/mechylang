@@ -5,14 +5,15 @@ use crate::{
     parser::{
         errors::{Error, ErrorKind},
         expressions::{
-            CallExpression, Expression, Identifier, IfExpression, InfixExpression, InfixOperator,
-            PrefixOperator,
+            CallExpression, Expression, ExpressionToken, Identifier, IfExpression, InfixExpression,
+            InfixOperator, PrefixOperator,
         },
         parser::{BlockStatement, LetStatement, Parser, Statement},
     },
 };
 
 use super::{
+    builtins::BUILTINS,
     environment::Environment,
     objects::{Function, Object, UnwrapReturnValue},
 };
@@ -21,14 +22,13 @@ pub type EvalResult = Result<Object, Rc<[Error]>>;
 
 pub struct Evaluator {
     lines: Vec<String>,
-    program: Rc<[Statement]>,
     current_token: Option<Token>,
 }
 
 impl Evaluator {
     pub fn eval(input: impl Into<Rc<str>>, env: &mut Environment) -> EvalResult {
         let input: Rc<str> = input.into();
-        let lexer = Lexer::new(&input);
+        let lexer = Lexer::new(input);
         let lines = lexer.lines();
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
@@ -39,20 +39,23 @@ impl Evaluator {
 
         let evaluator = Evaluator {
             lines,
-            program: program.statements.into(),
             current_token: None,
         };
 
-        evaluator.eval_program(env).map_err(|err| vec![err].into())
+        evaluator
+            .eval_program(program.statements, env)
+            .map_err(|err| vec![err].into())
     }
 
-    pub fn eval_program(mut self, env: &mut Environment) -> Result<Object, Error> {
+    pub fn eval_program(
+        mut self,
+        program: Vec<Statement>,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
         let mut result = Object::Null;
 
-        let program = self.program.clone();
-
-        for statement in program.iter() {
-            result = self.eval_statement(statement, env)?;
+        for statement in program.into_iter() {
+            result = self.eval_statement(&statement, env)?;
 
             if let Object::ReturnValue(val) = result {
                 return Ok(*val);
@@ -74,8 +77,9 @@ impl Evaluator {
                 Ok(Object::ReturnValue(Box::new(val)))
             }
             Statement::Let(let_statement) => {
+                let name = let_statement.name.clone();
                 let val = self.eval_let_statement(let_statement, env)?;
-                Ok(Object::Let(let_statement.name.clone(), Box::new(val)))
+                Ok(Object::Let(name, Box::new(val)))
             }
         }
     }
@@ -95,8 +99,6 @@ impl Evaluator {
         expression: &Expression,
         env: &mut Environment,
     ) -> Result<Object, Error> {
-        dbg!(&env);
-
         match expression {
             Expression::IntegerLiteral(lit) => Ok(Object::Integer(lit.value)),
             Expression::Boolean(boolean) => Ok(boolean.value.into()),
@@ -119,6 +121,7 @@ impl Evaluator {
                 env: env.clone(),
             })),
             Expression::Call(call) => self.eval_call_expression(call, env),
+            Expression::StringLiteral(lit) => Ok(Object::String(lit.value.clone())),
             _ => todo!(),
         }
     }
@@ -133,15 +136,21 @@ impl Evaluator {
 
         self.current_token = Some(infix.token.clone());
 
-        if let Object::Integer(left) = left {
+        if let Object::Integer(left) = &left {
             if let Object::Integer(right) = right {
-                return self.eval_integer_infix_expression(&infix.operator, left, right);
+                return self.eval_integer_infix_expression(&infix.operator, *left, right);
             }
         }
 
-        if let Object::Boolean(left) = left {
+        if let Object::Boolean(left) = &left {
             if let Object::Boolean(right) = right {
-                return self.eval_boolean_infix_expression(&infix.operator, left, right);
+                return self.eval_boolean_infix_expression(&infix.operator, *left, right);
+            }
+        }
+
+        if let Object::String(left) = &left {
+            if let Object::String(right) = right {
+                return self.eval_string_infix_expression(&infix.operator, left.clone(), right);
             }
         }
 
@@ -344,7 +353,15 @@ impl Evaluator {
         call: &CallExpression,
         env: &mut Environment,
     ) -> Result<Object, Error> {
-        let function = self.eval_expression(&call.function, env)?;
+        let function = match self.eval_expression(&call.function, env) {
+            Ok(function) => function,
+            Err(error) => match error.kind {
+                ErrorKind::IdentifierNotFound => {
+                    return self.apply_builtin_function(&call.function, &call.arguments, env);
+                }
+                _ => return Err(error),
+            },
+        };
 
         let arguments = self.eval_expressions(&call.arguments, env)?;
 
@@ -371,7 +388,7 @@ impl Evaluator {
 
         let evaluated = self.eval_block_statement(&function.body, &mut extended_env)?;
 
-        return Ok(evaluated.unwrap_return_value());
+        Ok(evaluated.unwrap_return_value())
     }
 
     fn extend_function_env(
@@ -379,13 +396,7 @@ impl Evaluator {
         function: &Function,
         arguments: Vec<Object>,
     ) -> Result<Environment, Error> {
-        println!("Extending function env");
-        println!("Function env: {:#?}", function.env);
-        let mut env = Environment::new_enclosed(function.env.clone());
-
-        println!("Extended env: {:#?}", env);
-        println!("rc count {}", env.strong_count());
-        println!("outer rc count {}", env.outer_strong_count());
+        let mut env = Environment::new_enclosed(&function.env);
 
         for (parameter, argument) in function.params.iter().zip(arguments) {
             env.set(parameter.value.clone(), argument);
@@ -401,12 +412,107 @@ impl Evaluator {
     ) -> Result<Vec<Object>, Error> {
         let mut result = Vec::with_capacity(arguments.len());
 
-        for argument in arguments {
+        for argument in arguments.iter() {
             let evaluated = self.eval_expression(argument, env)?;
             result.push(evaluated);
         }
 
         Ok(result)
+    }
+
+    fn eval_string_infix_expression(
+        &self,
+        operator: &InfixOperator,
+        left: Rc<str>,
+        right: Rc<str>,
+    ) -> Result<Object, Error> {
+        match operator {
+            InfixOperator::Plus => Ok((left.to_string() + &right).into()),
+            InfixOperator::CompareEqual => Ok((left == right).into()),
+            InfixOperator::CompareNotEqual => Ok((left != right).into()),
+
+            // Explicitly not supported. This ensures that we always handle all possible operators
+            InfixOperator::Minus
+            | InfixOperator::Asterisk
+            | InfixOperator::Slash
+            | InfixOperator::Percent
+            | InfixOperator::CompareGreater
+            | InfixOperator::CompareLess
+            | InfixOperator::CompareGreaterEqual
+            | InfixOperator::CompareLessEqual
+            | InfixOperator::LogicalAnd
+            | InfixOperator::LogicalOr
+            | InfixOperator::BitwiseOr
+            | InfixOperator::BitwiseAnd
+            | InfixOperator::BitwiseXor
+            | InfixOperator::BitwiseLeftShift
+            | InfixOperator::BitwiseRightShift => Err(self.error(
+                self.current_token.as_ref(),
+                format!(
+                    "Invalid operator: String({:?}) {} String({:?})",
+                    left, operator, right
+                )
+                .as_str(),
+                ErrorKind::InvalidOperator,
+            )),
+        }
+    }
+
+    fn apply_builtin_function(
+        &mut self,
+        function: &Expression,
+        arguments: &[Expression],
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
+        let function_token = function.token();
+        let first_argument_token = arguments.get(0).map(|arg| arg.token());
+        let function_name = match function {
+            Expression::Identifier(ident) => ident.value.clone(),
+            _ => {
+                return Err(self.error(
+                    Some(function_token),
+                    format!("Not a function: {:?}", function).as_str(),
+                    ErrorKind::TypeError,
+                ))
+            }
+        };
+
+        let function = match BUILTINS
+            .iter()
+            .find(|fun| fun.name == function_name.as_ref())
+        {
+            Some(function) => function,
+            None => {
+                return Err(self.error(
+                    Some(function_token),
+                    format!("Unknown function: {}", function_name).as_str(),
+                    ErrorKind::IdentifierNotFound,
+                ))
+            }
+        };
+
+        if arguments.len() != function.args_len {
+            return Err(self.error(
+                first_argument_token.or(Some(function_token)),
+                format!(
+                    "Wrong number of arguments. Expected {}, got {}",
+                    function.args_len,
+                    arguments.len()
+                )
+                .as_str(),
+                ErrorKind::WrongNumberOfArguments,
+            ));
+        };
+
+        let arguments = self.eval_expressions(arguments, env)?;
+
+        (function.function)(arguments).map_err(|(msg, err_type)| {
+            self.error(
+                first_argument_token.or(Some(function_token)),
+                msg.as_str(),
+                ErrorKind::BuiltInError(err_type),
+            )
+        })
     }
 }
 
@@ -414,7 +520,7 @@ impl Evaluator {
 mod tests {
 
     use crate::{
-        evaluator::{environment::Environment, objects::Object},
+        evaluator::{builtins::BuiltinError, environment::Environment, objects::Object},
         parser::errors::ErrorKind,
     };
 
@@ -432,7 +538,6 @@ mod tests {
                     println!("{}", error);
                 }
 
-                println!("env: {:#?}", env);
                 panic!("Error occured while evaluating input: {}", input);
             }
         }
@@ -686,13 +791,13 @@ mod tests {
                 "foobar",
                 1,
             ),
-            // (
-            //     "\"Hello\" - \"World\"",
-            //     "Unknown operator: String(\"Hello\") - String(\"World\")",
-            //     ErrorKind::UnknownOperator,
-            //     "\"Hello\" - \"World\"",
-            //     1,
-            // ),
+            (
+                "\"Hello\" - \"World\"",
+                "Invalid operator: String(\"Hello\") - String(\"World\")",
+                ErrorKind::InvalidOperator,
+                "\"Hello\" - \"World\"",
+                1,
+            ),
             (
                 "if (10 > 1) {
                         if (10 > 1) {
@@ -705,36 +810,29 @@ mod tests {
                 "return true + false;",
                 3,
             ),
-            // (
-            //     "if (10 > 1) {
-            //             if (10 > 1) {
-            //                 return true + false;
-            //             }
-            //             return 1;
-            //         }",
-            //     "Unknown operator: Boolean(true) + Boolean(false)",
-            //     ErrorKind::UnknownOperator,
-            //     "true + false;",
-            //     1,
-            // ),
-            // (
-            //     "if (10 > 1) {
-            //             if (10 > 1) {
-            //                 return true + false;
-            //             }
-            //             return 1;
-            //         }",
-            //     "Unknown operator: Boolean(true) + Boolean(false)",
-            //     ErrorKind::UnknownOperator,
-            //     "true + false;",
-            //     1,
-            // ),
+            (
+                "len(1)",
+                "Argument to `len` not supported, got Integer(1)",
+                ErrorKind::BuiltInError(BuiltinError::WrongArgumentType),
+                "len(1)",
+                1,
+            ),
+            (
+                "len(\"one\", \"two\")",
+                "Wrong number of arguments. Expected 1, got 2",
+                ErrorKind::WrongNumberOfArguments,
+                "len(\"one\", \"two\")",
+                1,
+            ),
         ];
 
         for (input, message, error_kind, line_with_err, line_nr) in tests {
             let evaluated = test_eval_fallible(input);
             match evaluated {
                 Err(errors) => {
+                    for error in errors.iter() {
+                        println!("{}", error);
+                    }
                     assert_eq!(errors.len(), 1);
                     let error = errors.first().unwrap();
                     assert_eq!(error.message, message);
@@ -789,29 +887,77 @@ mod tests {
     #[test]
     fn test_function_application() {
         let tests = vec![
-            // (
-            //     "let identity = fn(x) { x; }; identity(5);",
-            //     Object::Integer(5),
-            // ),
-            // (
-            //     "let identity = fn(x) { return x; }; identity(5);",
-            //     Object::Integer(5),
-            // ),
-            // (
-            //     "let double = fn(x) { x * 2; }; double(5);",
-            //     Object::Integer(10),
-            // ),
-            // (
-            //     "let add = fn(x, y) { x + y; }; add(5, 5);",
-            //     Object::Integer(10),
-            // ),
-            // (
-            //     "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
-            //     Object::Integer(20),
-            // ),
-            // ("fn(x) { x; }(5)", Object::Integer(5)),
+            (
+                "let identity = fn(x) { x; }; identity(5);",
+                Object::Integer(5),
+            ),
+            (
+                "let identity = fn(x) { return x; }; identity(5);",
+                Object::Integer(5),
+            ),
+            (
+                "let double = fn(x) { x * 2; }; double(5);",
+                Object::Integer(10),
+            ),
+            (
+                "let add = fn(x, y) { x + y; }; add(5, 5);",
+                Object::Integer(10),
+            ),
+            (
+                "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
+                Object::Integer(20),
+            ),
+            ("fn(x) { x; }(5)", Object::Integer(5)),
             ("let x = 5;
             let factorial = fn(n) { if (n == 0) { return 1; } return n * factorial(n - 1); }; factorial(5);", Object::Integer(120)),
+
+            // requires mutable variables to be implemented
+            // (
+            //     "let x = 5;
+            // let inc_x = fn() { x = x + 1; }; inc_x(); x;",
+            //     Object::Integer(6),
+            // ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_string_expressions() {
+        let tests = vec![
+            (r#""Hello World!""#, Object::String("Hello World!".into())),
+            (
+                r#""Hello" + " " + "World!""#,
+                Object::String("Hello World!".to_string().into()),
+            ),
+            // test escape sequences
+            (r#""Hello\nWorld!""#, Object::String("Hello\nWorld!".into())),
+            (r#""Hello\tWorld!""#, Object::String("Hello\tWorld!".into())),
+            (r#""Hello\rWorld!""#, Object::String("Hello\rWorld!".into())),
+            // test string comparison
+            (r#""Hello" == "Hello""#, Object::Boolean(true)),
+            (r#""Hello" == "World""#, Object::Boolean(false)),
+            (r#""Hello" != "Hello""#, Object::Boolean(false)),
+            (r#""Hello" != "World""#, Object::Boolean(true)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_builtin_functions() {
+        let tests = vec![
+            (r#"len("")"#, Object::Integer(0)),
+            (r#"len("four")"#, Object::Integer(4)),
+            (r#"len("hello world")"#, Object::Integer(11)),
+            ("len(\"this is a long string, where I can't quickly count the amount of characters.\")"
+            , Object::Integer(76)),
         ];
 
         for (input, expected) in tests {

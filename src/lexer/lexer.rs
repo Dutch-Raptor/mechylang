@@ -46,6 +46,7 @@ impl Lexer {
         l
     }
 
+    /// Advance the lexer by one character
     fn read_char(&mut self) {
         // Update line and column
         match self.ch {
@@ -70,6 +71,7 @@ impl Lexer {
         self.read_position += 1;
     }
 
+    /// Goes back n characters in the input string
     fn reverse_char(&mut self, n: usize) {
         for _ in 0..n {
             self.read_position = self.position;
@@ -135,12 +137,13 @@ impl Lexer {
     /// Get the next token from the input string.
     ///
     /// This will skip whitespace and return the next token.
-    /// If the end of the input string is reached, None
-    /// will be returned.
+    /// If the end of the input string is reached, a single EOF token
+    /// will be returned. Ater that, every call to next_token() will
+    /// return None.
     pub fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
 
-        if self.read_position > self.input.len() {
+        if self.read_position > self.input.len() + 1 {
             return None;
         }
 
@@ -219,6 +222,17 @@ impl Lexer {
             '[' => Some(TokenKind::LeftSquare),
             ']' => Some(TokenKind::RightSquare),
             '\0' => Some(TokenKind::EOF),
+            '\"' => {
+                let literal = match self.read_string() {
+                    Ok(literal) => literal,
+                    Err(err) => {
+                        eprintln!("Error while lexing input: {}", err);
+                        return None;
+                    }
+                };
+                token_length = literal.len();
+                Some(TokenKind::String(literal))
+            }
             _ => {
                 if is_letter(self.ch) {
                     let literal = self.read_identifier();
@@ -240,20 +254,37 @@ impl Lexer {
 
         self.read_char();
 
-        if let Some(token_kind) = token_kind {
-            Some(Token {
-                kind: token_kind,
-                line,
-                column,
-                length: token_length,
-            })
-        } else {
-            None
-        }
+        token_kind.map(|kind| Token {
+            kind,
+            line,
+            column,
+            length: token_length,
+        })
     }
 
     pub fn lines(&self) -> Vec<String> {
         self.input.lines().map(|s| s.to_string()).collect()
+    }
+
+    fn read_string(&mut self) -> Result<String, String> {
+        let position = self.position + 1;
+        // allow for escaped quotes
+        while !(self.peek_char() == '"' && self.ch != '\\') {
+            if self.ch == '\0' {
+                return Err("Unterminated string".to_string());
+            }
+            self.read_char();
+        }
+        // current char is the closing quote
+        self.read_char();
+
+        Ok(self.input[position..self.position]
+            .to_string()
+            // replace escaped quotes with regular quotes
+            .replace("\\\"", "\"")
+            .replace("\\n", "\n")
+            .replace("\\t", "\t")
+            .replace("\\r", "\r"))
     }
 }
 
@@ -262,7 +293,7 @@ fn is_letter(ch: char) -> bool {
 }
 
 fn is_digit(ch: char) -> bool {
-    ch.is_digit(10)
+    ch.is_ascii_digit()
 }
 
 impl Iterator for Lexer {
@@ -270,5 +301,158 @@ impl Iterator for Lexer {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::lexer::tokens::TokenKind;
+
+    use super::Lexer;
+
+    fn lex_token_kinds(input: &str) -> Vec<TokenKind> {
+        Lexer::new(input).map(|token| token.kind).collect()
+    }
+
+    #[test]
+    fn test_next_token_kind() {
+        let tests = vec![
+            (
+                "let five = 5;",
+                vec![
+                    TokenKind::Let,
+                    TokenKind::Identifier("five".to_string()),
+                    TokenKind::AssignEqual,
+                    TokenKind::Number("5".to_string()),
+                    TokenKind::Semicolon,
+                    TokenKind::EOF,
+                ],
+            ),
+            (
+                "let ten = 10;",
+                vec![
+                    TokenKind::Let,
+                    TokenKind::Identifier("ten".to_string()),
+                    TokenKind::AssignEqual,
+                    TokenKind::Number("10".to_string()),
+                    TokenKind::Semicolon,
+                    TokenKind::EOF,
+                ],
+            ),
+            (
+                "let add = fn(x, y) { x + y; };",
+                vec![
+                    TokenKind::Let,
+                    TokenKind::Identifier("add".to_string()),
+                    TokenKind::AssignEqual,
+                    TokenKind::Fn,
+                    TokenKind::LeftParen,
+                    TokenKind::Identifier("x".to_string()),
+                    TokenKind::Comma,
+                    TokenKind::Identifier("y".to_string()),
+                    TokenKind::RightParen,
+                    TokenKind::LeftSquirly,
+                    TokenKind::Identifier("x".to_string()),
+                    TokenKind::Plus,
+                    TokenKind::Identifier("y".to_string()),
+                    TokenKind::Semicolon,
+                    TokenKind::RightSquirly,
+                    TokenKind::Semicolon,
+                    TokenKind::EOF,
+                ],
+            ),
+            (
+                "let result = add(five, ten);",
+                vec![
+                    TokenKind::Let,
+                    TokenKind::Identifier("result".to_string()),
+                    TokenKind::AssignEqual,
+                    TokenKind::Identifier("add".to_string()),
+                    TokenKind::LeftParen,
+                    TokenKind::Identifier("five".to_string()),
+                    TokenKind::Comma,
+                    TokenKind::Identifier("ten".to_string()),
+                    TokenKind::RightParen,
+                    TokenKind::Semicolon,
+                    TokenKind::EOF,
+                ],
+            ),
+            (
+                "!-/*5;",
+                vec![
+                    TokenKind::Bang,
+                    TokenKind::Minus,
+                    TokenKind::Slash,
+                    TokenKind::Asterisk,
+                    TokenKind::Number("5".to_string()),
+                    TokenKind::Semicolon,
+                    TokenKind::EOF,
+                ],
+            ),
+            (
+                "5 < 10 > 5;",
+                vec![
+                    TokenKind::Number("5".to_string()),
+                    TokenKind::CompareLess,
+                    TokenKind::Number("10".to_string()),
+                    TokenKind::CompareGreater,
+                    TokenKind::Number("5".to_string()),
+                    TokenKind::Semicolon,
+                    TokenKind::EOF,
+                ],
+            ),
+            (
+                "5 <= 10 >= 5;",
+                vec![
+                    TokenKind::Number("5".to_string()),
+                    TokenKind::CompareLessEqual,
+                    TokenKind::Number("10".to_string()),
+                    TokenKind::CompareGreaterEqual,
+                    TokenKind::Number("5".to_string()),
+                    TokenKind::Semicolon,
+                    TokenKind::EOF,
+                ],
+            ),
+            (
+                "let a = [1, 2, 3];",
+                vec![
+                    TokenKind::Let,
+                    TokenKind::Identifier("a".to_string()),
+                    TokenKind::AssignEqual,
+                    TokenKind::LeftSquare,
+                    TokenKind::Number("1".to_string()),
+                    TokenKind::Comma,
+                    TokenKind::Number("2".to_string()),
+                    TokenKind::Comma,
+                    TokenKind::Number("3".to_string()),
+                    TokenKind::RightSquare,
+                    TokenKind::Semicolon,
+                    TokenKind::EOF,
+                ],
+            ),
+        ];
+
+        for (input, expected_tokens) in tests {
+            let tokens = lex_token_kinds(input);
+            assert_eq!(tokens, expected_tokens);
+        }
+    }
+
+    #[test]
+    fn test_lexer_iter() {
+        let input = "let five = 5;";
+        let expected_tokens = vec![
+            TokenKind::Let,
+            TokenKind::Identifier("five".to_string()),
+            TokenKind::AssignEqual,
+            TokenKind::Number("5".to_string()),
+            TokenKind::Semicolon,
+            TokenKind::EOF,
+        ];
+
+        let lexer = Lexer::new(input);
+        let tokens: Vec<TokenKind> = lexer.map(|token| token.kind).collect();
+
+        assert_eq!(tokens, expected_tokens);
     }
 }

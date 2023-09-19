@@ -3,6 +3,8 @@ use std::fmt::{Display, Formatter};
 
 use color_print::cformat;
 
+use crate::evaluator::builtins::BuiltinError;
+
 #[derive(Debug, PartialEq)]
 pub struct Error {
     pub kind: ErrorKind,
@@ -26,6 +28,8 @@ pub enum ErrorKind {
     IdentifierNotFound,
     InvalidOperator,
     TypeError,
+    WrongNumberOfArguments,
+    BuiltInError(BuiltinError),
 }
 
 impl Display for Error {

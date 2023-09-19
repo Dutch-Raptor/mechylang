@@ -1,3 +1,4 @@
+pub mod builtins;
 pub mod environment;
 pub mod eval;
 /// This module contains the evaluator for the language.

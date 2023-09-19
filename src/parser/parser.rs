@@ -11,7 +11,7 @@ use color_print::cformat;
 use super::errors::{Error, ErrorKind};
 use super::expressions::{
     BooleanLiteral, FloatLiteral, FunctionLiteral, IfExpression, InfixExpression, IntegerLiteral,
-    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator,
+    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral,
 };
 
 #[derive(Debug)]
@@ -200,6 +200,8 @@ impl Parser {
             // Block expressions
             TokenKind::LeftSquirly => self.parse_block_expression(),
 
+            TokenKind::String(_) => self.parse_string(),
+
             TokenKind::LeftParen => self.parse_grouped_expression(),
             _ => Err(self.error_current(
                 ErrorKind::MissingPrefix,
@@ -223,6 +225,8 @@ impl Parser {
             TokenKind::Minus => true,
 
             TokenKind::If => true,
+
+            TokenKind::String(_) => true,
 
             // Block expressions
             TokenKind::LeftSquirly => true,
@@ -786,7 +790,7 @@ impl Parser {
         Ok(Expression::Call(CallExpression {
             token: self.cur_token.clone(),
             function: Box::new(left),
-            arguments,
+            arguments: arguments.into(),
         }))
     }
 
@@ -814,6 +818,21 @@ impl Parser {
 
     fn parse_block_expression(&mut self) -> Result<Expression, Error> {
         Ok(Expression::Block(self.parse_block_statement()?))
+    }
+
+    fn parse_string(&mut self) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+        let value = match self.cur_token.kind {
+            TokenKind::String(ref s) => s.clone(),
+            _ => {
+                return Err(self.error_current(
+                    ErrorKind::UnexpectedToken,
+                    format!("Expected a string, got {:?}", self.cur_token),
+                ))
+            }
+        };
+
+        Ok(Expression::StringLiteral(StringLiteral { token, value: value.into() }))
     }
 }
 
@@ -1009,6 +1028,34 @@ mod tests {
                     assert_eq!(block.statements[2].to_string(), "(x + y);");
                 }
                 _ => panic!("expected block expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
+
+    #[test]
+    fn test_string_literal_expression() {
+        let input = r#""hello world";"#;
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 1);
+
+        let stmt = &program.statements[0];
+
+        match stmt {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::StringLiteral(ref literal) => {
+                    assert_eq!(literal.value, "hello world".into());
+                    assert_eq!(
+                        literal.token.kind,
+                        TokenKind::String("hello world".into())
+                    );
+                }
+                _ => panic!("expected string literal expression"),
             },
             _ => panic!("expected expression statement"),
         };

@@ -2,7 +2,7 @@ use std::{fmt::Display, rc::Rc};
 
 use crate::parser::{expressions::Identifier, parser::BlockStatement};
 
-use super::environment::Environment;
+use super::{builtins::BuiltinError, environment::Environment};
 
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
@@ -15,7 +15,19 @@ pub enum Object {
     ReturnValue(Box<Object>),
     Let(Identifier, Box<Object>),
     Function(Function),
+    String(Rc<str>),
+    BuiltinFunction(BuiltinFunction),
+    Array(Vec<Object>),
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct BuiltinFunction {
+    pub name: &'static str,
+    pub args_len: usize,
+    pub function: fn(Vec<Object>) -> BuiltinResult,
+}
+
+type BuiltinResult = Result<Object, (String, BuiltinError)>;
 
 /// Trait for unwrapping return values
 ///
@@ -51,11 +63,17 @@ impl UnwrapReturnValue for Object {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct Function {
     pub params: Rc<[Identifier]>,
     pub body: BlockStatement,
     pub env: Environment,
+}
+
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        self.params == other.params && self.body == other.body
+    }
 }
 
 impl Display for Object {
@@ -66,6 +84,7 @@ impl Display for Object {
             Object::Null => write!(f, "null"),
             Object::ReturnValue(val) => write!(f, "{}", val),
             Object::Let(name, val) => write!(f, "{} = {}", name, val),
+            Object::String(string) => write!(f, "\"{}\"", string),
             Object::Function(function) => {
                 let params = function
                     .params
@@ -76,13 +95,23 @@ impl Display for Object {
 
                 write!(f, "fn({}) {{\n{}\n}}", params, function.body)
             }
+            Object::BuiltinFunction(builtin) => write!(f, "builtin function {}", builtin.name),
+            Object::Array(array) => {
+                let elements = array
+                    .iter()
+                    .map(|elem| elem.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+
+                write!(f, "[{}]", elements)
+            }
         }
     }
 }
 
-impl Into<Object> for bool {
-    fn into(self) -> Object {
-        if self {
+impl From<bool> for Object {
+    fn from(boolean: bool) -> Self {
+        if boolean {
             TRUE
         } else {
             FALSE
@@ -90,8 +119,26 @@ impl Into<Object> for bool {
     }
 }
 
-impl Into<Object> for i64 {
-    fn into(self) -> Object {
-        Object::Integer(self)
+impl From<&str> for Object {
+    fn from(string: &str) -> Self {
+        Object::String(string.into())
+    }
+}
+
+impl From<String> for Object {
+    fn from(string: String) -> Self {
+        Object::String(string.into())
+    }
+}
+
+impl From<Vec<Object>> for Object {
+    fn from(array: Vec<Object>) -> Self {
+        Object::Array(array)
+    }
+}
+
+impl From<i64> for Object {
+    fn from(int: i64) -> Self {
+        Object::Integer(int)
     }
 }
