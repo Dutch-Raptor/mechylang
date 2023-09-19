@@ -1,6 +1,4 @@
 name: Rust
-permissions:
-  checks: write
   
 on:
   push:
