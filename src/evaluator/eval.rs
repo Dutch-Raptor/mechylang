@@ -366,7 +366,13 @@ impl Evaluator {
 
         let arguments = self.eval_expressions(&call.arguments, env)?;
 
-        self.apply_function(function, arguments)
+        self.apply_function(function, arguments).map_err(|err| {
+            self.error(
+                Some(call.function.token()),
+                err.message.as_str(),
+                err.kind,
+            )
+        })
     }
 
     fn apply_function(
