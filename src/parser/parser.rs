@@ -1,6 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 use std::rc::Rc;
 
+use crate::errors::{Error, ErrorKind};
 use crate::lexer::tokens::Token;
 use crate::lexer::{lexer::Lexer, tokens::TokenKind};
 use crate::parser::expressions::{Expression, Identifier};
@@ -8,10 +9,9 @@ use crate::trace;
 use crate::tracer::reset_trace;
 use color_print::cformat;
 
-use super::errors::{Error, ErrorKind};
 use super::expressions::{
     BooleanLiteral, FloatLiteral, FunctionLiteral, IfExpression, InfixExpression, IntegerLiteral,
-    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral,
+    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral, ArrayLiteral, IndexExpression,
 };
 
 #[derive(Debug)]
@@ -203,6 +203,8 @@ impl Parser {
             TokenKind::String(_) => self.parse_string(),
 
             TokenKind::LeftParen => self.parse_grouped_expression(),
+
+            TokenKind::LeftSquare => self.parse_array_expression(),
             _ => Err(self.error_current(
                 ErrorKind::MissingPrefix,
                 format!("No registered prefix function for {:?}", token),
@@ -230,6 +232,9 @@ impl Parser {
 
             // Block expressions
             TokenKind::LeftSquirly => true,
+
+            // Array expressions
+            TokenKind::LeftSquare => true,
             _ => false,
         }
     }
@@ -257,6 +262,7 @@ impl Parser {
             | TokenKind::BitwiseRightShift
                 => self.parse_infix_expression(left),
             TokenKind::LeftParen => self.parse_call_expression(left),
+            TokenKind::LeftSquare => self.parse_index_expression(left),
             _ => Err(self.error_current(
                 ErrorKind::MissingInfix,
                 format!("No registered infix function for {:?}", token),
@@ -279,6 +285,8 @@ impl Parser {
             | TokenKind::CompareLessEqual 
             // Open parenthesis for function calls
             | TokenKind::LeftParen
+            // Open square bracket for array indexing
+            | TokenKind::LeftSquare
 
             // logical operators
             | TokenKind::LogicalAnd
@@ -785,7 +793,7 @@ impl Parser {
     }
 
     fn parse_call_expression(&mut self, left: Expression) -> Result<Expression, Error> {
-        let arguments = self.parse_call_arguments()?;
+        let arguments = self.parse_expression_list(TokenKind::RightParen)?;
 
         Ok(Expression::Call(CallExpression {
             token: self.cur_token.clone(),
@@ -794,10 +802,10 @@ impl Parser {
         }))
     }
 
-    fn parse_call_arguments(&mut self) -> Result<Vec<Expression>, Error> {
+    fn parse_expression_list(&mut self, end: TokenKind) -> Result<Vec<Expression>, Error> {
         let mut arguments = Vec::new();
 
-        if self.peek_token.kind == TokenKind::RightParen {
+        if self.peek_token.kind == end {
             self.next_token();
             return Ok(arguments);
         }
@@ -811,7 +819,7 @@ impl Parser {
             arguments.push(self.parse_expression(Precedence::Lowest)?);
         }
 
-        self.expect_peek(TokenKind::RightParen)?;
+        self.expect_peek(end)?;
 
         Ok(arguments)
     }
@@ -834,98 +842,123 @@ impl Parser {
 
         Ok(Expression::StringLiteral(StringLiteral { token, value: value.into() }))
     }
+
+    fn parse_array_expression(&mut self) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+        let elements = self.parse_expression_list(TokenKind::RightSquare)?;
+
+        Ok(Expression::ArrayLiteral(ArrayLiteral { token, elements: elements.into() }))
+    }
+
+    fn parse_index_expression(&mut self, left: Expression) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+
+        self.next_token();
+
+        let index = self.parse_expression(Precedence::Lowest)?;
+
+        self.expect_peek(TokenKind::RightSquare)?;
+
+        Ok(Expression::Index(IndexExpression {
+            token,
+            left: Box::new(left),
+            index: Box::new(index),
+    }))
+}
 }
 
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Precedence {
-    Lowest,
-    LogicalOr,   // ||
-    LogicalAnd,  // &&
-    Equals,      // ==
-    LessGreater, // > or <
-    BitwiseOr,   // |
-    BitwiseXor,  // ^
-    BitwiseAnd,  // &
-    BitShift,    // << or >>
-    Sum,         // + or -
-    Product,     // * or /
-    Prefix,      // -X or !X
-    Call,        // myFunction(X)
+Lowest,
+LogicalOr,   // ||
+LogicalAnd,  // &&
+Equals,      // ==
+LessGreater, // > or <
+BitwiseOr,   // |
+BitwiseXor,  // ^
+BitwiseAnd,  // &
+BitShift,    // << or >>
+Sum,         // + or -
+Product,     // * or /
+Prefix,      // -X or !X
+Call,        // myFunction(X)
+Index,       // array[index]
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+use super::*;
 
-    #[test]
-    fn test_presedence() {
-        assert!(Precedence::Lowest < Precedence::LogicalOr);
-        assert!(Precedence::LogicalOr < Precedence::LogicalAnd);
-        assert!(Precedence::LogicalAnd < Precedence::Equals);
-        assert!(Precedence::Equals < Precedence::LessGreater);
-        assert!(Precedence::LessGreater < Precedence::BitwiseOr);
-        assert!(Precedence::BitwiseOr < Precedence::BitwiseXor);
-        assert!(Precedence::BitwiseXor < Precedence::BitwiseAnd);
-        assert!(Precedence::BitShift < Precedence::Sum);
-        assert!(Precedence::Sum < Precedence::Product);
-        assert!(Precedence::Product < Precedence::Prefix);
-        assert!(Precedence::Prefix < Precedence::Call);
-    }
+#[test]
+fn test_presedence() {
+    assert!(Precedence::Lowest < Precedence::LogicalOr);
+    assert!(Precedence::LogicalOr < Precedence::LogicalAnd);
+    assert!(Precedence::LogicalAnd < Precedence::Equals);
+    assert!(Precedence::Equals < Precedence::LessGreater);
+    assert!(Precedence::LessGreater < Precedence::BitwiseOr);
+    assert!(Precedence::BitwiseOr < Precedence::BitwiseXor);
+    assert!(Precedence::BitwiseXor < Precedence::BitwiseAnd);
+    assert!(Precedence::BitShift < Precedence::Sum);
+    assert!(Precedence::Sum < Precedence::Product);
+    assert!(Precedence::Product < Precedence::Prefix);
+    assert!(Precedence::Prefix < Precedence::Call);
+    assert!(Precedence::Call < Precedence::Index);
+}
 
-    #[test]
-    fn test_identifier_expression() {
-        let input = "foobar;";
+#[test]
+fn test_identifier_expression() {
+    let input = "foobar;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
+    let lexer = Lexer::new(input);
+    let mut parser = Parser::new(lexer);
 
-        let program = parser.parse();
+    let program = parser.parse();
 
-        assert_eq!(program.statements.len(), 1);
-        assert_eq!(program.errors.len(), 0);
+    assert_eq!(program.statements.len(), 1);
+    assert_eq!(program.errors.len(), 0);
 
-        let stmt = &program.statements[0];
+    let stmt = &program.statements[0];
 
-        match stmt {
-            Statement::Expression(ref expr) => {
-                assert_eq!(expr.token.kind, TokenKind::Identifier("foobar".to_string()));
-                match expr.expression {
-                    Expression::Identifier(ref ident) => {
-                        assert_eq!(ident.value, "foobar".into());
-                        assert_eq!(
-                            ident.token.kind,
-                            TokenKind::Identifier("foobar".into())
-                        );
-                    }
-                    _ => panic!("expected identifier expression"),
-                };
-            }
-            _ => panic!("expected expression statement"),
-        };
-    }
+    match stmt {
+        Statement::Expression(ref expr) => {
+            assert_eq!(expr.token.kind, TokenKind::Identifier("foobar".to_string()));
+            match expr.expression {
+                Expression::Identifier(ref ident) => {
+                    assert_eq!(ident.value, "foobar".into());
+                    assert_eq!(
+                        ident.token.kind,
+                        TokenKind::Identifier("foobar".into())
+                    );
+                }
+                _ => panic!("expected identifier expression"),
+            };
+        }
+        _ => panic!("expected expression statement"),
+    };
+}
 
-    #[test]
-    fn test_operator_precedence_parsing() {
-        let tests = vec![
-            ("-a * b;", "((-a) * b);"),
-            ("!-a;", "(!(-a));"),
-            ("a + b + c;", "((a + b) + c);"),
-            ("a + b - c;", "((a + b) - c);"),
-            ("a * b * c;", "((a * b) * c);"),
-            ("a * b / c;", "((a * b) / c);"),
-            ("a + b / c;", "(a + (b / c));"),
-            (
-                "a + b * c + d / e - f;",
-                "(((a + (b * c)) + (d / e)) - f);",
-            ),
-            ("3 + 4; -5 * 5;", "(3 + 4);\n((-5) * 5);"),
-            ("5 > 4 == 3 < 4;", "((5 > 4) == (3 < 4));"),
-            ("5 < 4 != 3 > 4;", "((5 < 4) != (3 > 4));"),
-            (
-                "3 + 4 * 5 == 3 * 1 + 4 * 5;",
-                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)));",
-            ),
-            ("true;", "true;"),
+#[test]
+fn test_operator_precedence_parsing() {
+    let tests = vec![
+        ("-a * b;", "((-a) * b);"),
+        ("!-a;", "(!(-a));"),
+        ("a + b + c;", "((a + b) + c);"),
+        ("a + b - c;", "((a + b) - c);"),
+        ("a * b * c;", "((a * b) * c);"),
+        ("a * b / c;", "((a * b) / c);"),
+        ("a + b / c;", "(a + (b / c));"),
+        (
+            "a + b * c + d / e - f;",
+            "(((a + (b * c)) + (d / e)) - f);",
+        ),
+        ("3 + 4; -5 * 5;", "(3 + 4);\n((-5) * 5);"),
+        ("5 > 4 == 3 < 4;", "((5 > 4) == (3 < 4));"),
+        ("5 < 4 != 3 > 4;", "((5 < 4) != (3 > 4));"),
+        (
+            "3 + 4 * 5 == 3 * 1 + 4 * 5;",
+            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)));",
+        ),
+        ("true;", "true;"),
             ("false;", "false;"),
             ("3 > 5 == false;", "((3 > 5) == false);"),
             ("3 < 5 == true;", "((3 < 5) == true);"),
@@ -945,6 +978,12 @@ mod tests {
             ("a | b ^ c & d;", "(a | (b ^ (c & d)));"),
             ("a << b >> c;", "((a << b) >> c);"),
             ("a <= b && c < d || e >= f && g > h;", "(((a <= b) && (c < d)) || ((e >= f) && (g > h)));"),
+
+            // Index expressions
+            ("myArray[1 + 1];", "(myArray[(1 + 1)]);"),
+            ("myArray[1][2];", "((myArray[1])[2]);"),
+            ("a * [1, 2, 3, 4][b * c] * d;", "((a * ([1, 2, 3, 4][(b * c)])) * d);"),
+            ("add(a * b[2], b[1], 2 * [1, 2][1]);", "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])));"),
 
 
         ];
@@ -1061,13 +1100,65 @@ mod tests {
         };
     }
 
+    #[test]
+    fn test_array_literal_expression() {
+        let input = "[1, 2 * 2, 3 + 3]";
 
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
 
+        for error in &program.errors {
+            println!("{}", error);
+        }
 
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 1);
 
+        let stmt = &program.statements[0];
 
+        match stmt {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::ArrayLiteral(ref literal) => {
+                    assert_eq!(literal.elements.len(), 3);
+                    assert_eq!(literal.elements[0].to_string(), "1");
+                    assert_eq!(literal.elements[1].to_string(), "(2 * 2)");
+                    assert_eq!(literal.elements[2].to_string(), "(3 + 3)");
+                }
+                _ => panic!("expected array literal expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
 
+    #[test]
+    fn test_index_expression() {
+        let input = "myArray[1 + 1]";
 
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
 
-    
+        for error in &program.errors {
+            println!("{}", error);
+        }
+
+        println!("{}", program.to_string());
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 1);
+
+        let stmt = &program.statements[0];
+
+        match stmt {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Index(ref index) => {
+                    assert_eq!(index.left.to_string(), "myArray");
+                    assert_eq!(index.index.to_string(), "(1 + 1)");
+                }
+                _ => panic!("expected index expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
 }

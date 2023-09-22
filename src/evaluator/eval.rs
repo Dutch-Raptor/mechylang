@@ -1,12 +1,12 @@
 use std::rc::Rc;
 
 use crate::{
+    errors::{Error, ErrorKind},
     lexer::{lexer::Lexer, tokens::Token},
     parser::{
-        errors::{Error, ErrorKind},
         expressions::{
-            CallExpression, Expression, ExpressionToken, Identifier, IfExpression, InfixExpression,
-            InfixOperator, PrefixOperator,
+            ArrayLiteral, CallExpression, Expression, ExpressionToken, Identifier, IfExpression,
+            IndexExpression, InfixExpression, InfixOperator, PrefixOperator,
         },
         parser::{BlockStatement, LetStatement, Parser, Statement},
     },
@@ -122,6 +122,8 @@ impl Evaluator {
             })),
             Expression::Call(call) => self.eval_call_expression(call, env),
             Expression::StringLiteral(lit) => Ok(Object::String(lit.value.clone())),
+            Expression::ArrayLiteral(array) => self.eval_array_expression(array, env),
+            Expression::Index(index) => self.eval_index_expression(index, env),
             _ => todo!(),
         }
     }
@@ -284,8 +286,7 @@ impl Evaluator {
             InfixOperator::BitwiseRightShift => Ok((left >> right).into()),
 
             // Explicitly not supported. This ensures that we always handle all possible operators
-            InfixOperator::LogicalAnd => Err(invalid()),
-            InfixOperator::LogicalOr => Err(invalid()),
+            InfixOperator::LogicalAnd | InfixOperator::LogicalOr => Err(invalid()),
         }
     }
 
@@ -514,14 +515,63 @@ impl Evaluator {
             )
         })
     }
+
+    fn eval_array_expression(
+        &mut self,
+        array: &ArrayLiteral,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
+        let elements = self.eval_expressions(&array.elements, env)?;
+
+        Ok(Object::Array(elements))
+    }
+
+    fn eval_index_expression(
+        &mut self,
+        index: &IndexExpression,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
+        let left = self.eval_expression(&index.left, env)?;
+
+        let array = match left {
+            Object::Array(ref arr) => arr,
+            _ => {
+                return Err(self.error(
+                    Some(index.left.token()),
+                    &format!("Expected an array. Got {:?}", left).to_string(),
+                    ErrorKind::TypeError,
+                ))
+            }
+        };
+
+        let evaluated_index = self.eval_expression(&index.index, env)?;
+
+        match evaluated_index {
+            Object::Integer(i) => match array.get(i as usize) {
+                Some(item) => Ok(item.clone()),
+                None => Err(self.error(
+                    Some(index.index.token()),
+                    &format!("Index out of bounds: {}, {} has len({})", i, left, array.len()).to_string(),
+                    ErrorKind::IndexOutOfBounds,
+                )),
+            },
+            _ => {
+                return Err(self.error(
+                    Some(index.index.token()),
+                    &format!("Index operator not supported for {:?}[{:?}]", left, evaluated_index).to_string(),
+                    ErrorKind::IndexOperatorNotSupported,
+                ))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use crate::{
+        errors::ErrorKind,
         evaluator::{builtins::BuiltinError, environment::Environment, objects::Object},
-        parser::errors::ErrorKind,
     };
 
     use super::{EvalResult, Evaluator};
@@ -824,6 +874,23 @@ mod tests {
                 "len(\"one\", \"two\")",
                 1,
             ),
+            (
+                "[1, 2, 3][\"hi\"]",
+                "Index operator not supported for Array([Integer(1), Integer(2), Integer(3)])[String(\"hi\")]",
+                ErrorKind::IndexOperatorNotSupported,
+                "[1, 2, 3][\"hi\"]",
+                1,
+            ),
+            (
+                "[1, 2, 3][-1]",
+                "Index out of bounds: -1, [1, 2, 3] has len(3)",
+                ErrorKind::IndexOutOfBounds,
+                "[1, 2, 3][-1]",
+                1,
+            ),
+        
+        
+        
         ];
 
         for (input, message, error_kind, line_with_err, line_nr) in tests {
@@ -958,6 +1025,58 @@ mod tests {
             (r#"len("hello world")"#, Object::Integer(11)),
             ("len(\"this is a long string, where I can't quickly count the amount of characters.\")"
             , Object::Integer(76)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let input = "[1, 2 * 2, 3 + 3]";
+        let evaluated = test_eval(input);
+        match evaluated {
+            Object::Array(array) => {
+                assert_eq!(array.len(), 3);
+                assert_eq!(array[0], Object::Integer(1));
+                assert_eq!(array[1], Object::Integer(4));
+                assert_eq!(array[2], Object::Integer(6));
+            }
+            _ => panic!("Object is not an array. Got: {:?}", evaluated),
+        }
+    }
+
+    #[test]
+    fn test_array_index_expressions() {
+        let tests = vec![
+            ("[1, 2, 3][0]", Object::Integer(1)),
+            ("[1, 2, 3][1]", Object::Integer(2)),
+            ("[1, 2, 3][2]", Object::Integer(3)),
+            ("let i = 0; [1][i];", Object::Integer(1)),
+            ("[1, 2, 3][1 + 1];", Object::Integer(3)),
+            ("let myArray = [1, 2, 3]; myArray[2];", Object::Integer(3)),
+            (
+                "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+                Object::Integer(6),
+            ),
+            (
+                "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+                Object::Integer(2),
+            ),
+            (
+                "let f = fn() { return [1, 2, 3]; }; f()[0]",
+                Object::Integer(1),
+            ),
+            (
+                "let f = fn() { return [1, 2, 3]; }; f()[1]",
+                Object::Integer(2),
+            ),
+            (
+                "let f = fn() { return [1, 2, 3]; }; f()[2]",
+                Object::Integer(3),
+            ),
         ];
 
         for (input, expected) in tests {

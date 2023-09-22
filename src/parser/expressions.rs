@@ -35,6 +35,8 @@ pub enum Expression {
     Call(CallExpression),
     Block(BlockStatement),
     StringLiteral(StringLiteral),
+    ArrayLiteral(ArrayLiteral),
+    Index(IndexExpression),
 }
 
 pub trait ExpressionToken {
@@ -55,6 +57,8 @@ impl ExpressionToken for Expression {
             Expression::Call(call) => &call.token,
             Expression::Block(block) => &block.token,
             Expression::StringLiteral(lit) => &lit.token,
+            Expression::ArrayLiteral(lit) => &lit.token,
+            Expression::Index(index) => &index.token,
         }
     }
 }
@@ -73,6 +77,8 @@ impl Display for Expression {
             Expression::Call(call) => write!(f, "{}", call),
             Expression::Block(block) => write!(f, "{}", block),
             Expression::StringLiteral(lit) => write!(f, "{}", lit),
+            Expression::ArrayLiteral(lit) => write!(f, "{}", lit),
+            Expression::Index(index) => write!(f, "{}", index),
         }
     }
 }
@@ -259,6 +265,7 @@ pub trait PrecedenceTrait {
 impl PrecedenceTrait for TokenKind {
     fn precedence(&self) -> Option<Precedence> {
         let presedence = match self {
+            TokenKind::LeftSquare => Precedence::Index,
             TokenKind::CompareEqual | TokenKind::CompareNotEqual => Precedence::Equals,
 
             TokenKind::CompareLess
@@ -291,6 +298,7 @@ impl PrecedenceTrait for TokenKind {
             TokenKind::RightSquirly => Precedence::Lowest,
             TokenKind::Comma => Precedence::Lowest,
             TokenKind::Return => Precedence::Lowest,
+            TokenKind::RightSquare => Precedence::Lowest,
             _ => {
                 return None;
             }
@@ -343,5 +351,37 @@ impl Display for CallExpression {
             .join(", ");
 
         write!(f, "{}({})", self.function, args)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ArrayLiteral {
+    pub token: Token,
+    pub elements: Rc<[Expression]>,
+}
+
+impl Display for ArrayLiteral {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let elements = self
+            .elements
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        write!(f, "[{}]", elements)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct IndexExpression {
+    pub token: Token,
+    pub left: Box<Expression>,
+    pub index: Box<Expression>,
+}
+
+impl Display for IndexExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}[{}])", self.left, self.index)
     }
 }

@@ -30,6 +30,8 @@ pub enum ErrorKind {
     TypeError,
     WrongNumberOfArguments,
     BuiltInError(BuiltinError),
+    IndexOutOfBounds,
+    IndexOperatorNotSupported,
 }
 
 impl Display for Error {
