@@ -103,12 +103,9 @@ impl Lexer {
 
     fn read_identifier(&mut self) -> String {
         let position = self.position;
-        while is_letter(self.ch) {
+        while is_letter(self.peek_char()) {
             self.read_char();
         }
-        // Since we keep reading until we find a non-letter character, we need to
-        // go back one character to get the last letter.
-        self.reverse_char(1);
         self.input[position..=self.position].to_string()
     }
 
@@ -117,12 +114,21 @@ impl Lexer {
     /// This can be an integer or a floating point number.
     fn read_number(&mut self) -> String {
         let position = self.position;
-        while is_digit(self.ch) || self.ch == '.' {
+        // Read all numbers
+
+        while is_digit(self.peek_char()) {
             self.read_char();
         }
-        // Since we keep reading until we find a non-digit character, we need to
-        // go back one character to get the last digit.
-        self.reverse_char(1);
+
+        // If the next character is a dot, and the second next character is a digit,
+        // then we have a floating point number.
+        if self.peek_char() == '.' && is_digit(self.peek_second_char()) {
+            self.read_char();
+            while is_digit(self.peek_char()) {
+                self.read_char();
+            }
+        }
+
         self.input[position..=self.position].to_string()
     }
 
@@ -131,6 +137,14 @@ impl Lexer {
             '\0'
         } else {
             self.input.chars().nth(self.read_position).unwrap()
+        }
+    }
+
+    fn peek_second_char(&mut self) -> char {
+        if self.read_position + 1 >= self.input.len() {
+            '\0'
+        } else {
+            self.input.chars().nth(self.read_position + 1).unwrap()
         }
     }
 
@@ -287,6 +301,18 @@ impl Lexer {
                     Some(TokenKind::AssignBitwiseXor)
                 } else {
                     Some(TokenKind::BitwiseXor)
+                }
+            }
+            '.' => {
+                if self.peek_char() == '.' && self.peek_second_char() == '.' {
+                    self.read_char();
+                    self.read_char();
+                    Some(TokenKind::Ellipsis)
+                } else if self.peek_char() == '.' {
+                    self.read_char();
+                    Some(TokenKind::RangeExclusive)
+                } else {
+                    Some(TokenKind::Dot)
                 }
             }
             '{' => Some(TokenKind::LeftSquirly),
@@ -501,7 +527,7 @@ mod test {
                     TokenKind::Identifier("i".to_string()),
                     TokenKind::In,
                     TokenKind::Number("0".to_string()),
-                    TokenKind::Range,
+                    TokenKind::RangeExclusive,
                     TokenKind::Number("10".to_string()),
                     TokenKind::LeftSquirly,
                     TokenKind::Identifier("print".to_string()),

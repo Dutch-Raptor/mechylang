@@ -1162,6 +1162,8 @@ mod tests {
             (r#"len("hello world")"#, Object::Integer(11)),
             ("len(\"this is a long string, where I can't quickly count the amount of characters.\")"
             , Object::Integer(76)),
+
+            (r#"len([1, 2, 3])"#, Object::Integer(3)),
         ];
 
         for (input, expected) in tests {

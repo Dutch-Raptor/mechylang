@@ -18,7 +18,6 @@ use std::fmt::{self, Display, Formatter};
 use std::rc::Rc;
 
 use crate::lexer::tokens::{Token, TokenKind};
-use crate::parser::parser::Precedence;
 
 use super::parser::BlockStatement;
 
@@ -37,6 +36,10 @@ pub enum Expression {
     StringLiteral(StringLiteral),
     ArrayLiteral(ArrayLiteral),
     Index(IndexExpression),
+    Range(RangeExpression),
+    RangeTo(RangeToExpression),
+    RangeFrom(RangeFromExpression),
+    RangeFull(RangeFullExpression),
 }
 
 pub trait ExpressionToken {
@@ -59,6 +62,10 @@ impl ExpressionToken for Expression {
             Expression::StringLiteral(lit) => &lit.token,
             Expression::ArrayLiteral(lit) => &lit.token,
             Expression::Index(index) => &index.token,
+            Expression::Range(range) => &range.token,
+            Expression::RangeTo(range) => &range.token,
+            Expression::RangeFrom(range) => &range.token,
+            Expression::RangeFull(range) => &range.token,
         }
     }
 }
@@ -79,6 +86,10 @@ impl Display for Expression {
             Expression::StringLiteral(lit) => write!(f, "{}", lit),
             Expression::ArrayLiteral(lit) => write!(f, "{}", lit),
             Expression::Index(index) => write!(f, "{}", index),
+            Expression::Range(range) => write!(f, "{}", range),
+            Expression::RangeTo(range) => write!(f, "{}", range),
+            Expression::RangeFrom(range) => write!(f, "{}", range),
+            Expression::RangeFull(range) => write!(f, "{}", range),
         }
     }
 }
@@ -277,6 +288,26 @@ impl Display for InfixExpression {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, PartialOrd)]
+pub enum Precedence {
+    Lowest,
+    Assign,      // =
+    Range,       // .. or ..=
+    LogicalOr,   // ||
+    LogicalAnd,  // &&
+    Equals,      // ==
+    LessGreater, // > or <
+    BitwiseOr,   // |
+    BitwiseXor,  // ^
+    BitwiseAnd,  // &
+    BitShift,    // << or >>
+    Sum,         // + or -
+    Product,     // * or /
+    Prefix,      // -X or !X
+    Index,       // array[index]
+    Call,        // myFunction(X)
+}
+
 pub trait PrecedenceTrait {
     fn precedence(&self) -> Option<Precedence>;
 }
@@ -284,32 +315,8 @@ pub trait PrecedenceTrait {
 impl PrecedenceTrait for TokenKind {
     fn precedence(&self) -> Option<Precedence> {
         let presedence = match self {
-            TokenKind::LeftSquare => Precedence::Index,
-            TokenKind::CompareEqual | TokenKind::CompareNotEqual => Precedence::Equals,
-
-            TokenKind::CompareLess
-            | TokenKind::CompareLessEqual
-            | TokenKind::CompareGreater
-            | TokenKind::CompareGreaterEqual => Precedence::LessGreater,
-
-            TokenKind::Multiply | TokenKind::Divide | TokenKind::Modulo => Precedence::Product,
-
-            TokenKind::Plus | TokenKind::Minus => Precedence::Sum,
-
-            TokenKind::LogicalAnd => Precedence::LogicalAnd,
-            TokenKind::LogicalOr => Precedence::LogicalOr,
-
-            TokenKind::BitwiseAnd => Precedence::BitwiseAnd,
-            TokenKind::BitwiseOr => Precedence::BitwiseOr,
-            TokenKind::BitwiseXor => Precedence::BitwiseXor,
-
-            TokenKind::BitwiseLeftShift | TokenKind::BitwiseRightShift => Precedence::BitShift,
-
-            TokenKind::EOF => Precedence::Lowest,
-            TokenKind::RightParen => Precedence::Lowest,
-
-            TokenKind::LeftParen => Precedence::Call,
-
+            // Precedences listed in ascending order, but lowest precedence at the end
+            // *** Assign ***
             TokenKind::AssignEqual
             | TokenKind::AssignPlus
             | TokenKind::AssignMinus
@@ -320,6 +327,52 @@ impl PrecedenceTrait for TokenKind {
             | TokenKind::AssignBitwiseAnd
             | TokenKind::AssignBitwiseXor => Precedence::Assign,
 
+            // *** Range ***
+            TokenKind::RangeExclusive | TokenKind::RangeInclusive => Precedence::Range,
+
+            // *** Logical Or ***
+            TokenKind::LogicalOr => Precedence::LogicalOr,
+
+            // *** Logical And ***
+            TokenKind::LogicalAnd => Precedence::LogicalAnd,
+
+            // *** Equals ***
+            TokenKind::CompareEqual | TokenKind::CompareNotEqual => Precedence::Equals,
+
+            // *** Less Greater ***
+            TokenKind::CompareLess
+            | TokenKind::CompareLessEqual
+            | TokenKind::CompareGreater
+            | TokenKind::CompareGreaterEqual => Precedence::LessGreater,
+
+            // *** Bitwise Or ***
+            TokenKind::BitwiseOr => Precedence::BitwiseOr,
+
+            // *** Bitwise Xor ***
+            TokenKind::BitwiseXor => Precedence::BitwiseXor,
+
+            // *** Bitwise And ***
+            TokenKind::BitwiseAnd => Precedence::BitwiseAnd,
+
+            // *** Bit Shift ***
+            TokenKind::BitwiseLeftShift | TokenKind::BitwiseRightShift => Precedence::BitShift,
+
+            // *** Sum ***
+            TokenKind::Plus | TokenKind::Minus => Precedence::Sum,
+
+            // *** Product ***
+            TokenKind::Multiply | TokenKind::Divide | TokenKind::Modulo => Precedence::Product,
+
+            // *** Prefix ***
+            // does not get inferred from token kind, but is used in parsing prefix expressions
+
+            // *** Index ***
+            TokenKind::LeftSquare => Precedence::Index,
+
+            // *** Call ***
+            TokenKind::LeftParen => Precedence::Call,
+
+            // *** Lowest precedence ***
             // some tokens are not used in expressions
             //
             // But can still show up as a peeked token
@@ -330,6 +383,8 @@ impl PrecedenceTrait for TokenKind {
             TokenKind::RightSquare => Precedence::Lowest,
             TokenKind::Identifier(_) => Precedence::Lowest,
             TokenKind::Let => Precedence::Lowest,
+            TokenKind::EOF => Precedence::Lowest,
+            TokenKind::RightParen => Precedence::Lowest,
             _ => {
                 return None;
             }
@@ -414,5 +469,72 @@ pub struct IndexExpression {
 impl Display for IndexExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}[{}])", self.left, self.index)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RangeExpression {
+    pub token: Token,
+    pub left: Rc<Expression>,
+    pub right: Rc<Expression>,
+    pub inclusive: bool,
+}
+
+impl Display for RangeExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "({}{}..{})",
+            self.left,
+            if self.inclusive { "..=" } else { ".." },
+            self.right
+        )
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RangeToExpression {
+    pub token: Token,
+    pub right: Rc<Expression>,
+    pub inclusive: bool,
+}
+
+impl Display for RangeToExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "(..{}{})",
+            if self.inclusive { "=" } else { "" },
+            self.right
+        )
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RangeFromExpression {
+    pub token: Token,
+    pub left: Rc<Expression>,
+    pub inclusive: bool,
+}
+
+impl Display for RangeFromExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "({}{}..)",
+            self.left,
+            if self.inclusive { "=" } else { "" }
+        )
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RangeFullExpression {
+    pub token: Token,
+}
+
+impl Display for RangeFullExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(..)")
     }
 }

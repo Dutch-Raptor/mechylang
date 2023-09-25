@@ -11,7 +11,7 @@ use color_print::cformat;
 
 use super::expressions::{
     BooleanLiteral, FloatLiteral, FunctionLiteral, IfExpression, InfixExpression, IntegerLiteral,
-    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral, ArrayLiteral, IndexExpression,
+    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral, ArrayLiteral, IndexExpression, Precedence,
 };
 
 #[derive(Debug)]
@@ -321,6 +321,10 @@ impl Parser {
             | TokenKind::AssignBitwiseAnd
             | TokenKind::AssignBitwiseOr
             | TokenKind::AssignBitwiseXor
+
+            // Range operator
+            | TokenKind::RangeExclusive
+            | TokenKind::RangeInclusive
 
                 => true,
             _ => false,
@@ -903,27 +907,11 @@ impl Parser {
 }
 }
 
-#[derive(Debug, PartialEq, Clone, PartialOrd)]
-pub enum Precedence {
-Lowest,
-Assign,      // =
-LogicalOr,   // ||
-LogicalAnd,  // &&
-Equals,      // ==
-LessGreater, // > or <
-BitwiseOr,   // |
-BitwiseXor,  // ^
-BitwiseAnd,  // &
-BitShift,    // << or >>
-Sum,         // + or -
-Product,     // * or /
-Prefix,      // -X or !X
-Call,        // myFunction(X)
-Index,       // array[index]
-}
 
 #[cfg(test)]
 mod tests {
+use crate::parser::expressions::Precedence;
+
 use super::*;
 
 #[test]
@@ -939,8 +927,8 @@ fn test_presedence() {
     assert!(Precedence::BitShift < Precedence::Sum);
     assert!(Precedence::Sum < Precedence::Product);
     assert!(Precedence::Product < Precedence::Prefix);
-    assert!(Precedence::Prefix < Precedence::Call);
-    assert!(Precedence::Call < Precedence::Index);
+    assert!(Precedence::Prefix < Precedence::Index);
+    assert!(Precedence::Index < Precedence::Call);
 }
 
 #[test]
@@ -1308,10 +1296,36 @@ fn test_operator_precedence_parsing() {
             },
             _ => panic!("expected expression statement"),
         };
+    }
 
+    #[test]
+    fn test_range_expression() {
+        let input = "1..5";
 
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
 
+        for error in &program.errors {
+            println!("{}", error);
+        }
 
+        println!("{}", program.to_string());
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Range(ref range) => {
+                    assert_eq!(range.left.to_string(), "1");
+                    assert_eq!(range.right.to_string(), "5");
+                    assert_eq!(range.inclusive, false);
+                }
+                _ => panic!("expected range expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
     }
 
 }

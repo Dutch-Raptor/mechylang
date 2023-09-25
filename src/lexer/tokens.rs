@@ -98,7 +98,7 @@ pub enum TokenKind {
     LeftSquare,
     RightSquare,
 
-    Range,
+    RangeExclusive,
     RangeInclusive,
 
     // Other
@@ -107,6 +107,7 @@ pub enum TokenKind {
     Illegal(String),
     BitwiseRightShift,
     BitwiseLeftShift,
+    Ellipsis,
 }
 
 impl TokenKind {
