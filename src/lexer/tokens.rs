@@ -51,10 +51,9 @@ pub enum TokenKind {
     // Operators
     Plus,
     Minus,
-    Asterisk,
-    Slash,
-    Percent,
-    BitwiseXor,
+    Multiply,
+    Divide,
+    Modulo,
     Tilde,
     Bang,
     Question,
@@ -70,17 +69,18 @@ pub enum TokenKind {
     // Bitwise
     BitwiseAnd,
     BitwiseOr,
+    BitwiseXor,
 
     // Assignment
     AssignEqual,
-    AssignPlusEqual,
-    AssignMinusEqual,
-    AssignAsteriskEqual,
-    AssignSlashEqual,
-    AssignPercentEqual,
-    AssignCaretEqual,
-    AssignAmpersandEqual,
-    AssignPipeEqual,
+    AssignPlus,
+    AssignMinus,
+    AssignMultiply,
+    AssignDivide,
+    AssignModulo,
+    AssignBitwiseXor,
+    AssignBitwiseAnd,
+    AssignBitwiseOr,
 
     // Comparison
     CompareEqual,
@@ -97,6 +97,9 @@ pub enum TokenKind {
     RightSquirly,
     LeftSquare,
     RightSquare,
+
+    Range,
+    RangeInclusive,
 
     // Other
     Identifier(String),

@@ -244,9 +244,9 @@ impl Parser {
         match token {
             TokenKind::Plus
             | TokenKind::Minus
-            | TokenKind::Slash
-            | TokenKind::Asterisk
-            | TokenKind::Percent
+            | TokenKind::Divide
+            | TokenKind::Multiply
+            | TokenKind::Modulo
             | TokenKind::CompareEqual
             | TokenKind::CompareNotEqual
             | TokenKind::CompareGreater
@@ -260,6 +260,18 @@ impl Parser {
             | TokenKind::BitwiseXor
             | TokenKind::BitwiseLeftShift
             | TokenKind::BitwiseRightShift
+
+            // Assignments
+            | TokenKind::AssignEqual
+            | TokenKind::AssignPlus
+            | TokenKind::AssignMinus
+            | TokenKind::AssignMultiply
+            | TokenKind::AssignDivide
+            | TokenKind::AssignModulo
+            | TokenKind::AssignBitwiseAnd
+            | TokenKind::AssignBitwiseOr
+            | TokenKind::AssignBitwiseXor
+
                 => self.parse_infix_expression(left),
             TokenKind::LeftParen => self.parse_call_expression(left),
             TokenKind::LeftSquare => self.parse_index_expression(left),
@@ -274,9 +286,9 @@ impl Parser {
         match token {
             TokenKind::Plus
             | TokenKind::Minus
-            | TokenKind::Slash
-            | TokenKind::Asterisk
-            | TokenKind::Percent
+            | TokenKind::Divide
+            | TokenKind::Multiply
+            | TokenKind::Modulo
             | TokenKind::CompareEqual
             | TokenKind::CompareNotEqual
             | TokenKind::CompareGreater
@@ -298,6 +310,18 @@ impl Parser {
             | TokenKind::BitwiseXor
             | TokenKind::BitwiseLeftShift
             | TokenKind::BitwiseRightShift
+
+            // Assignment operators
+            | TokenKind::AssignEqual
+            | TokenKind::AssignPlus
+            | TokenKind::AssignMinus
+            | TokenKind::AssignMultiply
+            | TokenKind::AssignDivide
+            | TokenKind::AssignModulo
+            | TokenKind::AssignBitwiseAnd
+            | TokenKind::AssignBitwiseOr
+            | TokenKind::AssignBitwiseXor
+
                 => true,
             _ => false,
         }
@@ -517,7 +541,7 @@ impl Parser {
         Ok(Expression::Prefix(PrefixExpression {
             token,
             operator,
-            right: Box::new(right),
+            right: Rc::new(right),
         }))
     }
 
@@ -528,9 +552,9 @@ impl Parser {
         let operator = match token.kind {
             TokenKind::Plus => InfixOperator::Plus,
             TokenKind::Minus => InfixOperator::Minus,
-            TokenKind::Asterisk => InfixOperator::Asterisk,
-            TokenKind::Slash => InfixOperator::Slash,
-            TokenKind::Percent => InfixOperator::Percent,
+            TokenKind::Multiply => InfixOperator::Asterisk,
+            TokenKind::Divide => InfixOperator::Slash,
+            TokenKind::Modulo => InfixOperator::Percent,
             TokenKind::CompareEqual => InfixOperator::CompareEqual,
             TokenKind::CompareNotEqual => InfixOperator::CompareNotEqual,
             TokenKind::CompareLess => InfixOperator::CompareLess,
@@ -547,6 +571,17 @@ impl Parser {
             TokenKind::LogicalAnd => InfixOperator::LogicalAnd,
             TokenKind::LogicalOr => InfixOperator::LogicalOr,
 
+            // Assignment
+            TokenKind::AssignEqual => InfixOperator::AssignEqual,
+            TokenKind::AssignPlus => InfixOperator::AssignPlus,
+            TokenKind::AssignMinus => InfixOperator::AssignMinus,
+            TokenKind::AssignMultiply => InfixOperator::AssignAsterisk,
+            TokenKind::AssignDivide => InfixOperator::AssignSlash,
+            TokenKind::AssignModulo => InfixOperator::AssignPercent,
+            TokenKind::AssignBitwiseXor => InfixOperator::AssignBitwiseXor,
+            TokenKind::AssignBitwiseAnd => InfixOperator::AssignBitwiseAnd,
+            TokenKind::AssignBitwiseOr => InfixOperator::AssignBitwiseOr,
+
             _ => {
                 return Err(self.error_current(
                     ErrorKind::MissingInfix,
@@ -562,12 +597,13 @@ impl Parser {
         Ok(Expression::Infix(InfixExpression {
             token,
             operator,
-            left: Box::new(left),
-            right: Box::new(right),
+            left: Rc::new(left),
+            right: Rc::new(right),
         }))
     }
 
     fn peek_precedence(&mut self) -> Precedence {
+        
         match self.peek_token.precedence() {
             Some(precedence) => precedence,
             None => {
@@ -645,7 +681,7 @@ impl Parser {
 
         Ok(Expression::If(IfExpression {
             token,
-            condition: Box::new(condition),
+            condition: Rc::new(condition),
             consequence,
             alternative,
         }))
@@ -797,7 +833,7 @@ impl Parser {
 
         Ok(Expression::Call(CallExpression {
             token: self.cur_token.clone(),
-            function: Box::new(left),
+            function: Rc::new(left),
             arguments: arguments.into(),
         }))
     }
@@ -861,8 +897,8 @@ impl Parser {
 
         Ok(Expression::Index(IndexExpression {
             token,
-            left: Box::new(left),
-            index: Box::new(index),
+            left: Rc::new(left),
+            index: Rc::new(index),
     }))
 }
 }
@@ -870,6 +906,7 @@ impl Parser {
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Precedence {
 Lowest,
+Assign,      // =
 LogicalOr,   // ||
 LogicalAnd,  // &&
 Equals,      // ==
@@ -891,7 +928,8 @@ use super::*;
 
 #[test]
 fn test_presedence() {
-    assert!(Precedence::Lowest < Precedence::LogicalOr);
+    assert!(Precedence::Lowest < Precedence::Assign);
+    assert!(Precedence::Assign < Precedence::LogicalOr);
     assert!(Precedence::LogicalOr < Precedence::LogicalAnd);
     assert!(Precedence::LogicalAnd < Precedence::Equals);
     assert!(Precedence::Equals < Precedence::LessGreater);
@@ -1161,4 +1199,119 @@ fn test_operator_precedence_parsing() {
             _ => panic!("expected expression statement"),
         };
     }
+
+    #[test]
+    fn test_mutating_values() {
+        let input = "let a = 1; a = 2;";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        for error in &program.errors {
+            println!("{}", error);
+        }
+
+        println!("{}", program.to_string());
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 2);
+
+        let stmt = &program.statements[1];
+
+        match stmt {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Infix(ref infix) => {
+                    assert_eq!(infix.operator, InfixOperator::AssignEqual);
+                    assert_eq!(infix.left.to_string(), "a");
+                    assert_eq!(infix.right.to_string(), "2");
+                }
+                _ => panic!("expected assign expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
+
+    #[test]
+    fn test_special_mutation_operators() {
+        let input = "let a = 1; a += 2; a -= 3; a *= 4; a /= 5; a %= 6;";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        for error in &program.errors {
+            println!("{}", error);
+        }
+
+        println!("{}", program.to_string());
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 6);
+
+        match &program.statements[1] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Infix(ref infix) => {
+                    assert_eq!(infix.operator, InfixOperator::AssignPlus);
+                    assert_eq!(infix.left.to_string(), "a");
+                    assert_eq!(infix.right.to_string(), "2");
+                }
+                _ => panic!("expected assign expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+
+        match &program.statements[2] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Infix(ref infix) => {
+                    assert_eq!(infix.operator, InfixOperator::AssignMinus);
+                    assert_eq!(infix.left.to_string(), "a");
+                    assert_eq!(infix.right.to_string(), "3");
+                }
+                _ => panic!("expected assign expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+
+        match &program.statements[3] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Infix(ref infix) => {
+                    assert_eq!(infix.operator, InfixOperator::AssignAsterisk);
+                    assert_eq!(infix.left.to_string(), "a");
+                    assert_eq!(infix.right.to_string(), "4");
+                }
+                _ => panic!("expected assign expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+
+        match &program.statements[4] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Infix(ref infix) => {
+                    assert_eq!(infix.operator, InfixOperator::AssignSlash);
+                    assert_eq!(infix.left.to_string(), "a");
+                    assert_eq!(infix.right.to_string(), "5");
+                }
+                _ => panic!("expected assign expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+
+        match &program.statements[5] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Infix(ref infix) => {
+                    assert_eq!(infix.operator, InfixOperator::AssignPercent);
+                    assert_eq!(infix.left.to_string(), "a");
+                    assert_eq!(infix.right.to_string(), "6");
+                }
+                _ => panic!("expected assign expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+
+
+
+
+    }
+
 }

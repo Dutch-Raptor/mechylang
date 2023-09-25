@@ -32,6 +32,8 @@ pub enum ErrorKind {
     BuiltInError(BuiltinError),
     IndexOutOfBounds,
     IndexOperatorNotSupported,
+    InvalidLeftHandSide,
+    MutateError,
 }
 
 impl Display for Error {

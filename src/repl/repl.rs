@@ -34,4 +34,20 @@ impl Repl {
             }
         }
     }
+
+    pub(crate) fn run_file(&self, file: &str) {
+        let mut env = Environment::new();
+        let input = std::fs::read_to_string(file).unwrap();
+
+        let evaluated = Evaluator::eval(input, &mut env);
+
+        match evaluated {
+            Ok(_) => {}
+            Err(errors) => {
+                for error in errors.iter() {
+                    cprintln!("{}", error);
+                }
+            }
+        }
+    }
 }

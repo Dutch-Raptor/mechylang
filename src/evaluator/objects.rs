@@ -1,4 +1,4 @@
-use std::{fmt::Display, rc::Rc};
+use std::{fmt::Display, ops::RangeInclusive, rc::Rc};
 
 use crate::parser::{expressions::Identifier, parser::BlockStatement};
 
@@ -23,7 +23,7 @@ pub enum Object {
 #[derive(Debug, PartialEq, Clone)]
 pub struct BuiltinFunction {
     pub name: &'static str,
-    pub args_len: usize,
+    pub args_len: RangeInclusive<usize>,
     pub function: fn(Vec<Object>) -> BuiltinResult,
 }
 
@@ -76,6 +76,19 @@ impl PartialEq for Function {
     }
 }
 
+impl Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let params = self
+            .params
+            .iter()
+            .map(|param| param.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        write!(f, "fn({}) {{\n{}\n}}", params, self.body)
+    }
+}
+
 impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -84,7 +97,7 @@ impl Display for Object {
             Object::Null => write!(f, "null"),
             Object::ReturnValue(val) => write!(f, "{}", val),
             Object::Let(name, val) => write!(f, "{} = {}", name, val),
-            Object::String(string) => write!(f, "\"{}\"", string),
+            Object::String(string) => write!(f, "{}", string),
             Object::Function(function) => {
                 let params = function
                     .params

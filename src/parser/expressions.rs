@@ -22,7 +22,7 @@ use crate::parser::parser::Precedence;
 
 use super::parser::BlockStatement;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
@@ -101,7 +101,7 @@ impl Into<Rc<str>> for Identifier {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: i64,
@@ -113,7 +113,7 @@ impl Display for IntegerLiteral {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FloatLiteral {
     pub token: Token,
     pub value: f64,
@@ -125,7 +125,7 @@ impl Display for FloatLiteral {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BooleanLiteral {
     pub token: Token,
     pub value: bool,
@@ -137,7 +137,7 @@ impl Display for BooleanLiteral {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct StringLiteral {
     pub token: Token,
     pub value: Rc<str>,
@@ -149,11 +149,11 @@ impl Display for StringLiteral {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: PrefixOperator,
-    pub right: Box<Expression>,
+    pub right: Rc<Expression>,
 }
 
 impl Display for PrefixExpression {
@@ -177,12 +177,12 @@ impl Display for PrefixOperator {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct InfixExpression {
     pub token: Token,
-    pub left: Box<Expression>,
+    pub left: Rc<Expression>,
     pub operator: InfixOperator,
-    pub right: Box<Expression>,
+    pub right: Rc<Expression>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -207,6 +207,16 @@ pub enum InfixOperator {
 
     BitwiseLeftShift,
     BitwiseRightShift,
+
+    AssignEqual,
+    AssignPlus,
+    AssignMinus,
+    AssignAsterisk,
+    AssignSlash,
+    AssignPercent,
+    AssignBitwiseAnd,
+    AssignBitwiseOr,
+    AssignBitwiseXor,
 }
 
 impl Display for InfixOperator {
@@ -230,14 +240,23 @@ impl Display for InfixOperator {
             InfixOperator::BitwiseXor => write!(f, "^"),
             InfixOperator::BitwiseLeftShift => write!(f, "<<"),
             InfixOperator::BitwiseRightShift => write!(f, ">>"),
+            InfixOperator::AssignEqual => write!(f, "="),
+            InfixOperator::AssignPlus => write!(f, "+="),
+            InfixOperator::AssignMinus => write!(f, "-="),
+            InfixOperator::AssignAsterisk => write!(f, "*="),
+            InfixOperator::AssignSlash => write!(f, "/="),
+            InfixOperator::AssignPercent => write!(f, "%="),
+            InfixOperator::AssignBitwiseAnd => write!(f, "&="),
+            InfixOperator::AssignBitwiseOr => write!(f, "|="),
+            InfixOperator::AssignBitwiseXor => write!(f, "^="),
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfExpression {
     pub token: Token,
-    pub condition: Box<Expression>,
+    pub condition: Rc<Expression>,
     pub consequence: BlockStatement,
     pub alternative: Option<BlockStatement>,
 }
@@ -273,7 +292,7 @@ impl PrecedenceTrait for TokenKind {
             | TokenKind::CompareGreater
             | TokenKind::CompareGreaterEqual => Precedence::LessGreater,
 
-            TokenKind::Asterisk | TokenKind::Slash | TokenKind::Percent => Precedence::Product,
+            TokenKind::Multiply | TokenKind::Divide | TokenKind::Modulo => Precedence::Product,
 
             TokenKind::Plus | TokenKind::Minus => Precedence::Sum,
 
@@ -291,6 +310,16 @@ impl PrecedenceTrait for TokenKind {
 
             TokenKind::LeftParen => Precedence::Call,
 
+            TokenKind::AssignEqual
+            | TokenKind::AssignPlus
+            | TokenKind::AssignMinus
+            | TokenKind::AssignMultiply
+            | TokenKind::AssignDivide
+            | TokenKind::AssignModulo
+            | TokenKind::AssignBitwiseOr
+            | TokenKind::AssignBitwiseAnd
+            | TokenKind::AssignBitwiseXor => Precedence::Assign,
+
             // some tokens are not used in expressions
             //
             // But can still show up as a peeked token
@@ -299,6 +328,8 @@ impl PrecedenceTrait for TokenKind {
             TokenKind::Comma => Precedence::Lowest,
             TokenKind::Return => Precedence::Lowest,
             TokenKind::RightSquare => Precedence::Lowest,
+            TokenKind::Identifier(_) => Precedence::Lowest,
+            TokenKind::Let => Precedence::Lowest,
             _ => {
                 return None;
             }
@@ -314,7 +345,7 @@ impl PrecedenceTrait for Token {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Rc<[Identifier]>,
@@ -334,10 +365,10 @@ impl Display for FunctionLiteral {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CallExpression {
     pub token: Token,
-    pub function: Box<Expression>,
+    pub function: Rc<Expression>,
     pub arguments: Rc<[Expression]>,
 }
 
@@ -354,7 +385,7 @@ impl Display for CallExpression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ArrayLiteral {
     pub token: Token,
     pub elements: Rc<[Expression]>,
@@ -373,11 +404,11 @@ impl Display for ArrayLiteral {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IndexExpression {
     pub token: Token,
-    pub left: Box<Expression>,
-    pub index: Box<Expression>,
+    pub left: Rc<Expression>,
+    pub index: Rc<Expression>,
 }
 
 impl Display for IndexExpression {

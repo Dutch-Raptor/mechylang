@@ -1,0 +1,9 @@
+print("Hello World")
+
+// This is a comment
+
+print(4, "is a number")
+
+// print also works with variables
+let x = 6
+print("It is the same as", 2+2, "or", 2*2, "or", x-2, "or", x/2 - -1)

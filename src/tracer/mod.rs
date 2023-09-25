@@ -44,8 +44,11 @@ pub fn stop_trace(name: &str) {
 #[macro_export]
 macro_rules! trace {
     ($name:expr) => {{
-        $crate::tracer::start_trace($name);
-        $crate::tracer::defer(|| $crate::tracer::stop_trace($name))
+        let name = $name.to_string();
+        $crate::tracer::start_trace(name.as_str());
+        $crate::tracer::defer(move || {
+            $crate::tracer::stop_trace(name.as_str());
+        })
     }};
 }
 
