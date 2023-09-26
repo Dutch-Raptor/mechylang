@@ -103,7 +103,7 @@ impl Lexer {
 
     fn read_identifier(&mut self) -> String {
         let position = self.position;
-        while is_letter(self.peek_char()) {
+        while is_letter(self.peek_char()) || is_digit(self.peek_char()) || self.peek_char() == '_' {
             self.read_char();
         }
         self.input[position..=self.position].to_string()
@@ -308,6 +308,10 @@ impl Lexer {
                     self.read_char();
                     self.read_char();
                     Some(TokenKind::Ellipsis)
+                } else if self.peek_char() == '.' && self.peek_second_char() == '=' {
+                    self.read_char();
+                    self.read_char();
+                    Some(TokenKind::RangeInclusive)
                 } else if self.peek_char() == '.' {
                     self.read_char();
                     Some(TokenKind::RangeExclusive)
@@ -332,7 +336,7 @@ impl Lexer {
                 Some(TokenKind::String(literal))
             }
             _ => {
-                if is_letter(self.ch) {
+                if is_letter(self.ch) || self.ch == '_' {
                     let literal = self.read_identifier();
                     token_length = literal.len();
                     if let Some(keyword_token) = TokenKind::is_keyword(&literal) {
@@ -535,6 +539,63 @@ mod test {
                     TokenKind::Identifier("i".to_string()),
                     TokenKind::RightParen,
                     TokenKind::Semicolon,
+                    TokenKind::RightSquirly,
+                    TokenKind::EOF,
+                ],
+            ),
+            (
+                "let range = 1..=5",
+                vec![
+                    TokenKind::Let,
+                    TokenKind::Identifier("range".to_string()),
+                    TokenKind::AssignEqual,
+                    TokenKind::Number("1".to_string()),
+                    TokenKind::RangeInclusive,
+                    TokenKind::Number("5".to_string()),
+                    TokenKind::EOF,
+                ],
+            ),
+            (
+                r#"for i in 0..=10 {
+                    if i % 2 == 0 {
+                        continue;
+                    }
+                    print(i);
+                    if i == 7 {
+                        break;
+                    }
+                }"#,
+                vec![
+                    TokenKind::For,
+                    TokenKind::Identifier("i".to_string()),
+                    TokenKind::In,
+                    TokenKind::Number("0".to_string()),
+                    TokenKind::RangeInclusive,
+                    TokenKind::Number("10".to_string()),
+                    TokenKind::LeftSquirly,
+                    TokenKind::If,
+                    TokenKind::Identifier("i".to_string()),
+                    TokenKind::Modulo,
+                    TokenKind::Number("2".to_string()),
+                    TokenKind::CompareEqual,
+                    TokenKind::Number("0".to_string()),
+                    TokenKind::LeftSquirly,
+                    TokenKind::Continue,
+                    TokenKind::Semicolon,
+                    TokenKind::RightSquirly,
+                    TokenKind::Identifier("print".to_string()),
+                    TokenKind::LeftParen,
+                    TokenKind::Identifier("i".to_string()),
+                    TokenKind::RightParen,
+                    TokenKind::Semicolon,
+                    TokenKind::If,
+                    TokenKind::Identifier("i".to_string()),
+                    TokenKind::CompareEqual,
+                    TokenKind::Number("7".to_string()),
+                    TokenKind::LeftSquirly,
+                    TokenKind::Break,
+                    TokenKind::Semicolon,
+                    TokenKind::RightSquirly,
                     TokenKind::RightSquirly,
                     TokenKind::EOF,
                 ],

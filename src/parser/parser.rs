@@ -11,7 +11,7 @@ use color_print::cformat;
 
 use super::expressions::{
     BooleanLiteral, FloatLiteral, FunctionLiteral, IfExpression, InfixExpression, IntegerLiteral,
-    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral, ArrayLiteral, IndexExpression, Precedence,
+    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral, ArrayLiteral, IndexExpression, Precedence, RangeToExpression, RangeExpression, RangeFromExpression, RangeFullExpression, ForExpression,
 };
 
 #[derive(Debug)]
@@ -34,6 +34,8 @@ pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
     Expression(ExpressionStatement),
+    Break(BreakStatement),
+    Continue(ContinueStatement),
 }
 
 impl Display for Statement {
@@ -42,6 +44,8 @@ impl Display for Statement {
             Statement::Let(s) => write!(f, "{}", s),
             Statement::Return(s) => write!(f, "{}", s),
             Statement::Expression(s) => write!(f, "{}", s),
+            Statement::Break(s) => write!(f, "{}", s),
+            Statement::Continue(s) => write!(f, "{}", s),
         }
     }
 }
@@ -101,6 +105,32 @@ pub struct ExpressionStatement {
 impl Display for ExpressionStatement {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{};", self.expression)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BreakStatement {
+    pub token: Token,
+    pub value: Option<Expression>,
+}
+
+impl Display for BreakStatement {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match &self.value {
+            Some(value) => write!(f, "{} {};", self.token, value),
+            None => write!(f, "{};", self.token),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ContinueStatement {
+    pub token: Token,
+}
+
+impl Display for ContinueStatement {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{};", self.token)
     }
 }
 
@@ -205,6 +235,10 @@ impl Parser {
             TokenKind::LeftParen => self.parse_grouped_expression(),
 
             TokenKind::LeftSquare => self.parse_array_expression(),
+
+            TokenKind::For => self.parse_for_expression(),
+
+            TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_prefix_expression(),
             _ => Err(self.error_current(
                 ErrorKind::MissingPrefix,
                 format!("No registered prefix function for {:?}", token),
@@ -227,6 +261,7 @@ impl Parser {
             TokenKind::Minus => true,
 
             TokenKind::If => true,
+            TokenKind::For => true,
 
             TokenKind::String(_) => true,
 
@@ -235,6 +270,9 @@ impl Parser {
 
             // Array expressions
             TokenKind::LeftSquare => true,
+
+            // Range expressions
+            TokenKind::RangeExclusive | TokenKind::RangeInclusive => true,
             _ => false,
         }
     }
@@ -275,6 +313,7 @@ impl Parser {
                 => self.parse_infix_expression(left),
             TokenKind::LeftParen => self.parse_call_expression(left),
             TokenKind::LeftSquare => self.parse_index_expression(left),
+            TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_infix_expression(token, left),
             _ => Err(self.error_current(
                 ErrorKind::MissingInfix,
                 format!("No registered infix function for {:?}", token),
@@ -341,6 +380,8 @@ impl Parser {
                 self.next_token();
                 self.parse_statement()?
             }
+            TokenKind::Break => self.parse_break_statement()?,
+            TokenKind::Continue => Statement::Continue(ContinueStatement { token: self.cur_token.clone() }),
             _ => self.parse_expression_statement()?,
         };
 
@@ -905,6 +946,169 @@ impl Parser {
             index: Rc::new(index),
     }))
 }
+
+    /// Parses a RangeTo expression
+    /// e.g. `..5` or `..=5`
+    fn parse_range_prefix_expression(&mut self) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+
+        // check if we are dealing with a FullRange expression
+        // e.g. `..`
+        // if so, we would have a `..` token followed by a ')' or a ']' token
+        if self.peek_token.kind == TokenKind::RightParen || self.peek_token.kind == TokenKind::RightSquare {
+            return Ok(Expression::RangeFull(RangeFullExpression { token }));
+        }
+
+        self.next_token();
+
+
+        let right = self.parse_expression(Precedence::Prefix)?;
+
+        let inclusive = match token.kind {
+            TokenKind::RangeInclusive => true,
+            TokenKind::RangeExclusive => false,
+            _ => {
+                return Err(self.error_current(
+                    ErrorKind::UnexpectedToken,
+                    format!("Expected a range operator, got {:?}", self.cur_token),
+                ))
+            }
+        };
+
+        Ok(Expression::RangeTo(RangeToExpression {
+            token,
+            right: Rc::new(right),
+            inclusive,
+        }))
+    }
+
+    fn parse_range_infix_expression(&mut self, token_kind: TokenKind, left: Expression) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+
+        let precedence = self.cur_precedence();
+        let inclusive = match token_kind {
+            TokenKind::RangeInclusive => true,
+            TokenKind::RangeExclusive => false,
+            _ => {
+                return Err(self.error_current(
+                    ErrorKind::UnexpectedToken,
+                    format!("Expected a range operator, got {:?}", self.cur_token),
+                ))
+            }
+        };
+
+        // check if we have a RangeFrom expression
+        // RangeFrom expressions are bounded by either square brackets or a parenthesis
+        // 
+        // ```text
+        // (1..) // RangeFrom
+        // [1..] // RangeFrom
+        if self.peek_token.kind == TokenKind::RightParen || self.peek_token.kind == TokenKind::RightSquare {
+            return Ok(Expression::RangeFrom(RangeFromExpression {
+                token,
+                left: Rc::new(left),
+                inclusive,
+            }));
+        }
+
+        self.next_token();
+
+
+        // if the next token is not a closing parenthesis or square bracket, we assume that we have a Range expression
+
+        let right = self.parse_expression(precedence)?;
+
+        Ok(Expression::Range(RangeExpression {
+            token,
+            left: Rc::new(left),
+            right: Rc::new(right),
+            inclusive,
+        }))
+    }
+
+    /// Parses a for expression
+    ///
+    /// valid syntax:
+    /// ```text
+    /// for <iterator> in <iterable> { <body> }
+    /// for (<index>, <iterator>) in <iterable> { <body> }
+    /// ```
+    fn parse_for_expression(&mut self) -> Result<Expression, Error> {
+        let _trace = trace!("parse_for_expression");
+        let token = self.cur_token.clone();
+
+        self.next_token();
+
+        // check if we have a for expression with an index
+        let index = match self.cur_token.kind {
+            TokenKind::LeftParen => {
+                self.next_token();
+                let index = match self.parse_identifier()? {
+                    Expression::Identifier(ident) => ident,
+                    _ => {
+                        return Err(self.error_current(
+                            ErrorKind::UnexpectedToken,
+                            format!("Expected an identifier, got {:?}", self.cur_token),
+                        ))
+                    }
+                };
+                self.expect_peek(TokenKind::Comma)?;
+                self.next_token();
+                Some(index)
+            }
+            _ => None,
+        };
+
+        let iterator = match self.parse_identifier()? {
+            Expression::Identifier(ident) => ident,
+            _ => {
+                return Err(self.error_current(
+                    ErrorKind::UnexpectedToken,
+                    format!("Expected an identifier, got {:?}", self.cur_token),
+                ))
+            }
+        };
+
+        if index.is_some() {
+            self.expect_peek(TokenKind::RightParen)?;
+        }
+
+        self.expect_peek(TokenKind::In)?;
+        self.next_token();
+
+        let iterable = self.parse_expression(Precedence::Lowest)?;
+
+        // set current token to the '{' token
+        self.next_token();
+
+        let body = self.parse_block_statement()?;
+
+        Ok(Expression::For(ForExpression {
+            token,
+            iterator,
+            iterable: Rc::new(iterable),
+            body,
+            index,
+        }))
+
+    }
+
+    fn parse_break_statement(&mut self) -> Result<Statement, Error> {
+        let token = self.cur_token.clone();
+
+        self.next_token();
+
+        // check if we have a value to return
+        let value = if self.cur_token.kind != TokenKind::Semicolon {
+            let value = self.parse_expression(Precedence::Lowest)?;
+            self.next_token();
+            Some(value)
+        } else {
+            None
+        };
+
+        Ok(Statement::Break(BreakStatement { token, value }))
+    }
 }
 
 
@@ -1300,7 +1504,166 @@ fn test_operator_precedence_parsing() {
 
     #[test]
     fn test_range_expression() {
-        let input = "1..5";
+        let input = "1..5; 1..=5;";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        for error in &program.errors {
+            println!("{}", error);
+        }
+
+        println!("{}", program.to_string());
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 2);
+
+        match &program.statements[0] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Range(ref range) => {
+                    assert_eq!(range.left.to_string(), "1");
+                    assert_eq!(range.right.to_string(), "5");
+                    assert_eq!(range.inclusive, false);
+                }
+                _ => panic!("expected range expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+
+        match &program.statements[1] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Range(ref range) => {
+                    assert_eq!(range.left.to_string(), "1");
+                    assert_eq!(range.right.to_string(), "5");
+                    assert_eq!(range.inclusive, true);
+                }
+                _ => panic!("expected range expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
+
+    #[test]
+    fn test_range_from_expressions() {
+        let input = "(1..); (1..=);";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        for error in &program.errors {
+            println!("{}", error);
+        }
+
+        println!("{}", program.to_string());
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 2);
+
+        match &program.statements[0] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::RangeFrom(ref range) => {
+                    assert_eq!(range.left.to_string(), "1");
+                    assert_eq!(range.inclusive, false);
+                }
+                _ => panic!("expected range expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+
+        match &program.statements[1] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::RangeFrom(ref range) => {
+                    assert_eq!(range.left.to_string(), "1");
+                    assert_eq!(range.inclusive, true);
+                }
+                _ => panic!("expected range expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
+
+    #[test]
+    fn test_range_to_expressions() {
+        let input = "..5; ..=5;";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        for error in &program.errors {
+            println!("{}", error);
+        }
+
+        println!("{}", program.to_string());
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 2);
+
+        match &program.statements[0] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::RangeTo(ref range) => {
+                    assert_eq!(range.right.to_string(), "5");
+                    assert_eq!(range.inclusive, false);
+                }
+                _ => panic!("expected range expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+
+        match &program.statements[1] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::RangeTo(ref range) => {
+                    assert_eq!(range.right.to_string(), "5");
+                    assert_eq!(range.inclusive, true);
+                }
+                _ => panic!("expected range expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
+
+    #[test]
+    fn test_range_full_expression() {
+        let input = "(..); array[..];";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        for error in &program.errors {
+            println!("{}", error);
+        }
+
+        println!("{}", program.to_string());
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 2);
+
+        match &program.statements[0] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::RangeFull(_) => {}
+                _ => panic!("expected range expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+
+        match &program.statements[1] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::Index(ref index) => {
+                    assert_eq!(index.left.to_string(), "array");
+                    assert_eq!(index.index.to_string(), "(..)");
+                }
+                _ => panic!("expected index expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
+
+    #[test]
+    fn test_for_loop() {
+        let input = "for i in 1..5 { i; }";
 
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
@@ -1317,15 +1680,95 @@ fn test_operator_precedence_parsing() {
 
         match &program.statements[0] {
             Statement::Expression(ref expr) => match expr.expression {
-                Expression::Range(ref range) => {
-                    assert_eq!(range.left.to_string(), "1");
-                    assert_eq!(range.right.to_string(), "5");
-                    assert_eq!(range.inclusive, false);
+                Expression::For(ref for_loop) => {
+                    assert_eq!(for_loop.iterator.to_string(), "i");
+                    assert_eq!(for_loop.iterable.to_string(), "(1..5)");
+                    assert_eq!(for_loop.body.statements.len(), 1);
                 }
-                _ => panic!("expected range expression"),
+                _ => panic!("expected for loop expression"),
             },
             _ => panic!("expected expression statement"),
         };
     }
 
+    #[test]
+    fn test_for_loop_with_index() {
+        let input = "for (i, j) in 1..5 { i; j; }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        for error in &program.errors {
+            println!("{}", error);
+        }
+
+        println!("{}", program);
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::For(ref for_loop) => {
+                    println!("{:#?}", for_loop);
+                    assert_eq!(for_loop.iterator.to_string(), "j");
+                    assert_eq!(for_loop.iterable.to_string(), "(1..5)");
+                    assert_eq!(for_loop.body.statements.len(), 2);
+
+                    match for_loop.index {
+                        Some(ref index) => {
+                            assert_eq!(index.to_string(), "i");
+                        }
+                        None => panic!("expected index"),
+                    }
+                }
+                _ => panic!("expected for loop expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
+
+    #[test]
+    fn test_break_continue() {
+        let input = r#"
+        break;
+        continue;
+        break 1;
+        "#;
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        for error in &program.errors {
+            println!("{}", error);
+        }
+
+        println!("{}", program);
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 3);
+
+        match &program.statements[0] {
+            Statement::Break(ref break_stmt) => {
+                assert_eq!(break_stmt.value, None);
+            },
+            _ => panic!("expected expression statement"),
+        };
+
+        match &program.statements[1] {
+            Statement::Continue(_) => {},
+            _ => panic!("expected expression statement"),
+        };
+
+        match &program.statements[2] {
+            Statement::Break(ref break_stmt) => {
+                assert_eq!(break_stmt.value.is_some(), true);
+                assert_eq!(break_stmt.value.as_ref().unwrap().to_string(), "1");
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
 }
+

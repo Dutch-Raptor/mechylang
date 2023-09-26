@@ -118,6 +118,49 @@ impl Environment {
             None => Err("Cannot mutate variable that does not exist".to_string()),
         }
     }
+
+    /// A function to update a value in the environment
+    ///
+    /// This function takes a name and a function that takes a mutable reference to an Object
+    /// It then searches for the value in the environment and applies the function to it
+    pub fn update(
+        &mut self,
+        name: impl Into<Rc<str>>,
+        func: impl FnOnce(&mut Object) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let name = name.into();
+        let mut env = self.inner.write().unwrap();
+        if let Some(obj) = env.store.get_mut(&name) {
+            func(obj)
+        } else if let Some(outer) = &env.outer {
+            Self::update_outer(outer, name, func)
+        } else {
+            Err("Cannot mutate variable that does not exist".to_string())
+        }
+    }
+
+    /// A function to update a value in an outer environment
+    fn update_outer(
+        outer: &Weak<RwLock<InnerEnvironment>>,
+        name: impl Into<Rc<str>>,
+        func: impl FnOnce(&mut Object) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let name = name.into();
+        // Try to upgrade the weak reference
+        let outer_ref = outer.upgrade().unwrap();
+
+        // Lock the outer environment
+        let mut outer_env = outer_ref.write().unwrap();
+
+        // Get the value from the outer environment
+        if let Some(obj) = outer_env.store.get_mut(&name) {
+            func(obj)
+        } else if let Some(outer) = &outer_env.outer {
+            Self::update_outer(outer, name, func)
+        } else {
+            Err("Cannot mutate variable that does not exist".to_string())
+        }
+    }
 }
 
 #[derive(Default)]

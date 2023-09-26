@@ -1,0 +1,23 @@
+let fizzbuzz = fn(n) {
+  for i in 1..=n {
+    if (i % 3 == 0 && i % 5 == 0) {
+      print("FizzBuzz");
+      continue;
+    }
+
+    if (i % 3 == 0) {
+      print("Fizz");
+      continue;
+    }
+
+    if (i % 5 == 0) {
+      print("Buzz");
+      continue;
+    }
+
+    print(i);
+
+  }
+};
+
+fizzbuzz(100);

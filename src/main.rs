@@ -24,7 +24,7 @@ enum Command {
     /// Run a file
     File {
         /// The file to run
-        file: Option<PathBuf>,
+        file: PathBuf,
     },
     /// Run the REPL
     Repl,
@@ -36,10 +36,15 @@ fn main() {
     if let Some(command) = args.command {
         match command {
             Command::File { file } => {
-                let file = file.expect("No file specified");
                 let file = file.to_str().expect("Invalid file path");
 
-                evaluator::eval_file(file);
+                let res = evaluator::eval_file(file);
+
+                if let Err(e) = res {
+                    for e in e {
+                        color_print::cprint!("{}", e);
+                    }
+                }
             }
             Command::Repl => repl(),
         }

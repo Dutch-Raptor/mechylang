@@ -1,8 +1,11 @@
 use std::{fmt::Display, ops::RangeInclusive, rc::Rc};
 
-use crate::parser::{expressions::Identifier, parser::BlockStatement};
+use crate::parser::{
+    expressions::{Expression, Identifier},
+    parser::BlockStatement,
+};
 
-use super::{builtins::BuiltinError, environment::Environment};
+use super::{builtins::BuiltinError, environment::Environment, iterators::IteratorObject};
 
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
@@ -18,13 +21,24 @@ pub enum Object {
     String(Rc<str>),
     BuiltinFunction(BuiltinFunction),
     Array(Vec<Object>),
+    RangeFrom(Rc<Object>),
+    RangeTo(Rc<Object>),
+    RangeToInclusive(Rc<Object>),
+    Range(Rc<Object>, Rc<Object>),
+    RangeInclusive(Rc<Object>, Rc<Object>),
+    RangeFull,
+
+    Iterator(IteratorObject),
+
+    Break(Option<Box<Object>>),
+    Continue,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BuiltinFunction {
     pub name: &'static str,
     pub args_len: RangeInclusive<usize>,
-    pub function: fn(Vec<Object>) -> BuiltinResult,
+    pub function: fn(&Vec<Object>, &Vec<Expression>, &mut Environment) -> BuiltinResult,
 }
 
 type BuiltinResult = Result<Object, (String, BuiltinError)>;
@@ -118,6 +132,16 @@ impl Display for Object {
 
                 write!(f, "[{}]", elements)
             }
+            Object::RangeFrom(from) => write!(f, "{}..", from),
+            Object::RangeTo(to) => write!(f, "..{}", to),
+            Object::RangeToInclusive(to) => write!(f, "..={}", to),
+            Object::Range(from, to) => write!(f, "{}..{}", from, to),
+            Object::RangeInclusive(from, to) => write!(f, "{}..={}", from, to),
+            Object::RangeFull => write!(f, ".."),
+            Object::Iterator(iterator) => write!(f, "{}", iterator),
+            Object::Break(Some(val)) => write!(f, "break {}", val),
+            Object::Break(None) => write!(f, "break"),
+            Object::Continue => write!(f, "continue"),
         }
     }
 }
@@ -153,5 +177,11 @@ impl From<Vec<Object>> for Object {
 impl From<i64> for Object {
     fn from(int: i64) -> Self {
         Object::Integer(int)
+    }
+}
+
+impl From<BuiltinFunction> for Object {
+    fn from(builtin: BuiltinFunction) -> Self {
+        Object::BuiltinFunction(builtin)
     }
 }

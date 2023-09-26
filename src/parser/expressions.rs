@@ -40,6 +40,7 @@ pub enum Expression {
     RangeTo(RangeToExpression),
     RangeFrom(RangeFromExpression),
     RangeFull(RangeFullExpression),
+    For(ForExpression),
 }
 
 pub trait ExpressionToken {
@@ -66,6 +67,7 @@ impl ExpressionToken for Expression {
             Expression::RangeTo(range) => &range.token,
             Expression::RangeFrom(range) => &range.token,
             Expression::RangeFull(range) => &range.token,
+            Expression::For(for_expr) => &for_expr.token,
         }
     }
 }
@@ -90,6 +92,7 @@ impl Display for Expression {
             Expression::RangeTo(range) => write!(f, "{}", range),
             Expression::RangeFrom(range) => write!(f, "{}", range),
             Expression::RangeFull(range) => write!(f, "{}", range),
+            Expression::For(for_expr) => write!(f, "{}", for_expr),
         }
     }
 }
@@ -385,6 +388,9 @@ impl PrecedenceTrait for TokenKind {
             TokenKind::Let => Precedence::Lowest,
             TokenKind::EOF => Precedence::Lowest,
             TokenKind::RightParen => Precedence::Lowest,
+            TokenKind::For => Precedence::Lowest,
+            TokenKind::In => Precedence::Lowest,
+            TokenKind::If => Precedence::Lowest,
             _ => {
                 return None;
             }
@@ -484,7 +490,7 @@ impl Display for RangeExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "({}{}..{})",
+            "({}{}{})",
             self.left,
             if self.inclusive { "..=" } else { ".." },
             self.right
@@ -501,12 +507,7 @@ pub struct RangeToExpression {
 
 impl Display for RangeToExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "(..{}{})",
-            if self.inclusive { "=" } else { "" },
-            self.right
-        )
+        write!(f, "(..{})", self.right)
     }
 }
 
@@ -536,5 +537,29 @@ pub struct RangeFullExpression {
 impl Display for RangeFullExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "(..)")
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ForExpression {
+    pub token: Token,
+    pub iterator: Identifier,
+    pub iterable: Rc<Expression>,
+    pub body: BlockStatement,
+    pub index: Option<Identifier>,
+}
+
+impl Display for ForExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "for {} in {} {{\n{}\n}}",
+            match &self.index {
+                Some(index) => format!("({}, {})", index, self.iterator),
+                None => format!("{}", self.iterator),
+            },
+            self.iterable,
+            self.body
+        )
     }
 }
