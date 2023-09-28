@@ -31,6 +31,11 @@ impl Environment {
         }
     }
 
+    pub fn set_outer(&mut self, outer: &Environment) {
+        let mut env = self.inner.write().unwrap();
+        env.outer = Some(Rc::downgrade(&outer.inner));
+    }
+
     /// Recursively get a value from the environment
     ///
     /// Keeps trying to get the value from the outer environment until it succeeds or there are no more outer
@@ -126,8 +131,8 @@ impl Environment {
     pub fn update(
         &mut self,
         name: impl Into<Rc<str>>,
-        func: impl FnOnce(&mut Object) -> Result<(), String>,
-    ) -> Result<(), String> {
+        func: impl FnOnce(&mut Object) -> Result<Object, String>,
+    ) -> Result<Object, String> {
         let name = name.into();
         let mut env = self.inner.write().unwrap();
         if let Some(obj) = env.store.get_mut(&name) {
@@ -143,8 +148,8 @@ impl Environment {
     fn update_outer(
         outer: &Weak<RwLock<InnerEnvironment>>,
         name: impl Into<Rc<str>>,
-        func: impl FnOnce(&mut Object) -> Result<(), String>,
-    ) -> Result<(), String> {
+        func: impl FnOnce(&mut Object) -> Result<Object, String>,
+    ) -> Result<Object, String> {
         let name = name.into();
         // Try to upgrade the weak reference
         let outer_ref = outer.upgrade().unwrap();

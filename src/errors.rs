@@ -34,6 +34,7 @@ pub enum ErrorKind {
     IndexOperatorNotSupported,
     InvalidLeftHandSide,
     MutateError,
+    MethodError,
 }
 
 impl Display for Error {

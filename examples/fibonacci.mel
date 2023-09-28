@@ -1,20 +1,21 @@
-
 let fib = fn(n) {
-  if (n == 0) {
+  if n == 0 {
     return 0;
   }
 
-  if (n == 1) {
+  if n == 1 {
     return 1;
   }
 
   return fib(n - 1) + fib(n - 2);
 };
 
-print("Recursive Fibonacci: fib(10) = ", fib(10));
+let result = fib(10);
+
+print("Recursive Fibonacci: fib(10) = ", result);
 
 // Iterative Fibonacci
-let fib = fn(n) {
+let fib2 = fn(n) {
   let a = 0;
   let b = 1;
 
@@ -26,4 +27,8 @@ let fib = fn(n) {
   return a;
 };
 
-print("Iterative Fibonacci: fib(10) = ", fib(10));
+let result2 = fib2(10);
+
+print("Iterative Fibonacci: fib(10) = ", result2);
+
+[result, result2]

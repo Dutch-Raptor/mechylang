@@ -11,7 +11,7 @@ use color_print::cformat;
 
 use super::expressions::{
     BooleanLiteral, FloatLiteral, FunctionLiteral, IfExpression, InfixExpression, IntegerLiteral,
-    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral, ArrayLiteral, IndexExpression, Precedence, RangeToExpression, RangeExpression, RangeFromExpression, RangeFullExpression, ForExpression,
+    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral, ArrayLiteral, IndexExpression, Precedence, RangeToExpression, RangeExpression, RangeFromExpression, RangeFullExpression, ForExpression, WhileExpression, MemberExpression,
 };
 
 #[derive(Debug)]
@@ -213,163 +213,6 @@ impl Parser {
         program
     }
 
-    fn parse_prefix(&mut self, token: TokenKind) -> Result<Expression, Error> {
-        let _trace = trace!("parse_prefix");
-        match token {
-            TokenKind::Identifier(_) => self.parse_identifier(),
-            TokenKind::Number(_) => self.parse_number(),
-            TokenKind::True | TokenKind::False => self.parse_boolean(),
-
-            TokenKind::Fn => self.parse_function_literal(),
-
-            TokenKind::If => self.parse_if_expression(),
-
-            TokenKind::Bang => self.parse_prefix_expression(),
-            TokenKind::Minus => self.parse_prefix_expression(),
-
-            // Block expressions
-            TokenKind::LeftSquirly => self.parse_block_expression(),
-
-            TokenKind::String(_) => self.parse_string(),
-
-            TokenKind::LeftParen => self.parse_grouped_expression(),
-
-            TokenKind::LeftSquare => self.parse_array_expression(),
-
-            TokenKind::For => self.parse_for_expression(),
-
-            TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_prefix_expression(),
-            _ => Err(self.error_current(
-                ErrorKind::MissingPrefix,
-                format!("No registered prefix function for {:?}", token),
-            )),
-        }
-    }
-
-    fn has_prefix(&self, token: &TokenKind) -> bool {
-        match token {
-            TokenKind::Identifier(_) => true,
-            TokenKind::Number(_) => true,
-
-            TokenKind::Fn => true,
-
-            TokenKind::LeftParen => true,
-
-            TokenKind::True | TokenKind::False => true,
-
-            TokenKind::Bang => true,
-            TokenKind::Minus => true,
-
-            TokenKind::If => true,
-            TokenKind::For => true,
-
-            TokenKind::String(_) => true,
-
-            // Block expressions
-            TokenKind::LeftSquirly => true,
-
-            // Array expressions
-            TokenKind::LeftSquare => true,
-
-            // Range expressions
-            TokenKind::RangeExclusive | TokenKind::RangeInclusive => true,
-            _ => false,
-        }
-    }
-
-    fn parse_infix(&mut self, token: TokenKind, left: Expression) -> Result<Expression, Error> {
-        let _trace = trace!("parse_infix");
-        match token {
-            TokenKind::Plus
-            | TokenKind::Minus
-            | TokenKind::Divide
-            | TokenKind::Multiply
-            | TokenKind::Modulo
-            | TokenKind::CompareEqual
-            | TokenKind::CompareNotEqual
-            | TokenKind::CompareGreater
-            | TokenKind::CompareGreaterEqual
-            | TokenKind::CompareLess
-            | TokenKind::CompareLessEqual 
-            | TokenKind::LogicalAnd
-            | TokenKind::LogicalOr
-            | TokenKind::BitwiseAnd
-            | TokenKind::BitwiseOr
-            | TokenKind::BitwiseXor
-            | TokenKind::BitwiseLeftShift
-            | TokenKind::BitwiseRightShift
-
-            // Assignments
-            | TokenKind::AssignEqual
-            | TokenKind::AssignPlus
-            | TokenKind::AssignMinus
-            | TokenKind::AssignMultiply
-            | TokenKind::AssignDivide
-            | TokenKind::AssignModulo
-            | TokenKind::AssignBitwiseAnd
-            | TokenKind::AssignBitwiseOr
-            | TokenKind::AssignBitwiseXor
-
-                => self.parse_infix_expression(left),
-            TokenKind::LeftParen => self.parse_call_expression(left),
-            TokenKind::LeftSquare => self.parse_index_expression(left),
-            TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_infix_expression(token, left),
-            _ => Err(self.error_current(
-                ErrorKind::MissingInfix,
-                format!("No registered infix function for {:?}", token),
-            )),
-        }
-    }
-
-    fn has_infix(&self, token: &TokenKind) -> bool {
-        match token {
-            TokenKind::Plus
-            | TokenKind::Minus
-            | TokenKind::Divide
-            | TokenKind::Multiply
-            | TokenKind::Modulo
-            | TokenKind::CompareEqual
-            | TokenKind::CompareNotEqual
-            | TokenKind::CompareGreater
-            | TokenKind::CompareGreaterEqual
-            | TokenKind::CompareLess
-            | TokenKind::CompareLessEqual 
-            // Open parenthesis for function calls
-            | TokenKind::LeftParen
-            // Open square bracket for array indexing
-            | TokenKind::LeftSquare
-
-            // logical operators
-            | TokenKind::LogicalAnd
-            | TokenKind::LogicalOr
-
-                // bitwise operators
-            | TokenKind::BitwiseAnd
-            | TokenKind::BitwiseOr
-            | TokenKind::BitwiseXor
-            | TokenKind::BitwiseLeftShift
-            | TokenKind::BitwiseRightShift
-
-            // Assignment operators
-            | TokenKind::AssignEqual
-            | TokenKind::AssignPlus
-            | TokenKind::AssignMinus
-            | TokenKind::AssignMultiply
-            | TokenKind::AssignDivide
-            | TokenKind::AssignModulo
-            | TokenKind::AssignBitwiseAnd
-            | TokenKind::AssignBitwiseOr
-            | TokenKind::AssignBitwiseXor
-
-            // Range operator
-            | TokenKind::RangeExclusive
-            | TokenKind::RangeInclusive
-
-                => true,
-            _ => false,
-        }
-    }
-
     fn parse_statement(&mut self) -> Result<Statement, Error> {
         let _trace = trace!("parse_statement");
 
@@ -508,6 +351,170 @@ impl Parser {
         }
 
         return Ok(left_exp);
+    }
+
+    fn has_prefix(&self, token: &TokenKind) -> bool {
+        match token {
+            TokenKind::Identifier(_) => true,
+            TokenKind::Number(_) => true,
+
+            TokenKind::Fn => true,
+
+            TokenKind::LeftParen => true,
+
+            TokenKind::True | TokenKind::False => true,
+
+            TokenKind::Bang => true,
+            TokenKind::Minus => true,
+
+            // Control flow expressions
+            TokenKind::If => true,
+            TokenKind::For => true,
+            TokenKind::While => true,
+
+            TokenKind::String(_) => true,
+
+            // Block expressions
+            TokenKind::LeftSquirly => true,
+
+            // Array expressions
+            TokenKind::LeftSquare => true,
+
+            // Range expressions
+            TokenKind::RangeExclusive | TokenKind::RangeInclusive => true,
+            _ => false,
+        }
+    }
+
+    fn parse_prefix(&mut self, token: TokenKind) -> Result<Expression, Error> {
+        let _trace = trace!("parse_prefix");
+        match token {
+            TokenKind::Identifier(_) => self.parse_identifier(),
+            TokenKind::Number(_) => self.parse_number(),
+            TokenKind::True | TokenKind::False => self.parse_boolean(),
+
+            TokenKind::Fn => self.parse_function_literal(),
+
+            TokenKind::If => self.parse_if_expression(),
+
+            TokenKind::Bang => self.parse_prefix_expression(),
+            TokenKind::Minus => self.parse_prefix_expression(),
+
+            // Block expressions
+            TokenKind::LeftSquirly => self.parse_block_expression(),
+
+            TokenKind::String(_) => self.parse_string(),
+
+            TokenKind::LeftParen => self.parse_grouped_expression(),
+
+            TokenKind::LeftSquare => self.parse_array_expression(),
+
+            TokenKind::For => self.parse_for_expression(),
+            TokenKind::While => self.parse_while_expression(),
+
+            TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_prefix_expression(),
+            _ => Err(self.error_current(
+                ErrorKind::MissingPrefix,
+                format!("No registered prefix function for {:?}", token),
+            )),
+        }
+    }
+
+    fn has_infix(&self, token: &TokenKind) -> bool {
+        match token {
+            TokenKind::Plus
+            | TokenKind::Minus
+            | TokenKind::Divide
+            | TokenKind::Multiply
+            | TokenKind::Modulo
+            | TokenKind::CompareEqual
+            | TokenKind::CompareNotEqual
+            | TokenKind::CompareGreater
+            | TokenKind::CompareGreaterEqual
+            | TokenKind::CompareLess
+            | TokenKind::CompareLessEqual 
+            // Open parenthesis for function calls
+            | TokenKind::LeftParen
+            // Open square bracket for array indexing
+            | TokenKind::LeftSquare
+
+            // logical operators
+            | TokenKind::LogicalAnd
+            | TokenKind::LogicalOr
+
+                // bitwise operators
+            | TokenKind::BitwiseAnd
+            | TokenKind::BitwiseOr
+            | TokenKind::BitwiseXor
+            | TokenKind::BitwiseLeftShift
+            | TokenKind::BitwiseRightShift
+
+            // Assignment operators
+            | TokenKind::AssignEqual
+            | TokenKind::AssignPlus
+            | TokenKind::AssignMinus
+            | TokenKind::AssignMultiply
+            | TokenKind::AssignDivide
+            | TokenKind::AssignModulo
+            | TokenKind::AssignBitwiseAnd
+            | TokenKind::AssignBitwiseOr
+            | TokenKind::AssignBitwiseXor
+
+            // Range operator
+            | TokenKind::RangeExclusive
+            | TokenKind::RangeInclusive
+
+            // Method expressions
+            | TokenKind::Dot 
+
+                => true,
+            _ => false,
+        }
+    }
+
+    fn parse_infix(&mut self, token: TokenKind, left: Expression) -> Result<Expression, Error> {
+        let _trace = trace!("parse_infix");
+        match token {
+            TokenKind::Plus
+            | TokenKind::Minus
+            | TokenKind::Divide
+            | TokenKind::Multiply
+            | TokenKind::Modulo
+            | TokenKind::CompareEqual
+            | TokenKind::CompareNotEqual
+            | TokenKind::CompareGreater
+            | TokenKind::CompareGreaterEqual
+            | TokenKind::CompareLess
+            | TokenKind::CompareLessEqual 
+            | TokenKind::LogicalAnd
+            | TokenKind::LogicalOr
+            | TokenKind::BitwiseAnd
+            | TokenKind::BitwiseOr
+            | TokenKind::BitwiseXor
+            | TokenKind::BitwiseLeftShift
+            | TokenKind::BitwiseRightShift
+
+            // Assignments
+            | TokenKind::AssignEqual
+            | TokenKind::AssignPlus
+            | TokenKind::AssignMinus
+            | TokenKind::AssignMultiply
+            | TokenKind::AssignDivide
+            | TokenKind::AssignModulo
+            | TokenKind::AssignBitwiseAnd
+            | TokenKind::AssignBitwiseOr
+            | TokenKind::AssignBitwiseXor
+
+                => self.parse_infix_expression(left),
+            TokenKind::LeftParen => self.parse_call_expression(left),
+            TokenKind::LeftSquare => self.parse_index_expression(left),
+            TokenKind::Dot => self.parse_member(left),
+            TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_infix_expression(token, left),
+            _ => Err(self.error_current(
+                ErrorKind::MissingInfix,
+                format!("No registered infix function for {:?}", token),
+            )),
+        }
     }
 
     fn is_cur_token(&self, token: TokenKind) -> bool {
@@ -703,12 +710,10 @@ impl Parser {
     fn parse_if_expression(&mut self) -> Result<Expression, Error> {
         let token = self.cur_token.clone();
 
-        self.expect_peek(TokenKind::LeftParen)?;
 
         self.next_token();
         let condition = self.parse_expression(Precedence::Lowest)?;
 
-        self.expect_peek(TokenKind::RightParen)?;
         self.expect_peek(TokenKind::LeftSquirly)?;
 
         // parse_block_statement handles opening and closing braces
@@ -1109,6 +1114,52 @@ impl Parser {
 
         Ok(Statement::Break(BreakStatement { token, value }))
     }
+
+    /// Parses a while expression
+    ///
+    /// valid syntax:
+    ///
+    /// ```text
+    /// while <condition> { <body> }
+    fn parse_while_expression(&mut self) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+
+        self.next_token();
+
+        let condition = self.parse_expression(Precedence::Lowest)?;
+
+        self.expect_peek(TokenKind::LeftSquirly)?;
+
+        let body = self.parse_block_statement()?;
+
+        Ok(Expression::While(WhileExpression {
+            token,
+            condition: Rc::new(condition),
+            body,
+        }))
+    }
+
+    fn parse_member(&mut self, left: Expression) -> Result<Expression, Error> {
+        let token = self.cur_token.clone();
+
+        self.next_token();
+
+        let property = match self.parse_identifier()? {
+            Expression::Identifier(ident) => ident,
+            _ => {
+                return Err(self.error_current(
+                    ErrorKind::UnexpectedToken,
+                    format!("Expected a property (identifier), got {:?}", self.cur_token),
+                ))
+            }
+        };
+
+        Ok(Expression::Member(MemberExpression {
+            token,
+            object: Rc::new(left),
+            property,
+        }))
+    }
 }
 
 
@@ -1297,6 +1348,36 @@ fn test_operator_precedence_parsing() {
                     assert_eq!(block.statements[2].to_string(), "(x + y);");
                 }
                 _ => panic!("expected block expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let input = "if x < y { x }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        for error in &program.errors {
+            println!("{}", error);
+        }
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 1);
+
+        let stmt = &program.statements[0];
+
+        match stmt {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::If(ref if_expr) => {
+                    assert_eq!(if_expr.condition.to_string(), "(x < y)");
+                    assert_eq!(if_expr.consequence.to_string().trim(), "x;");
+                    assert_eq!(if_expr.alternative.is_none(), true);
+                }
+                _ => panic!("expected if expression"),
             },
             _ => panic!("expected expression statement"),
         };
@@ -1769,6 +1850,45 @@ fn test_operator_precedence_parsing() {
             },
             _ => panic!("expected expression statement"),
         };
+    }
+
+    #[test]
+    fn test_while_expression() {
+        let input = "while true { 1; }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        println!("{}", program);
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 1);
+
+        match &program.statements[0] {
+            Statement::Expression(ref expr) => match expr.expression {
+                Expression::While(ref while_expr) => {
+                    assert_eq!(while_expr.condition.to_string(), "true");
+                    assert_eq!(while_expr.body.statements.len(), 1);
+                }
+                _ => panic!("expected while expression"),
+            },
+            _ => panic!("expected expression statement"),
+        };
+    }
+
+    #[test]
+    fn test_method_call() {
+        let input = "foo.bar(1, 2, 3);";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        println!("{}", program);
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 1);
     }
 }
 

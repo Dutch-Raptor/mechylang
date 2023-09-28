@@ -6,15 +6,15 @@ use crate::{
     parser::{
         expressions::{
             ArrayLiteral, CallExpression, Expression, ExpressionToken, Identifier, IfExpression,
-            IndexExpression, InfixExpression, InfixOperator, PrefixOperator, ForExpression,
+            IndexExpression, InfixExpression, InfixOperator, PrefixOperator, ForExpression, WhileExpression, MemberExpression,
         },
-        parser::{BlockStatement, LetStatement, Parser, Statement, BreakStatement},
-    }, trace,
+        parser::{BlockStatement, LetStatement, Parser, Statement },
+    }, trace, evaluator::methods::ObjectMethods,
 };
 
 use super::{
     environment::Environment,
-    objects::{Function, Object, UnwrapReturnValue, BuiltinFunction}, iterators::IteratorObject,
+    objects::{Function, Object, UnwrapReturnValue, BuiltinFunction}, iterators::IteratorObject, methods::Method,
 };
 
 pub type EvalResult = Result<Object, Rc<[Error]>>;
@@ -47,6 +47,8 @@ impl Evaluator {
             .eval_program(program.statements, env)
             .map_err(|err| vec![err].into())
     }
+
+    
 
     pub fn eval_program(
         mut self,
@@ -136,10 +138,12 @@ impl Evaluator {
             Expression::ArrayLiteral(array) => self.eval_array_expression(array, env),
             Expression::Index(index) => self.eval_index_expression(index, env),
             Expression::For(for_expr) => self.eval_for_expression(for_expr, env),
+            Expression::While(while_expr) => self.eval_while_expression(while_expr, env),
             Expression::Range(_)
             | Expression::RangeFrom(_)
             | Expression::RangeTo(_)
             | Expression::RangeFull(_) => self.eval_range_expression(expression, env),
+            Expression::Member(member) => self.eval_member_expression(member, env),
             other => panic!("Unhandled expression: {:?}", other), 
         }
     }
@@ -234,7 +238,7 @@ impl Evaluator {
     ) -> Result<Object, Error> {
         let condition = self.eval_expression(&if_expr.condition, env)?;
 
-        if Self::is_truthy(condition) {
+        if Self::is_truthy(&condition) {
             self.eval_block_statement(&if_expr.consequence, env)
         } else if let Some(alternative) = &if_expr.alternative {
             self.eval_block_statement(alternative, env)
@@ -243,10 +247,10 @@ impl Evaluator {
         }
     }
 
-    fn is_truthy(condition: Object) -> bool {
+    pub fn is_truthy(condition: &Object) -> bool {
         match condition {
             Object::Null => false,
-            Object::Boolean(boolean) => boolean,
+            Object::Boolean(boolean) => *boolean,
             _ => true,
         }
     }
@@ -441,10 +445,21 @@ impl Evaluator {
             return self.apply_builtin_function(&builtin, &call.arguments, env);
         }
 
+        if let Object::Method(method) = function {
+            return self.apply_method(&method, &call.arguments, env);
+        }
+
+        if let Object::Null = function {
+            return Err(self.error(
+                Some(call.function.token()),
+                "Cannot call null",
+                ErrorKind::TypeError,
+            ));
+        }
+
         let arguments = self.eval_expressions(&call.arguments, env)?;
 
-
-        self.apply_function(function, arguments).map_err(|err| {
+        self.apply_function(function, arguments, None).map_err(|err| {
             self.error(
                 Some(call.function.token()),
                 err.message.as_str(),
@@ -453,10 +468,24 @@ impl Evaluator {
         })
     }
 
+    pub fn eval_function(function: Object, arguments: Vec<Object>, env: Option<Environment>) -> Result<Object, String> {
+        let mut evaluator = Evaluator {
+            globals: HashMap::new(),
+            current_token: None,
+            lines: vec![],
+        };
+
+        evaluator
+            .apply_function(function, arguments, env)
+            .map(|object| object.unwrap_return_value())
+            .map_err(|err| err.message)
+    }
+
     fn apply_function(
         &mut self,
         function: Object,
         arguments: Vec<Object>,
+        env: Option<Environment>,
     ) -> Result<Object, Error> {
         let _trace = trace!(&format!("apply_function({}, {:?})", function, arguments));
         let function = match function {
@@ -472,6 +501,15 @@ impl Evaluator {
 
         let mut extended_env = self.extend_function_env(&function, arguments)?;
 
+        // if any external environment was passed, extend the function environment with it
+        // this is used to pass mutable variables to functions in method calls
+        if let Some(mut env) = env {
+            let new_outer = Environment::new_enclosed(&extended_env);
+            env.set_outer(&new_outer);
+            extended_env = env;
+        }
+
+
         let evaluated = self.eval_block_statement(&function.body, &mut extended_env)?;
 
         Ok(evaluated.unwrap_return_value())
@@ -484,6 +522,19 @@ impl Evaluator {
     ) -> Result<Environment, Error> {
         let _trace = trace!(&format!("extend_function_env({}, {:?})", function, arguments));
         let mut env = Environment::new_enclosed(&function.env);
+
+        if function.params.len() != arguments.len() {
+            return Err(self.error(
+                None,
+                format!(
+                    "Wrong number of arguments: expected {}, got {}",
+                    function.params.len(),
+                    arguments.len()
+                )
+                .as_str(),
+                ErrorKind::WrongNumberOfArguments,
+            ));
+        }
 
         for (parameter, argument) in function.params.iter().zip(arguments) {
             env.set(parameter.value.clone(), argument);
@@ -575,7 +626,7 @@ impl Evaluator {
                 format!(
                     "Wrong number of arguments. Expected {}, got {}",
                     match function.args_len.start() - function.args_len.end() {
-                        0 => format!("{} argument", function.args_len.start()),
+                        0 => format!("{} argument(s)", function.args_len.start()),
                         _ => format!("{} to {} arguments", function.args_len.start(), function.args_len.end())
                     },
                 
@@ -737,14 +788,10 @@ impl Evaluator {
             index += 1;
 
             match result {
-                // TODO add these later
-                // Object::Break => break,
-                // Object::Continue => continue,
                 Object::ReturnValue(_) => return Ok(result),
                 Object::Break(Some(value)) => return Ok(*value),
                 Object::Break(None) => return Ok(Object::Null),
-                // Stopping the current iteration is already handled by eval_block_statement
-                Object::Continue => continue,
+                // continue is handled in eval_block_statement
                 _ => {}
             }
         }
@@ -777,9 +824,75 @@ impl Evaluator {
                 &format!("Invalid range expression: {:?}", expression).to_string(),
                 ErrorKind::UnexpectedToken,
             ));}
-
-
         })
+    }
+
+    fn eval_while_expression(&mut self, while_expr: &WhileExpression, env: &mut Environment) -> Result<Object, Error> {
+        let _trace = trace!(&format!("eval_while_expression: {}", while_expr));
+
+        let mut result = Object::Null;
+
+        while Self::is_truthy(&self.eval_expression(&while_expr.condition, env)?) {
+            let mut new_env = Environment::new_enclosed(env);
+
+            result = self.eval_block_statement(&while_expr.body, &mut new_env)?;
+
+            match result {
+                Object::ReturnValue(_) => return Ok(result),
+                Object::Break(Some(value)) => return Ok(*value),
+                Object::Break(None) => return Ok(Object::Null),
+                // continue is handled in eval_block_statement
+                _ => {}
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn eval_member_expression(&mut self, member: &MemberExpression, env: &mut Environment) -> Result<Object, Error> {
+        let _trace = trace!(&format!("eval_member_expression: {}", member));
+
+        
+        let object = self.eval_expression(&member.object, env)?;
+
+        let property = member.property.value.clone();
+
+        let ident = match *member.object {
+            Expression::Identifier(ref ident) => Some(ident.value.clone()),
+            _ => None,
+        };
+
+        if let Some(method) = object.get_method(&property, ident) {
+            return Ok(Object::Method(method));
+        }
+
+        // try to read property from object
+        panic!("TODO: implement reading property from object");
+    }
+
+    fn apply_method(&mut self, method: &Method, arguments: &[Expression], env: &mut Environment) -> Result<Object, Error> {
+
+        if !method.args_len.contains(&arguments.len()) {
+            return Err(self.error(
+                self.current_token.as_ref(),
+                &format!(
+                    "Wrong number of arguments: expected {}, got {}",
+                    match method.args_len.start() - method.args_len.end() {
+                        0 => format!("{} argument(s)", method.args_len.start()),
+                        _ => format!("{} to {} arguments", method.args_len.start(), method.args_len.end())
+                    },
+                    arguments.len()
+                ),
+                ErrorKind::WrongNumberOfArguments,
+            ));
+        };
+
+
+        let args = self.eval_expressions(arguments, env)?;
+
+        (method.function)(&method.obj, method.ident.as_deref(), args, env).map_err(|err| self.error(self.current_token.as_ref(), &format!("Error evaluating method: {}", err), ErrorKind::MethodError))
+
+
     }
 }
 
@@ -1086,7 +1199,7 @@ mod tests {
             ),
             (
                 "len(\"one\", \"two\")",
-                "Wrong number of arguments. Expected 1 argument, got 2",
+                "Wrong number of arguments. Expected 1 argument(s), got 2",
                 ErrorKind::WrongNumberOfArguments,
                 "len(\"one\", \"two\")",
                 1,
@@ -1404,33 +1517,61 @@ mod tests {
         }
     }
 
+    // Deprecated in favor of method calls
+    // #[test]
+    // fn test_push_builtin() {
+    //     let tests = vec![
+    //         ("let a = [1, 2, 3]; push(a, 4); a;", Object::Array(vec![
+    //             Object::Integer(1),
+    //             Object::Integer(2),
+    //             Object::Integer(3),
+    //             Object::Integer(4),
+    //         ])),
+    //         ("let a = []; push(a, 1); a;", Object::Array(vec![
+    //             Object::Integer(1),
+    //         ])),
+    //         ("let a = []; push(a, 1); push(a, 2); a;", Object::Array(vec![
+    //             Object::Integer(1),
+    //             Object::Integer(2),
+    //         ])),
+    //         ("let a = []; push(a, 1); push(a, 2); push(a, 3); a;", Object::Array(vec![
+    //             Object::Integer(1),
+    //             Object::Integer(2),
+    //             Object::Integer(3),
+    //         ])),
+    //         ("let a = []; push(a, 1); push(a, 2); push(a, 3); push(a, 4); a;", Object::Array(vec![
+    //             Object::Integer(1),
+    //             Object::Integer(2),
+    //             Object::Integer(3),
+    //             Object::Integer(4),
+    //         ])),
+    //     ];
+    //
+    //     for (input, expected) in tests {
+    //         let evaluated = test_eval(input);
+    //         assert_eq!(evaluated, expected);
+    //     }
+    // }
+
     #[test]
-    fn test_push_builtin() {
+    fn test_eval_while_expression() {
         let tests = vec![
-            ("let a = [1, 2, 3]; push(a, 4); a;", Object::Array(vec![
-                Object::Integer(1),
-                Object::Integer(2),
-                Object::Integer(3),
-                Object::Integer(4),
-            ])),
-            ("let a = []; push(a, 1); a;", Object::Array(vec![
-                Object::Integer(1),
-            ])),
-            ("let a = []; push(a, 1); push(a, 2); a;", Object::Array(vec![
-                Object::Integer(1),
-                Object::Integer(2),
-            ])),
-            ("let a = []; push(a, 1); push(a, 2); push(a, 3); a;", Object::Array(vec![
-                Object::Integer(1),
-                Object::Integer(2),
-                Object::Integer(3),
-            ])),
-            ("let a = []; push(a, 1); push(a, 2); push(a, 3); push(a, 4); a;", Object::Array(vec![
-                Object::Integer(1),
-                Object::Integer(2),
-                Object::Integer(3),
-                Object::Integer(4),
-            ])),
+            ("let sum = 0;
+            let i = 0;
+            while i < 5 {
+                sum += i;
+                i += 1;
+            }
+            sum;", Object::Integer(10)),
+
+            ("let n = 10;
+            let answer = while true {
+                if n == 0 {
+                    break 42;
+                }
+                n -= 1;
+            };
+            answer;", Object::Integer(42)),
         ];
 
         for (input, expected) in tests {
@@ -1473,6 +1614,184 @@ mod tests {
             let evaluated = test_eval(input);
             assert_eq!(evaluated, expected);
         }
+    }
 
+    #[test]
+    fn test_eval_basic_program() {
+        let tests = vec![
+            (r#"
+                let fib = fn(n) {
+                  if n == 0 {
+                    return 0;
+                  }
+
+                  if n == 1 {
+                    return 1;
+                  }
+
+                  return fib(n - 1) + fib(n - 2);
+                };
+
+                fib(10);
+            "#, Object::Integer(55)),
+                (r#"
+                // Iterative Fibonacci
+                let fib = fn(n) {
+                  let a = 0;
+                  let b = 1;
+
+                  for i in 0..n {
+                    b = a + b;
+                    a = b - a;
+                  }
+
+                  return a;
+                };
+
+                fib(10);
+                "#, 
+            Object::Integer(55)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+
+    #[test]
+    fn test_method_call_expression() {
+        let tests = vec![
+            (r#"let a = [1, 2, 3]; a.push(4); a;"#, Object::Array(vec![
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::Integer(3),
+                Object::Integer(4),
+            ])),
+
+            (r#"let a = [1, 2, 3]; let b = a.pop(); [b, a];"#,  
+            Object::Array(vec![
+                Object::Integer(3),
+                Object::Array(vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                ]),
+            ])),
+
+            (r#"let a = [1, 2, 3]; a.len()"#,
+            Object::Integer(3)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    fn test_iter_methods() {
+        let tests = vec![
+            (
+                r#"let a = [1, 2, 3]; a.iter().map(fn(x) { x * 2 }).collect()"#,
+                Object::Array(vec![
+                    Object::Integer(2),
+                    Object::Integer(4),
+                    Object::Integer(6),
+                ]),
+            ),
+            (
+                r#"let a = [1, 2, 3]; a.iter().filter(fn(x) { x % 2 == 0 }).collect()"#,
+                Object::Array(vec![
+                    Object::Integer(2),
+                ]),
+            ),
+            (
+                r#"
+                let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).collect();
+                a;
+                "#,
+                Object::Array(vec![
+                    Object::Integer(9),
+                    Object::Integer(18),
+                    Object::Integer(27),
+                    Object::Integer(36),
+                    Object::Integer(45),
+                    Object::Integer(54),
+                ]),
+            ),
+
+            // sum of first 6 multiples of 9
+            (
+                r#"
+                let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).sum();
+                a;
+                "#,
+                Object::Integer(189),
+            ),
+
+            (
+                r#"
+                let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).fold("", fn(acc, x) { acc + x.to_string() });
+                a;
+                "#,
+                Object::String("91827364554".into()),
+            ),
+
+            (
+                r#"
+                let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).step_by(2).skip(2).take(4).collect();
+                a;
+                "#,
+                Object::Array(vec![
+                    Object::Integer(45),
+                    Object::Integer(63),
+                    Object::Integer(81),
+                    Object::Integer(99),
+                ]),
+            ),
+
+            (
+                r#"
+                let n = 1000;
+
+                let sum_primes = fn(n) {
+                    if n < 2 {
+                        return 0;
+                    };
+                    if n == 2 {
+                        return 2;
+                    };
+                    if n <= 4 {
+                        return 5;
+                    };
+
+                    (5..=n).iter()
+                      .step_by(6)
+                      .fold([2, 3], fn(primes, i) {
+                          if primes.iter().filter(fn(p) { i % p == 0 }).count() == 0 {
+                              primes.push(i);
+                          }
+
+                          if i + 2 <= n && primes.iter().filter(fn(p) { (i + 2) % p == 0 }).count() == 0 {
+                              primes.push(i + 2);
+                          }
+                          primes;
+                      })
+                      .iter()
+                      .sum();
+                };
+                sum_primes(n);
+
+                "#,
+                Object::Integer(76127),
+            ),
+
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, expected);
+        }
     }
 }

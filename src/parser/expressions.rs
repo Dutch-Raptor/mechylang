@@ -41,6 +41,8 @@ pub enum Expression {
     RangeFrom(RangeFromExpression),
     RangeFull(RangeFullExpression),
     For(ForExpression),
+    While(WhileExpression),
+    Member(MemberExpression),
 }
 
 pub trait ExpressionToken {
@@ -68,6 +70,8 @@ impl ExpressionToken for Expression {
             Expression::RangeFrom(range) => &range.token,
             Expression::RangeFull(range) => &range.token,
             Expression::For(for_expr) => &for_expr.token,
+            Expression::While(while_expr) => &while_expr.token,
+            Expression::Member(member) => &member.token,
         }
     }
 }
@@ -93,6 +97,8 @@ impl Display for Expression {
             Expression::RangeFrom(range) => write!(f, "{}", range),
             Expression::RangeFull(range) => write!(f, "{}", range),
             Expression::For(for_expr) => write!(f, "{}", for_expr),
+            Expression::While(while_expr) => write!(f, "{}", while_expr),
+            Expression::Member(member) => write!(f, "{}", member),
         }
     }
 }
@@ -309,6 +315,7 @@ pub enum Precedence {
     Prefix,      // -X or !X
     Index,       // array[index]
     Call,        // myFunction(X)
+    Member,      // object.member
 }
 
 pub trait PrecedenceTrait {
@@ -374,6 +381,9 @@ impl PrecedenceTrait for TokenKind {
 
             // *** Call ***
             TokenKind::LeftParen => Precedence::Call,
+
+            // *** Member ***
+            TokenKind::Dot => Precedence::Member,
 
             // *** Lowest precedence ***
             // some tokens are not used in expressions
@@ -561,5 +571,31 @@ impl Display for ForExpression {
             self.iterable,
             self.body
         )
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct WhileExpression {
+    pub token: Token,
+    pub condition: Rc<Expression>,
+    pub body: BlockStatement,
+}
+
+impl Display for WhileExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "while {} {{\n{}\n}}", self.condition, self.body)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct MemberExpression {
+    pub token: Token,
+    pub object: Rc<Expression>,
+    pub property: Identifier,
+}
+
+impl Display for MemberExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}", self.object, self.property)
     }
 }

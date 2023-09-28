@@ -5,7 +5,10 @@ use crate::parser::{
     parser::BlockStatement,
 };
 
-use super::{builtins::BuiltinError, environment::Environment, iterators::IteratorObject};
+use super::{
+    builtins::BuiltinError, environment::Environment, eval::Evaluator, iterators::IteratorObject,
+    methods::Method,
+};
 
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
@@ -32,6 +35,7 @@ pub enum Object {
 
     Break(Option<Box<Object>>),
     Continue,
+    Method(Method),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -82,6 +86,12 @@ pub struct Function {
     pub params: Rc<[Identifier]>,
     pub body: BlockStatement,
     pub env: Environment,
+}
+
+impl Function {
+    pub fn call(&self, args: Vec<Object>, env: Option<Environment>) -> Result<Object, String> {
+        Evaluator::eval_function(Object::Function(self.clone()), args, env)
+    }
 }
 
 impl PartialEq for Function {
@@ -142,6 +152,7 @@ impl Display for Object {
             Object::Break(Some(val)) => write!(f, "break {}", val),
             Object::Break(None) => write!(f, "break"),
             Object::Continue => write!(f, "continue"),
+            Object::Method(method) => write!(f, "{}", method),
         }
     }
 }

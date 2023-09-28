@@ -1,32 +1,61 @@
-let target = 500;
+//let target = 500;
+//
+//let is_prime = fn(n, primes) {
+//    for p in primes {
+//        if n % p == 0 {
+//            return false;
+//        }
+//    }
+//    return true;
+//};
+//
+//let summing_primes = fn(n) {
+//    if n < 2 {
+//        return 0;
+//    }
+//    if n == 2 {
+//        return 2;
+//    }
+//    let primes = [2];
+//    let sum = 2;
+//    for i in 3..=n {
+//        if is_prime(i, primes) {
+//            sum = sum + i;
+//
+//            push(primes, i);
+//        }
+//    }
+//    return sum;
+//};
+//
+//print(summing_primes(target));
+let n = 20000;
 
-let is_prime = fn(n, primes) {
-    for p in primes {
-        if (n % p == 0) {
-            return false;
-        }
-    }
-    return true;
-};
-
-let summing_primes = fn(n) {
-    if (n < 2) {
+let sum_primes = fn(n) {
+    if n < 2 {
         return 0;
     }
-    if (n == 2) {
+    if n == 2 {
         return 2;
     }
-    let primes = [2];
-    let sum = 2;
-    for i in (3..=n) {
-        if (is_prime(i, primes)) {
-            sum = sum + i;
+    if n <= 4 {
+        return 5;
+    };
 
-            push(primes, i);
-        }
-    }
-    return sum;
+    (5..=n).iter()
+      .step_by(6)
+      .fold([2, 3], fn(primes, i) {
+          if primes.iter().filter(fn(p) { i % p == 0 }).count() == 0 {
+              primes.push(i);
+          }
+
+          if i + 2 <= n && primes.iter().filter(fn(p) { (i + 2) % p == 0 }).count() == 0 {
+              primes.push(i + 2);
+          }
+          primes;
+      })
+      .iter()
+      .sum()
 };
 
-print(summing_primes(target));
-
+print(sum_primes(n)) // 76127

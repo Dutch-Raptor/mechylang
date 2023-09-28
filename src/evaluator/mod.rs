@@ -4,6 +4,7 @@ pub mod builtins;
 pub mod environment;
 pub mod eval;
 pub mod iterators;
+pub mod methods;
 /// This module contains the evaluator for the language.
 /// It takes the AST and evaluates it.
 pub mod objects;
