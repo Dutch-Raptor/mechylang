@@ -1,0 +1,12 @@
+// Mechylang is not that great at recursion, but it can do it.
+// It reaches it's recursion limit quite quickly, so be careful.
+
+let counter = fn(x) {
+  if (x > 61) {
+    return true;
+  } else {
+    let foobar = 9999;
+    counter(x + 1);
+  }
+};
+print(counter(0));

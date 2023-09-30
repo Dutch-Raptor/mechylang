@@ -35,6 +35,7 @@ pub enum ErrorKind {
     InvalidLeftHandSide,
     MutateError,
     MethodError,
+    PropertyNotFound,
 }
 
 impl Display for Error {

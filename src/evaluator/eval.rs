@@ -446,7 +446,7 @@ impl Evaluator {
         }
 
         if let Object::Method(method) = function {
-            return self.apply_method(&method, &call.arguments, env);
+            return self.apply_method(method, &call.arguments, env);
         }
 
         if let Object::Null = function {
@@ -851,7 +851,6 @@ impl Evaluator {
 
     fn eval_member_expression(&mut self, member: &MemberExpression, env: &mut Environment) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_member_expression: {}", member));
-
         
         let object = self.eval_expression(&member.object, env)?;
 
@@ -867,11 +866,14 @@ impl Evaluator {
         }
 
         // try to read property from object
-        panic!("TODO: implement reading property from object");
+        Err(self.error(
+            Some(&member.token),
+            &format!("Property or method '{}' not found on object: {:?}", property, object).to_string(),
+            ErrorKind::PropertyNotFound,
+        ))
     }
 
-    fn apply_method(&mut self, method: &Method, arguments: &[Expression], env: &mut Environment) -> Result<Object, Error> {
-
+    fn apply_method(&mut self, method: Method, arguments: &[Expression], env: &mut Environment) -> Result<Object, Error> {
         if !method.args_len.contains(&arguments.len()) {
             return Err(self.error(
                 self.current_token.as_ref(),
@@ -887,12 +889,9 @@ impl Evaluator {
             ));
         };
 
-
         let args = self.eval_expressions(arguments, env)?;
 
-        (method.function)(&method.obj, method.ident.as_deref(), args, env).map_err(|err| self.error(self.current_token.as_ref(), &format!("Error evaluating method: {}", err), ErrorKind::MethodError))
-
-
+        (method.function)(*method.obj, method.ident.as_deref(), args, env).map_err(|err| self.error(self.current_token.as_ref(), &format!("Error evaluating method: {}", err), ErrorKind::MethodError))
     }
 }
 
@@ -1753,6 +1752,48 @@ mod tests {
 
             (
                 r#"
+                let a = (1..).iter();
+                a.next();
+                a.next();
+                a.next();
+                a.next();
+                a.next();
+                "#,
+                Object::Integer(5),
+            ),
+
+            (
+                r#"
+                let iter = (1..).iter();
+                let iter_skip = iter.skip(5);
+                iter_skip.next();
+                iter_skip.next();
+                "#,
+                Object::Integer(7),
+            ),
+
+            (
+                r#"
+                let iter = (1..).iter();
+                let iter_take = iter.take(5);
+                iter_take.next();
+                iter_take.next();
+                "#,
+                Object::Integer(2),
+            ),
+
+            (
+                r#"
+                let iter = (1..).iter();
+                let iter_stepped = iter.step_by(2);
+                iter_stepped.next();
+                iter_stepped.next();
+                "#,
+                Object::Integer(3),
+            ),
+
+            (
+                r#"
                 let n = 1000;
 
                 let sum_primes = fn(n) {
@@ -1786,6 +1827,8 @@ mod tests {
                 "#,
                 Object::Integer(76127),
             ),
+
+
 
         ];
 

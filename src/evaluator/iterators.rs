@@ -23,7 +23,7 @@ where
 }
 
 pub struct IteratorObject {
-    pub iterator: Box<dyn CloneIterator<Item = Object>>,
+    pub iterator: Box<dyn CloneIterator<Item = <IteratorObject as Iterator>::Item>>,
 }
 
 impl Clone for IteratorObject {

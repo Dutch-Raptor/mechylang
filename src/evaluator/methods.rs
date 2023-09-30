@@ -23,7 +23,7 @@ pub struct Method {
     /// * `args` - The arguments passed to the method
     /// * `env` - The environment the method is being called in
     pub function: fn(
-        obj: &Object,
+        obj: Object,
         ident: Option<&str>,
         args: Vec<Object>,
         env: &mut Environment,
@@ -115,7 +115,7 @@ struct MethodInner {
     name: &'static str,
     args_len: RangeInclusive<usize>,
     function: fn(
-        obj: &Object,
+        obj: Object,
         ident: Option<&str>,
         args: Vec<Object>,
         env: &mut Environment,
@@ -124,92 +124,107 @@ struct MethodInner {
 
 const RANGE_METHODS: [MethodInner; 0] = [];
 
-const ITERATOR_METHODS: [MethodInner; 10] = [
-    MethodInner {
-        name: "next",
-        args_len: 0..=0,
-        function: |obj, _, _, _| {
-            if let Object::Iterator(ref iterator) = obj {
-                iterator
-                    .clone()
-                    .next()
-                    .ok_or("Iterator is empty".to_string())
-            } else {
-                Err(format!("Expected Iterator, got {}", obj))
-            }
+const ITERATOR_METHODS: [MethodInner; 10] =
+    [
+        MethodInner {
+            name: "next",
+            args_len: 0..=0,
+            function: |obj, ident, _, env| {
+                if let Object::Iterator(mut iterator) = obj {
+                    // mutate the object if it has an identifier
+                    if let Some(ident) = ident {
+                        return env.update(ident, |iter| {
+                            Ok(if let Object::Iterator(iterator) = iter {
+                                iterator.iterator.next().unwrap_or(Object::Null)
+                            } else {
+                                Object::Null
+                            })
+                        });
+                    }
+
+                    // otherwise just return the next item from the passed iterator
+                    let item = iterator.next();
+                    Ok(item.unwrap_or(Object::Null))
+                } else {
+                    Err(format!("Expected Iterator, got {}", obj))
+                }
+            },
         },
-    },
-    MethodInner {
-        name: "collect",
-        args_len: 0..=0,
-        function: |obj, _, _, _| {
-            if let Object::Iterator(ref iterator) = obj {
-                let vec: Vec<Object> = iterator.clone().collect();
-                Ok(Object::Array(vec))
-            } else {
-                Err(format!("Expected Iterator, got {}", obj))
-            }
+        MethodInner {
+            name: "collect",
+            args_len: 0..=0,
+            function: |obj, _, _, _| {
+                if let Object::Iterator(iterator) = obj {
+                    let vec: Vec<Object> = iterator.collect();
+                    Ok(Object::Array(vec))
+                } else {
+                    Err(format!("Expected Iterator, got {}", obj))
+                }
+            },
         },
-    },
-    MethodInner {
-        name: "step_by",
-        args_len: 1..=1,
-        function: |obj, _, args, _| {
-            if let Object::Iterator(ref iterator) = obj {
-                let step = match args[0] {
-                    Object::Integer(i) => i,
-                    _ => return Err("Expected integer for step".to_string()),
+        MethodInner {
+            name: "step_by",
+            args_len: 1..=1,
+            function: |obj, _, args, _| {
+                if let Object::Iterator(iterator) = obj {
+                    let step = match args[0] {
+                        Object::Integer(i) => i,
+                        _ => return Err("Expected integer for step".to_string()),
+                    };
+
+                    Ok(Object::Iterator(IteratorObject {
+                        iterator: Box::new(iterator.step_by(step as usize)),
+                    }))
+                } else {
+                    Err(format!("Expected Iterator, got {}", obj))
+                }
+            },
+        },
+        MethodInner {
+            name: "skip",
+            args_len: 1..=1,
+            function: |obj, _, args, _| {
+                if let Object::Iterator(iterator) = obj {
+                    let skip = match args[0] {
+                        Object::Integer(i) => i,
+                        _ => return Err("Expected integer for skip".to_string()),
+                    };
+
+                    Ok(Object::Iterator(IteratorObject {
+                        iterator: Box::new(iterator.skip(skip as usize)),
+                    }))
+                } else {
+                    Err(format!("Expected Iterator, got {}", obj))
+                }
+            },
+        },
+        MethodInner {
+            name: "take",
+            args_len: 1..=1,
+            function: |obj, _, args, _| {
+                if let Object::Iterator(iterator) = obj {
+                    let take = match args[0] {
+                        Object::Integer(i) => i,
+                        _ => return Err("Expected integer for take".to_string()),
+                    };
+
+                    Ok(Object::Iterator(IteratorObject {
+                        iterator: Box::new(iterator.take(take as usize)),
+                    }))
+                } else {
+                    Err(format!("Expected Iterator, got {}", obj))
+                }
+            },
+        },
+        MethodInner {
+            name: "filter",
+            args_len: 1..=1,
+            function: |obj, _, args, _| {
+                let iterator = match obj {
+                    Object::Iterator(iterator) => iterator,
+                    _ => return Err(format!("Expected Iterator, got {}", obj)),
                 };
 
-                Ok(Object::Iterator(IteratorObject {
-                    iterator: Box::new(iterator.clone().step_by(step as usize)),
-                }))
-            } else {
-                Err(format!("Expected Iterator, got {}", obj))
-            }
-        },
-    },
-    MethodInner {
-        name: "skip",
-        args_len: 1..=1,
-        function: |obj, _, args, _| {
-            if let Object::Iterator(ref iterator) = obj {
-                let skip = match args[0] {
-                    Object::Integer(i) => i,
-                    _ => return Err("Expected integer for skip".to_string()),
-                };
-
-                Ok(Object::Iterator(IteratorObject {
-                    iterator: Box::new(iterator.clone().skip(skip as usize)),
-                }))
-            } else {
-                Err(format!("Expected Iterator, got {}", obj))
-            }
-        },
-    },
-    MethodInner {
-        name: "take",
-        args_len: 1..=1,
-        function: |obj, _, args, _| {
-            if let Object::Iterator(ref iterator) = obj {
-                let take = match args[0] {
-                    Object::Integer(i) => i,
-                    _ => return Err("Expected integer for take".to_string()),
-                };
-
-                Ok(Object::Iterator(IteratorObject {
-                    iterator: Box::new(iterator.clone().take(take as usize)),
-                }))
-            } else {
-                Err(format!("Expected Iterator, got {}", obj))
-            }
-        },
-    },
-    MethodInner {
-        name: "filter",
-        args_len: 1..=1,
-        function: |obj, _, args, _| {
-            if let Object::Iterator(ref iterator) = obj {
                 let predicate = match &args[0] {
                     Object::Function(f) => f.clone(),
                     _ => return Err("Expected function for filter".to_string()),
@@ -221,8 +236,8 @@ const ITERATOR_METHODS: [MethodInner; 10] = [
                 }
 
                 Ok(Object::Iterator(IteratorObject {
-                    iterator: Box::new(iterator.clone().filter(move |obj| {
-                        match predicate.call(vec![obj.clone()], None) {
+                    iterator: Box::new(iterator.filter(move |item| {
+                        match predicate.call(vec![item.clone()], None) {
                             Ok(obj) => Evaluator::is_truthy(&obj),
                             Err(e) => {
                                 eprintln!("Error evaluating closure in filter {}", e);
@@ -231,29 +246,25 @@ const ITERATOR_METHODS: [MethodInner; 10] = [
                         }
                     })),
                 }))
-            } else {
-                Err(format!("Expected Iterator, got {}", obj))
-            }
+            },
         },
-    },
-    MethodInner {
-        name: "map",
-        args_len: 1..=1,
-        function: |obj, _, args, _| {
-            if let Object::Iterator(ref iterator) = obj {
-                let predicate = match &args[0] {
+        MethodInner {
+            name: "map",
+            args_len: 1..=1,
+            function: |obj, _, args, _| {
+                let iterator = match obj {
+                    Object::Iterator(iterator) => iterator,
+                    _ => return Err(format!("Expected Iterator, got {}", obj)),
+                };
+
+                let function = match &args[0] {
                     Object::Function(f) => f.clone(),
                     _ => return Err("Expected function for map".to_string()),
                 };
 
-                match predicate.params.len() {
-                    1 => {}
-                    _ => return Err("Expected function with 1 parameter".to_string()),
-                }
-
                 Ok(Object::Iterator(IteratorObject {
-                    iterator: Box::new(iterator.clone().map(move |obj| {
-                        match predicate.call(vec![obj.clone()], None) {
+                    iterator: Box::new(iterator.map(move |item| {
+                        match function.call(vec![item], None) {
                             Ok(obj) => obj,
                             Err(e) => {
                                 eprintln!("Error evaluating closure in map {}", e);
@@ -262,44 +273,45 @@ const ITERATOR_METHODS: [MethodInner; 10] = [
                         }
                     })),
                 }))
-            } else {
-                Err(format!("Expected Iterator, got {}", obj))
-            }
+            },
         },
-    },
-    MethodInner {
-        name: "count",
-        args_len: 0..=0,
-        function: |obj, _, _, _| {
-            if let Object::Iterator(ref iterator) = obj {
-                Ok(Object::Integer(iterator.clone().count() as i64))
-            } else {
-                Err(format!("Expected Iterator, got {}", obj))
-            }
+        MethodInner {
+            name: "count",
+            args_len: 0..=0,
+            function: |obj, _, _, _| {
+                if let Object::Iterator(iterator) = obj {
+                    Ok(Object::Integer(iterator.count() as i64))
+                } else {
+                    Err(format!("Expected Iterator, got {}", obj))
+                }
+            },
         },
-    },
-    MethodInner {
-        name: "sum",
-        args_len: 0..=0,
-        function: |obj, _, _, _| {
-            if let Object::Iterator(ref iterator) = obj {
-                Ok(iterator.clone().sum())
-            } else {
-                Err(format!("Expected Iterator, got {}", obj))
-            }
+        MethodInner {
+            name: "sum",
+            args_len: 0..=0,
+            function: |obj, _, _, _| {
+                if let Object::Iterator(ref iterator) = obj {
+                    Ok(iterator.clone().sum())
+                } else {
+                    Err(format!("Expected Iterator, got {}", obj))
+                }
+            },
         },
-    },
-    MethodInner {
-        name: "fold",
-        args_len: 2..=2,
-        function: |obj, _, args, _| {
-            let initial = args[0].clone();
-            let function = match &args[1] {
-                Object::Function(f) => f.clone(),
-                _ => return Err("Expected function for fold".to_string()),
-            };
+        MethodInner {
+            name: "fold",
+            args_len: 2..=2,
+            function: |obj, _, args, _| {
+                let iterator = match obj {
+                    Object::Iterator(iterator) => iterator,
+                    _ => return Err(format!("Expected Iterator, got {}", obj)),
+                };
 
-            if let Object::Iterator(ref iterator) = obj {
+                let initial = args[0].clone();
+                let function = match &args[1] {
+                    Object::Function(f) => f.clone(),
+                    _ => return Err("Expected function for fold".to_string()),
+                };
+
                 match function.params.len() {
                     2 => {}
                     _ => return Err(
@@ -319,12 +331,9 @@ const ITERATOR_METHODS: [MethodInner; 10] = [
 
                     res
                 }))
-            } else {
-                Err(format!("Expected Iterator, got {}", obj))
-            }
+            },
         },
-    },
-];
+    ];
 
 const INTEGER_METHODS: [MethodInner; 1] = [MethodInner {
     name: "pow",
@@ -344,7 +353,7 @@ const INTEGER_METHODS: [MethodInner; 1] = [MethodInner {
     },
 }];
 
-const ARRAY_METHODS: [MethodInner; 5] = [
+const ARRAY_METHODS: [MethodInner; 6] = [
     MethodInner {
         name: "push",
         args_len: 1..=1,
@@ -423,6 +432,43 @@ const ARRAY_METHODS: [MethodInner; 5] = [
                 })
                 .map_err(|e| e.to_string())?;
             Ok(item)
+        },
+    },
+    MethodInner {
+        name: "insert",
+        args_len: 2..=2,
+        function: |obj, ident, args, env| {
+            let index = match args[0] {
+                Object::Integer(i) => i,
+                _ => return Err("Expected integer for index".to_string()),
+            };
+
+            let value = args[1].clone();
+
+            let ident = get_mutable_ident(ident)?;
+
+            match obj {
+                Object::Array(arr) => {
+                    if index < 0 || index as usize > arr.len() {
+                        return Err(format!(
+                            "Index {} out of bounds for array of length {}",
+                            index,
+                            arr.len()
+                        ));
+                    }
+                }
+                _ => return Err("Expected array".to_string()),
+            }
+
+            env.update(ident.to_string(), move |arr| {
+                if let Object::Array(ref mut arr) = arr {
+                    arr.insert(index as usize, value.clone());
+                    Ok(Object::Null)
+                } else {
+                    Err(format!("Expected array, got {}", arr))
+                }
+            })?;
+            Ok(Object::Null)
         },
     },
     MethodInner {
