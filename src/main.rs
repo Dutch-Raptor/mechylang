@@ -38,7 +38,7 @@ fn main() {
             Command::File { file } => {
                 let file = file.to_str().expect("Invalid file path");
 
-                let res = evaluator::eval_file(file);
+                let res = evaluator::eval_file(file, std::io::stdout());
 
                 if let Err(e) = res {
                     for e in e {

@@ -5,7 +5,10 @@ use std::{
 };
 
 use super::{
-    environment::Environment, eval::Evaluator, iterators::IteratorObject, objects::Object,
+    environment::Environment,
+    eval::{EvalConfig, Evaluator},
+    iterators::IteratorObject,
+    objects::Object,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,6 +30,7 @@ pub struct Method {
         ident: Option<&str>,
         args: Vec<Object>,
         env: &mut Environment,
+        config: Rc<EvalConfig>,
     ) -> Result<Object, String>,
 }
 
@@ -94,7 +98,7 @@ impl ObjectMethods for Object {
                 method_name: "iter",
                 ident: obj_identifier,
                 args_len: 0..=0,
-                function: |obj, _, _, _| {
+                function: |obj, _, _, _, _| {
                     Ok(Object::Iterator(IteratorObject::try_from(obj.clone())?))
                 },
                 obj: Box::new(self.clone()),
@@ -103,7 +107,7 @@ impl ObjectMethods for Object {
                 method_name: "to_string",
                 ident: obj_identifier,
                 args_len: 0..=0,
-                function: |obj, _, _, _| Ok(Object::String(obj.to_string().into())),
+                function: |obj, _, _, _, _| Ok(Object::String(obj.to_string().into())),
                 obj: Box::new(self.clone()),
             }),
             _ => None,
@@ -119,6 +123,7 @@ struct MethodInner {
         ident: Option<&str>,
         args: Vec<Object>,
         env: &mut Environment,
+        config: Rc<EvalConfig>,
     ) -> Result<Object, String>,
 }
 
@@ -129,7 +134,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         MethodInner {
             name: "next",
             args_len: 0..=0,
-            function: |obj, ident, _, env| {
+            function: |obj, ident, _, env, _| {
                 if let Object::Iterator(mut iterator) = obj {
                     // mutate the object if it has an identifier
                     if let Some(ident) = ident {
@@ -153,7 +158,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         MethodInner {
             name: "collect",
             args_len: 0..=0,
-            function: |obj, _, _, _| {
+            function: |obj, _, _, _, _| {
                 if let Object::Iterator(iterator) = obj {
                     let vec: Vec<Object> = iterator.collect();
                     Ok(Object::Array(vec))
@@ -165,7 +170,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         MethodInner {
             name: "step_by",
             args_len: 1..=1,
-            function: |obj, _, args, _| {
+            function: |obj, _, args, _, _| {
                 if let Object::Iterator(iterator) = obj {
                     let step = match args[0] {
                         Object::Integer(i) => i,
@@ -183,7 +188,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         MethodInner {
             name: "skip",
             args_len: 1..=1,
-            function: |obj, _, args, _| {
+            function: |obj, _, args, _, _| {
                 if let Object::Iterator(iterator) = obj {
                     let skip = match args[0] {
                         Object::Integer(i) => i,
@@ -201,7 +206,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         MethodInner {
             name: "take",
             args_len: 1..=1,
-            function: |obj, _, args, _| {
+            function: |obj, _, args, _, _| {
                 if let Object::Iterator(iterator) = obj {
                     let take = match args[0] {
                         Object::Integer(i) => i,
@@ -219,7 +224,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         MethodInner {
             name: "filter",
             args_len: 1..=1,
-            function: |obj, _, args, _| {
+            function: |obj, _, args, _, config| {
                 let iterator = match obj {
                     Object::Iterator(iterator) => iterator,
                     _ => return Err(format!("Expected Iterator, got {}", obj)),
@@ -237,7 +242,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
 
                 Ok(Object::Iterator(IteratorObject {
                     iterator: Box::new(iterator.filter(move |item| {
-                        match predicate.call(vec![item.clone()], None) {
+                        match predicate.call(vec![item.clone()], None, config.clone()) {
                             Ok(obj) => Evaluator::is_truthy(&obj),
                             Err(e) => {
                                 eprintln!("Error evaluating closure in filter {}", e);
@@ -251,7 +256,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         MethodInner {
             name: "map",
             args_len: 1..=1,
-            function: |obj, _, args, _| {
+            function: |obj, _, args, _, config| {
                 let iterator = match obj {
                     Object::Iterator(iterator) => iterator,
                     _ => return Err(format!("Expected Iterator, got {}", obj)),
@@ -264,7 +269,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
 
                 Ok(Object::Iterator(IteratorObject {
                     iterator: Box::new(iterator.map(move |item| {
-                        match function.call(vec![item], None) {
+                        match function.call(vec![item], None, config.clone()) {
                             Ok(obj) => obj,
                             Err(e) => {
                                 eprintln!("Error evaluating closure in map {}", e);
@@ -278,7 +283,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         MethodInner {
             name: "count",
             args_len: 0..=0,
-            function: |obj, _, _, _| {
+            function: |obj, _, _, _, _| {
                 if let Object::Iterator(iterator) = obj {
                     Ok(Object::Integer(iterator.count() as i64))
                 } else {
@@ -289,7 +294,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         MethodInner {
             name: "sum",
             args_len: 0..=0,
-            function: |obj, _, _, _| {
+            function: |obj, _, _, _, _| {
                 if let Object::Iterator(ref iterator) = obj {
                     Ok(iterator.clone().sum())
                 } else {
@@ -300,7 +305,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         MethodInner {
             name: "fold",
             args_len: 2..=2,
-            function: |obj, _, args, _| {
+            function: |obj, _, args, _, config| {
                 let iterator = match obj {
                     Object::Iterator(iterator) => iterator,
                     _ => return Err(format!("Expected Iterator, got {}", obj)),
@@ -321,13 +326,14 @@ const ITERATOR_METHODS: [MethodInner; 10] =
                 }
 
                 Ok(iterator.clone().fold(initial, move |acc, obj| {
-                    let res = match function.call(vec![acc.clone(), obj.clone()], None) {
-                        Ok(obj) => obj,
-                        Err(e) => {
-                            eprintln!("Error evaluating closure in fold {}", e);
-                            Object::Null
-                        }
-                    };
+                    let res =
+                        match function.call(vec![acc.clone(), obj.clone()], None, config.clone()) {
+                            Ok(obj) => obj,
+                            Err(e) => {
+                                eprintln!("Error evaluating closure in fold {}", e);
+                                Object::Null
+                            }
+                        };
 
                     res
                 }))
@@ -338,7 +344,7 @@ const ITERATOR_METHODS: [MethodInner; 10] =
 const INTEGER_METHODS: [MethodInner; 1] = [MethodInner {
     name: "pow",
     args_len: 1..=1,
-    function: |obj, _, args, _| {
+    function: |obj, _, args, _, _| {
         let exponent = match args[0] {
             Object::Integer(i) => i,
             _ => return Err("Expected integer for base".to_string()),
@@ -357,7 +363,7 @@ const ARRAY_METHODS: [MethodInner; 6] = [
     MethodInner {
         name: "push",
         args_len: 1..=1,
-        function: |_, ident, args, env| {
+        function: |_, ident, args, env, _| {
             let value = args[0].clone();
 
             let ident = get_mutable_ident(ident)?;
@@ -377,7 +383,7 @@ const ARRAY_METHODS: [MethodInner; 6] = [
     MethodInner {
         name: "pop",
         args_len: 0..=0,
-        function: |_, ident, _, env| {
+        function: |_, ident, _, env, _| {
             let ident = get_mutable_ident(ident)?;
 
             let item = env
@@ -397,7 +403,7 @@ const ARRAY_METHODS: [MethodInner; 6] = [
     MethodInner {
         name: "first",
         args_len: 0..=0,
-        function: |_, ident, _, env| {
+        function: |_, ident, _, env, _| {
             let ident = get_mutable_ident(ident)?;
 
             let item = env
@@ -417,7 +423,7 @@ const ARRAY_METHODS: [MethodInner; 6] = [
     MethodInner {
         name: "last",
         args_len: 0..=0,
-        function: |_, ident, _, env| {
+        function: |_, ident, _, env, _| {
             let ident = get_mutable_ident(ident)?;
 
             let item = env
@@ -437,7 +443,7 @@ const ARRAY_METHODS: [MethodInner; 6] = [
     MethodInner {
         name: "insert",
         args_len: 2..=2,
-        function: |obj, ident, args, env| {
+        function: |obj, ident, args, env, _| {
             let index = match args[0] {
                 Object::Integer(i) => i,
                 _ => return Err("Expected integer for index".to_string()),
@@ -474,7 +480,7 @@ const ARRAY_METHODS: [MethodInner; 6] = [
     MethodInner {
         name: "len",
         args_len: 0..=0,
-        function: |obj, _, _, _| match obj {
+        function: |obj, _, _, _, _| match obj {
             Object::Array(ref arr) => Ok(Object::Integer(arr.len() as i64)),
             _ => Err("Argument to `len` not supported".to_string()),
         },

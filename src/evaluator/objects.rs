@@ -6,7 +6,10 @@ use crate::parser::{
 };
 
 use super::{
-    builtins::BuiltinError, environment::Environment, eval::Evaluator, iterators::IteratorObject,
+    builtins::BuiltinError,
+    environment::Environment,
+    eval::{EvalConfig, Evaluator},
+    iterators::IteratorObject,
     methods::Method,
 };
 
@@ -42,7 +45,8 @@ pub enum Object {
 pub struct BuiltinFunction {
     pub name: &'static str,
     pub args_len: RangeInclusive<usize>,
-    pub function: fn(&Vec<Object>, &Vec<Expression>, &mut Environment) -> BuiltinResult,
+    pub function:
+        fn(&Vec<Object>, &Vec<Expression>, &mut Environment, Rc<EvalConfig>) -> BuiltinResult,
 }
 
 type BuiltinResult = Result<Object, (String, BuiltinError)>;
@@ -89,8 +93,13 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn call(&self, args: Vec<Object>, env: Option<Environment>) -> Result<Object, String> {
-        Evaluator::eval_function(Object::Function(self.clone()), args, env)
+    pub fn call(
+        &self,
+        args: Vec<Object>,
+        env: Option<Environment>,
+        config: Rc<EvalConfig>,
+    ) -> Result<Object, String> {
+        Evaluator::eval_function(Object::Function(self.clone()), args, env, config)
     }
 }
 

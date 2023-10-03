@@ -1,4 +1,6 @@
-use self::eval::Evaluator;
+use std::io::Write;
+
+use self::eval::{EvalConfig, Evaluator};
 
 pub mod builtins;
 pub mod environment;
@@ -9,10 +11,10 @@ pub mod methods;
 /// It takes the AST and evaluates it.
 pub mod objects;
 
-pub fn eval_file(file: &str) -> Result<(), Vec<String>> {
+pub fn eval_file(file: &str, out: impl Write + 'static) -> Result<(), Vec<String>> {
     let input = std::fs::read_to_string(file).unwrap();
     let mut env = environment::Environment::new();
-    Evaluator::eval(input, &mut env)
+    Evaluator::eval(input, &mut env, EvalConfig::default().with_output(out))
         .map(|_| ())
         .map_err(|e| e.iter().map(|e| color_print::cformat!("{}", e)).collect())
 }

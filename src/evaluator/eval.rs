@@ -1,4 +1,4 @@
-use std::{rc::Rc, collections::HashMap};
+use std::{rc::Rc, collections::HashMap, io::Write, sync::Mutex};
 
 use crate::{
     errors::{Error, ErrorKind},
@@ -22,16 +22,57 @@ pub type EvalResult = Result<Object, Rc<[Error]>>;
 pub struct Evaluator {
     lines: Vec<String>,
     current_token: Option<Token>,
-    globals: HashMap<Rc<str>, Object>
+    globals: HashMap<Rc<str>, Object>,
+    eval_config: Rc<EvalConfig>,
+}
+
+// We have to provide a special trait for our clonable iterator,
+// since Clone requires a Sized type (so we can't call it on a trait object).
+pub trait CloneWriter: Write {
+    fn clone_box(&self) -> Box<dyn CloneWriter>;
+}
+
+// Implement our special trait for all Cloneable Iterators
+impl<T> CloneWriter for T
+where
+    T: 'static + Write + Clone,
+{
+    fn clone_box(&self) -> Box<dyn CloneWriter> {
+        Box::new(self.clone())
+    }
+}
+
+pub struct EvalConfig {
+    pub output: Mutex<Box<dyn Write>>,
+}
+
+impl Default for EvalConfig {
+    fn default() -> Self {
+        Self {
+            output: Mutex::new(Box::new(std::io::stdout())),
+        }
+    }
+}
+
+impl EvalConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_output(mut self, output: impl Write + 'static) -> Self {
+        self.output = Mutex::new(Box::new(output));
+        self
+    }
 }
 
 impl Evaluator {
-    pub fn eval(input: impl Into<Rc<str>>, env: &mut Environment) -> EvalResult {
+    pub fn eval(input: impl Into<Rc<str>>, env: &mut Environment, config: EvalConfig) -> EvalResult {
         let input: Rc<str> = input.into();
         let lexer = Lexer::new(input);
         let lines = lexer.lines();
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
+
 
         if !program.errors.is_empty() {
             return Err(program.errors.into());
@@ -40,7 +81,8 @@ impl Evaluator {
         let evaluator = Evaluator {
             lines,
             current_token: None,
-            globals: HashMap::new()
+            globals: HashMap::new(),
+            eval_config: config.into(),
         };
 
         evaluator
@@ -468,11 +510,12 @@ impl Evaluator {
         })
     }
 
-    pub fn eval_function(function: Object, arguments: Vec<Object>, env: Option<Environment>) -> Result<Object, String> {
+    pub fn eval_function(function: Object, arguments: Vec<Object>, env: Option<Environment>, config: Rc<EvalConfig>) -> Result<Object, String> {
         let mut evaluator = Evaluator {
             globals: HashMap::new(),
             current_token: None,
             lines: vec![],
+            eval_config: config,
         };
 
         evaluator
@@ -641,7 +684,7 @@ impl Evaluator {
         let arg_exprs = arguments.iter().map(|e| e.clone()).collect::<Vec<_>>();
 
 
-        (function.function)(&arg_objects, &arg_exprs, env).map_err(|(msg, err_type)| {
+        (function.function)(&arg_objects, &arg_exprs, env, self.eval_config.clone()).map_err(|(msg, err_type)| {
             self.error(
                 self.current_token.as_ref(),
                 msg.as_str(),
@@ -891,7 +934,7 @@ impl Evaluator {
 
         let args = self.eval_expressions(arguments, env)?;
 
-        (method.function)(*method.obj, method.ident.as_deref(), args, env).map_err(|err| self.error(self.current_token.as_ref(), &format!("Error evaluating method: {}", err), ErrorKind::MethodError))
+        (method.function)(*method.obj, method.ident.as_deref(), args, env, self.eval_config.clone()).map_err(|err| self.error(self.current_token.as_ref(), &format!("Error evaluating method: {}", err), ErrorKind::MethodError))
     }
 }
 
@@ -908,7 +951,7 @@ mod tests {
     fn test_eval(input: &str) -> Object {
         let mut env = Environment::new();
 
-        let result = Evaluator::eval(input, &mut env);
+        let result = Evaluator::eval(input, &mut env, Default::default());
 
         match result {
             Ok(object) => object,
@@ -925,7 +968,7 @@ mod tests {
     fn test_eval_fallible(input: &str) -> EvalResult {
         let mut env = Environment::new();
 
-        Evaluator::eval(input, &mut env)
+        Evaluator::eval(input, &mut env, Default::default())
     }
 
     #[test]
