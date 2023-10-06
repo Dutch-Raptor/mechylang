@@ -26,7 +26,7 @@ impl Repl {
             let evaluated = Evaluator::eval(
                 input,
                 &mut env,
-                EvalConfig::default().with_output(io::stdout()),
+                EvalConfig::default(),
             );
 
             match evaluated {

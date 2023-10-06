@@ -43,13 +43,13 @@ where
 }
 
 pub struct EvalConfig {
-    pub output: Mutex<Box<dyn Write>>,
+    pub output: Rc<Mutex<Box<dyn Write>>>,
 }
 
 impl Default for EvalConfig {
     fn default() -> Self {
         Self {
-            output: Mutex::new(Box::new(std::io::stdout())),
+            output: Rc::new(Mutex::new(Box::new(std::io::stdout()))),
         }
     }
 }
@@ -59,9 +59,14 @@ impl EvalConfig {
         Self::default()
     }
 
-    pub fn with_output(mut self, output: impl Write + 'static) -> Self {
-        self.output = Mutex::new(Box::new(output));
-        self
+    pub fn with_output(output: Box<dyn Write>) -> Self {
+        Self {
+            output: Rc::new(Mutex::new(output)),
+        }
+    }
+
+    pub fn with_output_ref(output: Rc<Mutex<Box<dyn Write>>>) -> Self {
+        Self { output }
     }
 }
 

@@ -14,7 +14,7 @@ pub mod objects;
 pub fn eval_file(file: &str, out: impl Write + 'static) -> Result<(), Vec<String>> {
     let input = std::fs::read_to_string(file).unwrap();
     let mut env = environment::Environment::new();
-    Evaluator::eval(input, &mut env, EvalConfig::default().with_output(out))
+    Evaluator::eval(input, &mut env, EvalConfig::default())
         .map(|_| ())
         .map_err(|e| e.iter().map(|e| color_print::cformat!("{}", e)).collect())
 }
