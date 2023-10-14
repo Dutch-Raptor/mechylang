@@ -1,12 +1,9 @@
-use std::{fmt::Display, ops::RangeInclusive, rc::Rc};
+use std::{fmt::Display, rc::Rc};
 
-use crate::parser::{
-    expressions::{Expression, Identifier},
-    parser::BlockStatement,
-};
+use crate::parser::{expressions::Identifier, parser::BlockStatement};
 
 use super::{
-    builtins::BuiltinError,
+    builtins::BuiltinFunction,
     environment::Environment,
     eval::{EvalConfig, Evaluator},
     iterators::IteratorObject,
@@ -40,16 +37,6 @@ pub enum Object {
     Continue,
     Method(Method),
 }
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct BuiltinFunction {
-    pub name: &'static str,
-    pub args_len: RangeInclusive<usize>,
-    pub function:
-        fn(&Vec<Object>, &Vec<Expression>, &mut Environment, Rc<EvalConfig>) -> BuiltinResult,
-}
-
-type BuiltinResult = Result<Object, (String, BuiltinError)>;
 
 /// Trait for unwrapping return values
 ///
@@ -197,11 +184,5 @@ impl From<Vec<Object>> for Object {
 impl From<i64> for Object {
     fn from(int: i64) -> Self {
         Object::Integer(int)
-    }
-}
-
-impl From<BuiltinFunction> for Object {
-    fn from(builtin: BuiltinFunction) -> Self {
-        Object::BuiltinFunction(builtin)
     }
 }

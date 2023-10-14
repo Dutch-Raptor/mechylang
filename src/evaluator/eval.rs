@@ -14,7 +14,7 @@ use crate::{
 
 use super::{
     environment::Environment,
-    objects::{Function, Object, UnwrapReturnValue, BuiltinFunction}, iterators::IteratorObject, methods::Method,
+    objects::{Function, Object, UnwrapReturnValue}, iterators::IteratorObject, methods::Method, builtins::BuiltinFunction,
 };
 
 pub type EvalResult = Result<Object, Rc<[Error]>>;
@@ -43,13 +43,13 @@ where
 }
 
 pub struct EvalConfig {
-    pub output: Rc<Mutex<Box<dyn Write>>>,
+    pub output_fn: Box<dyn Fn(String) + Send>,
 }
 
 impl Default for EvalConfig {
     fn default() -> Self {
         Self {
-            output: Rc::new(Mutex::new(Box::new(std::io::stdout()))),
+            output_fn: Box::new(|string| println!("{}", string)),
         }
     }
 }
@@ -59,14 +59,10 @@ impl EvalConfig {
         Self::default()
     }
 
-    pub fn with_output(output: Box<dyn Write>) -> Self {
+    pub fn with_output(output_fn: impl Fn(String) + Send + 'static) -> Self {
         Self {
-            output: Rc::new(Mutex::new(output)),
+            output_fn: Box::new(output_fn),
         }
-    }
-
-    pub fn with_output_ref(output: Rc<Mutex<Box<dyn Write>>>) -> Self {
-        Self { output }
     }
 }
 
@@ -95,7 +91,9 @@ impl Evaluator {
             .map_err(|err| vec![err].into())
     }
 
-    
+    pub(in super) fn print(&self, string: String) {
+        (self.eval_config.output_fn)(string);
+    }
 
     pub fn eval_program(
         mut self,
@@ -689,7 +687,7 @@ impl Evaluator {
         let arg_exprs = arguments.iter().map(|e| e.clone()).collect::<Vec<_>>();
 
 
-        (function.function)(&arg_objects, &arg_exprs, env, self.eval_config.clone()).map_err(|(msg, err_type)| {
+        (function.function)(&arg_objects, env, &self).map_err(|(msg, err_type)| {
             self.error(
                 self.current_token.as_ref(),
                 msg.as_str(),
