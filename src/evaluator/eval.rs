@@ -1,4 +1,4 @@
-use std::{rc::Rc, collections::HashMap, io::Write, sync::Mutex};
+use std::{rc::Rc, collections::HashMap, io::Write};
 
 use crate::{
     errors::{Error, ErrorKind},
@@ -59,6 +59,24 @@ impl EvalConfig {
         Self::default()
     }
 
+    /// If you want to capture the output of the evaluator, you can use this function.
+    ///
+    /// This closure will be called every time the evaluator prints something.
+    /// The string passed to the closure is the string that would be printed.
+    ///
+    /// # Examples
+    /// ```
+    /// use mechylang::evaluator::EvalConfig;
+    /// use mechylang::evaluator::Evaluator;
+    ///
+    /// let mut output = String::new();
+    ///
+    /// let config = EvalConfig::with_output(|string| output.push_str(&string));
+    ///
+    /// Evaluator::eval("print(\"Hello, world!\")", &mut Default::default(), config).unwrap();
+    ///
+    /// assert_eq!(output, "Hello, world!\n");
+    /// ```
     pub fn with_output(output_fn: impl Fn(String) + Send + 'static) -> Self {
         Self {
             output_fn: Box::new(output_fn),
@@ -159,6 +177,7 @@ impl Evaluator {
         let _trace = trace!(&format!("Evaluating expression: {}", expression).to_string());
         match expression {
             Expression::IntegerLiteral(lit) => Ok(Object::Integer(lit.value)),
+            Expression::FloatLiteral(lit) => Ok(Object::Float(lit.value)),
             Expression::Boolean(boolean) => Ok(boolean.value.into()),
             Expression::Prefix(prefix) => {
                 let right = self.eval_expression(&prefix.right, env)?;
@@ -189,7 +208,6 @@ impl Evaluator {
             | Expression::RangeTo(_)
             | Expression::RangeFull(_) => self.eval_range_expression(expression, env),
             Expression::Member(member) => self.eval_member_expression(member, env),
-            other => panic!("Unhandled expression: {:?}", other), 
         }
     }
 
@@ -222,29 +240,34 @@ impl Evaluator {
 
         self.current_token = Some(infix.token.clone());
 
-        if let Object::Integer(left) = &left {
-            if let Object::Integer(right) = right {
-                return self.eval_integer_infix_expression(&infix.operator, *left, right);
-            }
-        }
-
-        if let Object::Boolean(left) = &left {
-            if let Object::Boolean(right) = right {
-                return self.eval_boolean_infix_expression(&infix.operator, *left, right);
-            }
-        }
-
-        if let Object::String(left) = &left {
-            if let Object::String(right) = right {
-                return self.eval_string_infix_expression(&infix.operator, left.clone(), right);
-            }
-        }
-
-        Err(self.error(
+        let err = self.error(
             self.current_token.as_ref(),
             format!("Type mismatch: {:?} {} {:?}", left, infix.operator, right).as_str(),
-            ErrorKind::TypeMismatch,
-        ))
+            ErrorKind::TypeMismatch
+        );
+
+
+        match (left, right) {
+            (Object::Integer(left), Object::Integer(right)) => {
+                self.eval_integer_infix_expression(&infix.operator, left, right)
+            }
+            (Object::Float(left), Object::Float(right)) => {
+                self.eval_float_infix_expression(&infix.operator, left, right)
+            }
+            (Object::Float(left), Object::Integer(right)) => {
+                self.eval_float_infix_expression(&infix.operator, left, right as f64)
+            }
+            (Object::Integer(left), Object::Float(right)) => {
+                self.eval_float_infix_expression(&infix.operator, left as f64, right)
+            }
+            (Object::Boolean(left), Object::Boolean(right)) => {
+                self.eval_boolean_infix_expression(&infix.operator, left, right)
+            }
+            (Object::String(left), Object::String(right)) => {
+                self.eval_string_infix_expression(&infix.operator, left, right)
+            }
+            _ => Err(err),
+        }
     }
 
     fn eval_block_statement(
@@ -408,10 +431,59 @@ impl Evaluator {
         }
     }
 
+    fn eval_float_infix_expression(&self, operator: &InfixOperator, left: f64, right: f64) -> Result<Object, Error> {
+        let invalid = || {
+            self.error(
+                self.current_token.as_ref(),
+                format!(
+                    "Invalid operator: Float({:?}) {} Float({:?})",
+                    left, operator, right
+                )
+                .as_str(),
+                ErrorKind::InvalidOperator,
+            )
+        };
+
+        match operator {
+            InfixOperator::Plus => Ok((left + right).into()),
+            InfixOperator::Minus => Ok((left - right).into()),
+            InfixOperator::Asterisk => Ok((left * right).into()),
+            InfixOperator::Slash => Ok((left / right).into()),
+            InfixOperator::Percent => Ok((left % right).into()),
+            InfixOperator::CompareEqual => Ok((left == right).into()),
+            InfixOperator::CompareNotEqual => Ok((left != right).into()),
+            InfixOperator::CompareGreater => Ok((left > right).into()),
+            InfixOperator::CompareLess => Ok((left < right).into()),
+            InfixOperator::CompareGreaterEqual => Ok((left >= right).into()),
+            InfixOperator::CompareLessEqual => Ok((left <= right).into()),
+
+            // Explicitly not supported. This ensures that we always handle all possible operators
+            InfixOperator::LogicalAnd
+            | InfixOperator::LogicalOr
+            | InfixOperator::BitwiseOr
+            | InfixOperator::BitwiseAnd
+            | InfixOperator::BitwiseXor
+            | InfixOperator::BitwiseLeftShift
+            | InfixOperator::BitwiseRightShift
+            | InfixOperator::AssignEqual
+            | InfixOperator::AssignPlus
+            | InfixOperator::AssignMinus
+            | InfixOperator::AssignAsterisk
+            | InfixOperator::AssignSlash
+            | InfixOperator::AssignPercent
+            | InfixOperator::AssignBitwiseOr
+            | InfixOperator::AssignBitwiseAnd
+            | InfixOperator::AssignBitwiseXor
+
+                => Err(invalid()),
+        }
+    }
+
     fn eval_minus_prefix_operator_expression(&self, right: Object) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_minus_prefix_operator_expression({})", right));
         match right {
             Object::Integer(integer) => Ok((-integer).into()),
+            Object::Float(float) => Ok((-float).into()),
             _ => Err(self.error(
                 self.current_token.as_ref(),
                 format!("Unknown operator: -{:?}", right).as_str(),
@@ -684,8 +756,6 @@ impl Evaluator {
         };
 
         let arg_objects = self.eval_expressions(arguments, env)?;
-        let arg_exprs = arguments.iter().map(|e| e.clone()).collect::<Vec<_>>();
-
 
         (function.function)(&arg_objects, env, &self).map_err(|(msg, err_type)| {
             self.error(
@@ -1044,6 +1114,7 @@ mod tests {
             ("(1 < 2) == false", false),
             ("(1 > 2) == true", false),
             ("(1 > 2) == false", true),
+            ("2.6 > -2.9", true),
         ];
 
         for (input, expected) in tests {
@@ -1051,6 +1122,29 @@ mod tests {
             test_boolean_object(evaluated, expected);
         }
     }
+
+    fn test_float_object(obj: Object, expected: f64) {
+        match obj {
+            Object::Float(float) => assert_eq!(float, expected),
+            _ => panic!("Object is not a Float. Got: {:?}", obj),
+        };
+    }
+
+    #[test]
+    fn test_eval_float_expression() {
+        let tests = vec![
+            ("3.0", 3.0),
+            ("3.0 + 1.5", 4.5),
+            ("-29.6", -29.6),
+
+        ];
+
+        for (input, evaluated) in tests {
+            test_float_object(test_eval(input), evaluated);
+        }
+    }
+        
+        
 
     #[test]
     fn test_bang_operator() {

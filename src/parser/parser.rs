@@ -901,6 +901,12 @@ impl Parser {
 
         while self.peek_token.kind == TokenKind::Comma {
             self.next_token();
+
+            // allow trailing commas
+            if self.peek_token.kind == end {
+                break;
+            }
+
             self.next_token();
             arguments.push(self.parse_expression(Precedence::Lowest)?);
         }

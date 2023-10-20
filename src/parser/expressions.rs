@@ -21,6 +21,125 @@ use crate::lexer::tokens::{Token, TokenKind};
 
 use super::parser::BlockStatement;
 
+#[derive(Debug, PartialEq, Clone, PartialOrd)]
+pub enum Precedence {
+    Lowest,
+    Assign,      // =
+    Range,       // .. or ..=
+    LogicalOr,   // ||
+    LogicalAnd,  // &&
+    Equals,      // ==
+    LessGreater, // > or <
+    BitwiseOr,   // |
+    BitwiseXor,  // ^
+    BitwiseAnd,  // &
+    BitShift,    // << or >>
+    Sum,         // + or -
+    Product,     // * or /
+    Prefix,      // -X or !X
+    Index,       // array[index]
+    Call,        // myFunction(X)
+    Member,      // object.member
+}
+
+pub trait PrecedenceTrait {
+    fn precedence(&self) -> Option<Precedence>;
+}
+
+impl PrecedenceTrait for TokenKind {
+    fn precedence(&self) -> Option<Precedence> {
+        let presedence = match self {
+            // Precedences listed in ascending order, but lowest precedence at the end
+            // *** Assign ***
+            TokenKind::AssignEqual
+            | TokenKind::AssignPlus
+            | TokenKind::AssignMinus
+            | TokenKind::AssignMultiply
+            | TokenKind::AssignDivide
+            | TokenKind::AssignModulo
+            | TokenKind::AssignBitwiseOr
+            | TokenKind::AssignBitwiseAnd
+            | TokenKind::AssignBitwiseXor => Precedence::Assign,
+
+            // *** Range ***
+            TokenKind::RangeExclusive | TokenKind::RangeInclusive => Precedence::Range,
+
+            // *** Logical Or ***
+            TokenKind::LogicalOr => Precedence::LogicalOr,
+
+            // *** Logical And ***
+            TokenKind::LogicalAnd => Precedence::LogicalAnd,
+
+            // *** Equals ***
+            TokenKind::CompareEqual | TokenKind::CompareNotEqual => Precedence::Equals,
+
+            // *** Less Greater ***
+            TokenKind::CompareLess
+            | TokenKind::CompareLessEqual
+            | TokenKind::CompareGreater
+            | TokenKind::CompareGreaterEqual => Precedence::LessGreater,
+
+            // *** Bitwise Or ***
+            TokenKind::BitwiseOr => Precedence::BitwiseOr,
+
+            // *** Bitwise Xor ***
+            TokenKind::BitwiseXor => Precedence::BitwiseXor,
+
+            // *** Bitwise And ***
+            TokenKind::BitwiseAnd => Precedence::BitwiseAnd,
+
+            // *** Bit Shift ***
+            TokenKind::BitwiseLeftShift | TokenKind::BitwiseRightShift => Precedence::BitShift,
+
+            // *** Sum ***
+            TokenKind::Plus | TokenKind::Minus => Precedence::Sum,
+
+            // *** Product ***
+            TokenKind::Multiply | TokenKind::Divide | TokenKind::Modulo => Precedence::Product,
+
+            // *** Prefix ***
+            // does not get inferred from token kind, but is used in parsing prefix expressions
+
+            // *** Index ***
+            TokenKind::LeftSquare => Precedence::Index,
+
+            // *** Call ***
+            TokenKind::LeftParen => Precedence::Call,
+
+            // *** Member ***
+            TokenKind::Dot => Precedence::Member,
+
+            // *** Lowest precedence ***
+            // some tokens are not used in expressions
+            //
+            // But can still show up as a peeked token
+            TokenKind::LeftSquirly => Precedence::Lowest,
+            TokenKind::RightSquirly => Precedence::Lowest,
+            TokenKind::Comma => Precedence::Lowest,
+            TokenKind::Return => Precedence::Lowest,
+            TokenKind::RightSquare => Precedence::Lowest,
+            TokenKind::Identifier(_) => Precedence::Lowest,
+            TokenKind::Let => Precedence::Lowest,
+            TokenKind::EOF => Precedence::Lowest,
+            TokenKind::RightParen => Precedence::Lowest,
+            TokenKind::For => Precedence::Lowest,
+            TokenKind::In => Precedence::Lowest,
+            TokenKind::If => Precedence::Lowest,
+            _ => {
+                return None;
+            }
+        };
+
+        Some(presedence)
+    }
+}
+
+impl PrecedenceTrait for Token {
+    fn precedence(&self) -> Option<Precedence> {
+        self.kind.precedence()
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Identifier(Identifier),
@@ -294,125 +413,6 @@ impl Display for IfExpression {
 impl Display for InfixExpression {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "({} {} {})", self.left, self.operator, self.right)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, PartialOrd)]
-pub enum Precedence {
-    Lowest,
-    Assign,      // =
-    Range,       // .. or ..=
-    LogicalOr,   // ||
-    LogicalAnd,  // &&
-    Equals,      // ==
-    LessGreater, // > or <
-    BitwiseOr,   // |
-    BitwiseXor,  // ^
-    BitwiseAnd,  // &
-    BitShift,    // << or >>
-    Sum,         // + or -
-    Product,     // * or /
-    Prefix,      // -X or !X
-    Index,       // array[index]
-    Call,        // myFunction(X)
-    Member,      // object.member
-}
-
-pub trait PrecedenceTrait {
-    fn precedence(&self) -> Option<Precedence>;
-}
-
-impl PrecedenceTrait for TokenKind {
-    fn precedence(&self) -> Option<Precedence> {
-        let presedence = match self {
-            // Precedences listed in ascending order, but lowest precedence at the end
-            // *** Assign ***
-            TokenKind::AssignEqual
-            | TokenKind::AssignPlus
-            | TokenKind::AssignMinus
-            | TokenKind::AssignMultiply
-            | TokenKind::AssignDivide
-            | TokenKind::AssignModulo
-            | TokenKind::AssignBitwiseOr
-            | TokenKind::AssignBitwiseAnd
-            | TokenKind::AssignBitwiseXor => Precedence::Assign,
-
-            // *** Range ***
-            TokenKind::RangeExclusive | TokenKind::RangeInclusive => Precedence::Range,
-
-            // *** Logical Or ***
-            TokenKind::LogicalOr => Precedence::LogicalOr,
-
-            // *** Logical And ***
-            TokenKind::LogicalAnd => Precedence::LogicalAnd,
-
-            // *** Equals ***
-            TokenKind::CompareEqual | TokenKind::CompareNotEqual => Precedence::Equals,
-
-            // *** Less Greater ***
-            TokenKind::CompareLess
-            | TokenKind::CompareLessEqual
-            | TokenKind::CompareGreater
-            | TokenKind::CompareGreaterEqual => Precedence::LessGreater,
-
-            // *** Bitwise Or ***
-            TokenKind::BitwiseOr => Precedence::BitwiseOr,
-
-            // *** Bitwise Xor ***
-            TokenKind::BitwiseXor => Precedence::BitwiseXor,
-
-            // *** Bitwise And ***
-            TokenKind::BitwiseAnd => Precedence::BitwiseAnd,
-
-            // *** Bit Shift ***
-            TokenKind::BitwiseLeftShift | TokenKind::BitwiseRightShift => Precedence::BitShift,
-
-            // *** Sum ***
-            TokenKind::Plus | TokenKind::Minus => Precedence::Sum,
-
-            // *** Product ***
-            TokenKind::Multiply | TokenKind::Divide | TokenKind::Modulo => Precedence::Product,
-
-            // *** Prefix ***
-            // does not get inferred from token kind, but is used in parsing prefix expressions
-
-            // *** Index ***
-            TokenKind::LeftSquare => Precedence::Index,
-
-            // *** Call ***
-            TokenKind::LeftParen => Precedence::Call,
-
-            // *** Member ***
-            TokenKind::Dot => Precedence::Member,
-
-            // *** Lowest precedence ***
-            // some tokens are not used in expressions
-            //
-            // But can still show up as a peeked token
-            TokenKind::LeftSquirly => Precedence::Lowest,
-            TokenKind::RightSquirly => Precedence::Lowest,
-            TokenKind::Comma => Precedence::Lowest,
-            TokenKind::Return => Precedence::Lowest,
-            TokenKind::RightSquare => Precedence::Lowest,
-            TokenKind::Identifier(_) => Precedence::Lowest,
-            TokenKind::Let => Precedence::Lowest,
-            TokenKind::EOF => Precedence::Lowest,
-            TokenKind::RightParen => Precedence::Lowest,
-            TokenKind::For => Precedence::Lowest,
-            TokenKind::In => Precedence::Lowest,
-            TokenKind::If => Precedence::Lowest,
-            _ => {
-                return None;
-            }
-        };
-
-        Some(presedence)
-    }
-}
-
-impl PrecedenceTrait for Token {
-    fn precedence(&self) -> Option<Precedence> {
-        self.kind.precedence()
     }
 }
 

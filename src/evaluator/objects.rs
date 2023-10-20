@@ -16,6 +16,7 @@ const FALSE: Object = Object::Boolean(false);
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {
     Integer(i64),
+    Float(f64),
     Boolean(bool),
     Null,
     ReturnValue(Box<Object>),
@@ -42,7 +43,7 @@ pub enum Object {
 ///
 /// # Examples
 /// ```
-/// use interpreter::evaluator::objects::{Object, UnwrapReturnValue};
+/// use mechylang::evaluator::objects::{Object, UnwrapReturnValue};
 ///
 /// let obj = Object::ReturnValue(Box::new(Object::Integer(5)));
 /// assert_eq!(obj.unwrap_return_value(), Object::Integer(5));
@@ -56,7 +57,7 @@ impl UnwrapReturnValue for Object {
     ///
     /// # Examples
     /// ```
-    /// use interpreter::evaluator::objects::{Object, UnwrapReturnValue};
+    /// use mechylang::evaluator::objects::{Object, UnwrapReturnValue};
     ///
     /// let obj = Object::ReturnValue(Box::new(Object::Integer(5)));
     /// assert_eq!(obj.unwrap_return_value(), Object::Integer(5));
@@ -113,6 +114,7 @@ impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Object::Integer(int) => write!(f, "{}", int),
+            Object::Float(float) => write!(f, "{}", float),
             Object::Boolean(boolean) => write!(f, "{}", boolean),
             Object::Null => write!(f, "null"),
             Object::ReturnValue(val) => write!(f, "{}", val),
@@ -184,5 +186,11 @@ impl From<Vec<Object>> for Object {
 impl From<i64> for Object {
     fn from(int: i64) -> Self {
         Object::Integer(int)
+    }
+}
+
+impl From<f64> for Object {
+    fn from(float: f64) -> Self {
+        Object::Float(float)
     }
 }

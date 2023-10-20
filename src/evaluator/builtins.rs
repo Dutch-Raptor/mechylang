@@ -1,22 +1,30 @@
-use std::{ops::RangeInclusive, rc::Rc};
+use std::ops::RangeInclusive;
 
-use crate::parser::expressions::{Expression, Identifier};
+use crate::parser::expressions::Identifier;
 
-use super::{
-    environment::Environment,
-    eval::{EvalConfig, Evaluator},
-    objects::Object,
-};
+use super::{environment::Environment, eval::Evaluator, objects::Object};
 
+/// A builtin function that can be called from `mechylang`
 #[derive(Debug, PartialEq, Clone)]
 pub struct BuiltinFunction {
+    /// The name of the builtin function
+    ///
+    /// This is the name that will be used to call the function
     pub name: &'static str,
+    /// The number of arguments the function takes
     pub args_len: RangeInclusive<usize>,
+    /// The function that will be called when the builtin is called
+    ///
+    /// # Arguments
+    /// - `args`: The arguments passed to the function
+    /// - `env`: The environment the function is being called in
+    /// - `eval`: The evaluator, used for configuration (e.g. printing)
     pub function: fn(&Vec<Object>, &mut Environment, &Evaluator) -> BuiltinResult,
 }
 
 type BuiltinResult = Result<Object, (String, BuiltinError)>;
 
+/// A list of all the builtin functions in `mechylang`
 pub const BUILTINS: [BuiltinFunction; 2] = [
     BuiltinFunction {
         name: "len",

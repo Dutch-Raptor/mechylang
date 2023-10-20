@@ -43,7 +43,7 @@ impl Iterator for IteratorObject {
 }
 
 impl PartialEq for IteratorObject {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _other: &Self) -> bool {
         // TODO: possibly implement this
         false
     }

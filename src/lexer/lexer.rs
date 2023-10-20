@@ -21,7 +21,7 @@ impl Lexer {
     ///
     /// # Example
     /// ```
-    /// use interpreter::lexer::lexer::Lexer;
+    /// use mechylang::lexer::lexer::Lexer;
     ///
     /// let input = String::from(
     ///     r#"
@@ -69,30 +69,6 @@ impl Lexer {
         }
         self.position = self.read_position;
         self.read_position += 1;
-    }
-
-    /// Goes back n characters in the input string
-    fn reverse_char(&mut self, n: usize) {
-        for _ in 0..n {
-            self.read_position = self.position;
-            self.position -= 1;
-            self.ch = self.input.chars().nth(self.position).unwrap();
-
-            // Update line and column
-            match self.ch {
-                '\n' => {
-                    self.line -= 1;
-                    // don't know how to get the column of the last char in the line
-                    self.column = 0;
-                }
-                '\t' => {
-                    self.column -= 4;
-                    dbg!("tab");
-                }
-                '\r' => self.column = 0,
-                _ => self.column -= 1,
-            }
-        }
     }
 
     fn skip_whitespace(&mut self) {
