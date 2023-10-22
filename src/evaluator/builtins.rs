@@ -1,3 +1,31 @@
+//! Builtins for `mechylang`
+//!
+//! #### `print`
+//!
+//! The `print` function can be used to print to stdout.
+//! It prints the string representation of the arguments passed to it, separated by spaces.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! print("Hello", "World!"); // prints "Hello World!"
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! #### `println`
+//!
+//! The `println` function can be used to print to stdout with a newline at the end.
+//! It prints the string representation of the arguments passed to it, separated by spaces.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! println("Hello", "World!"); // prints "Hello World!\n"
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+
 use std::ops::RangeInclusive;
 
 use crate::parser::expressions::Identifier;
@@ -25,7 +53,12 @@ pub struct BuiltinFunction {
 type BuiltinResult = Result<Object, (String, BuiltinError)>;
 
 /// A list of all the builtin functions in `mechylang`
-pub const BUILTINS: [BuiltinFunction; 2] = [
+pub const BUILTINS: [BuiltinFunction; 5] = [
+    // The `len` function
+    //
+    // `Mechylang` arguments:
+    // - item: The item to get the length of
+    //     - Type: `String` or `Array`
     BuiltinFunction {
         name: "len",
         args_len: (1..=1),
@@ -38,6 +71,11 @@ pub const BUILTINS: [BuiltinFunction; 2] = [
             )),
         },
     },
+    // The `print` function
+    //
+    // `Mechylang` arguments:
+    // - items: The items to print
+    //    - Type: `Any`
     BuiltinFunction {
         name: "print",
         args_len: (1..=usize::MAX),
@@ -52,11 +90,62 @@ pub const BUILTINS: [BuiltinFunction; 2] = [
             Ok(Object::Null)
         },
     },
+    BuiltinFunction {
+        name: "println",
+        args_len: (1..=usize::MAX),
+        function: |args, _, eval| {
+            eval.print(format!(
+                "{}\n",
+                args.iter()
+                    .map(|a| a.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            ));
+            Ok(Object::Null)
+        },
+    },
+    // Assert
+    BuiltinFunction {
+        name: "assert",
+        args_len: (1..=1),
+        function: |args, _, eval| {
+            if args[0] == Object::Boolean(true) {
+                Ok(Object::Null)
+            } else {
+                eval.print(format!(
+                    "Assertion failed: {} is not true",
+                    args[0].to_string()
+                ));
+                Err((
+                    format!("Assertion failed: {} is not true", args[0].to_string()),
+                    BuiltinError::AssertionFailed,
+                ))
+            }
+        },
+    },
+    // AssertEq
+    BuiltinFunction {
+        name: "assert_eq",
+        args_len: (2..=usize::MAX),
+        function: |args, _, _| {
+            let first = args[0].clone();
+            for arg in args.iter().skip(1) {
+                if first != *arg {
+                    return Err((
+                        format!("Assertion failed: {} != {}", first, arg),
+                        BuiltinError::AssertionFailed,
+                    ));
+                }
+            }
+            Ok(Object::Null)
+        },
+    },
 ];
 
 #[derive(Debug, PartialEq)]
 pub enum BuiltinError {
     WrongArgumentType,
+    AssertionFailed,
 }
 
 impl TryFrom<&Identifier> for BuiltinFunction {

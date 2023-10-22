@@ -1,4 +1,7 @@
-use std::{fmt::Display, rc::Rc};
+use std::{
+    fmt::{Debug, Display},
+    rc::Rc,
+};
 
 use crate::parser::{expressions::Identifier, parser::BlockStatement};
 
@@ -41,11 +44,16 @@ pub enum Object {
 
 /// Trait for unwrapping return values
 ///
+/// If the object is a return value, it will unwrap it and return the inner value.
+///
 /// # Examples
-/// ```
-/// use mechylang::evaluator::objects::{Object, UnwrapReturnValue};
+/// ```ignore
+/// use crate::evaluator::objects::{Object, UnwrapReturnValue};
 ///
 /// let obj = Object::ReturnValue(Box::new(Object::Integer(5)));
+/// assert_eq!(obj.unwrap_return_value(), Object::Integer(5));
+///
+/// let obj = Object::Integer(5);
 /// assert_eq!(obj.unwrap_return_value(), Object::Integer(5));
 /// ```
 pub trait UnwrapReturnValue {
@@ -53,18 +61,6 @@ pub trait UnwrapReturnValue {
 }
 
 impl UnwrapReturnValue for Object {
-    /// Returns the inner value of a return value, otherwise returns the object
-    ///
-    /// # Examples
-    /// ```
-    /// use mechylang::evaluator::objects::{Object, UnwrapReturnValue};
-    ///
-    /// let obj = Object::ReturnValue(Box::new(Object::Integer(5)));
-    /// assert_eq!(obj.unwrap_return_value(), Object::Integer(5));
-    ///
-    /// let obj = Object::Integer(5);
-    /// assert_eq!(obj.unwrap_return_value(), Object::Integer(5));
-    /// ```
     fn unwrap_return_value(self) -> Object {
         match self {
             Object::ReturnValue(val) => *val,
@@ -73,7 +69,7 @@ impl UnwrapReturnValue for Object {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Function {
     pub params: Rc<[Identifier]>,
     pub body: BlockStatement,
@@ -94,6 +90,19 @@ impl Function {
 impl PartialEq for Function {
     fn eq(&self, other: &Self) -> bool {
         self.params == other.params && self.body == other.body
+    }
+}
+
+impl Debug for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let params = self
+            .params
+            .iter()
+            .map(|param| param.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        write!(f, "fn({}) {{\n{}\n}}", params, self.body)
     }
 }
 

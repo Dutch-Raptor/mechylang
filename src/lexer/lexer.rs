@@ -21,7 +21,7 @@ impl Lexer {
     ///
     /// # Example
     /// ```
-    /// use mechylang::lexer::lexer::Lexer;
+    /// use mechylang::Lexer;
     ///
     /// let input = String::from(
     ///     r#"
@@ -179,6 +179,7 @@ impl Lexer {
                     Some(TokenKind::Bang)
                 }
             }
+            '~' => Some(TokenKind::BitwiseNot),
             '/' => {
                 // Support comments
                 if self.peek_char() == '/' {

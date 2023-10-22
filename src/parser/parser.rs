@@ -366,6 +366,7 @@ impl Parser {
 
             TokenKind::Bang => true,
             TokenKind::Minus => true,
+            TokenKind::BitwiseNot => true,
 
             // Control flow expressions
             TokenKind::If => true,
@@ -399,6 +400,7 @@ impl Parser {
 
             TokenKind::Bang => self.parse_prefix_expression(),
             TokenKind::Minus => self.parse_prefix_expression(),
+            TokenKind::BitwiseNot => self.parse_prefix_expression(),
 
             // Block expressions
             TokenKind::LeftSquirly => self.parse_block_expression(),
@@ -578,6 +580,7 @@ impl Parser {
         let operator = match token.kind {
             TokenKind::Bang => PrefixOperator::Bang,
             TokenKind::Minus => PrefixOperator::Minus,
+            TokenKind::BitwiseNot => PrefixOperator::BitwiseNot,
             _ => {
                 return Err(self.error_current(
                     ErrorKind::MissingPrefix,

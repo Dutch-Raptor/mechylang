@@ -42,10 +42,7 @@
 //! Then, you can use it in your code like so:
 //!
 //! ```rust
-//! use mechylang::evaluator::eval::Evaluator;
-//! use mechylang::evaluator::environment::Environment;
-//! use mechylang::evaluator::eval::EvalConfig;
-//! use mechylang::evaluator::objects::Object;
+//! use mechylang::{Evaluator, Environment, EvalConfig, Object};
 //!
 //! # fn main() {
 //! let mut env = Environment::new();
@@ -64,7 +61,7 @@
 //! No programming language is complete without a hello world example.
 //!
 //! ```rust
-//! # use mechylang::evaluator::{eval::Evaluator, environment::Environment, eval::EvalConfig, objects::Object};
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
 //! # let result = Evaluator::eval(r#"
 //! // This is a comment
 //! // With the print function you can print to stdout
@@ -80,16 +77,11 @@
 //!
 //! Behind the scenes every code example is run as a test like the following:
 //! ```rust
-//! use mechylang::evaluator::{
-//!     eval::Evaluator,
-//!     environment::Environment,
-//!     eval::EvalConfig,
-//!     objects::Object
-//! };
+//! use mechylang::{Evaluator, Environment, EvalConfig, Object};
 //! let result = Evaluator::eval(r#" // define the `mechylang` code to run
-//! 5
+//! assert_eq(2 + 3, 5);
 //! "#, &mut Environment::new(), EvalConfig::default());
-//! assert_eq!(result, Ok(Object::Integer(5))); // specify the expected result
+//! assert_eq!(result, Ok(Object::Null)); // assert that the result is `Ok(Object::Null)`
 //! ```
 //!
 //! Only the mechylang executed code is shown in the examples, not the rust code that runs the tests.
@@ -100,26 +92,45 @@
 //! Variables can be declared using the `let` keyword.
 //!
 //! ```rust
-//! # use mechylang::evaluator::{eval::Evaluator, environment::Environment, eval::EvalConfig, objects::Object};
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
 //! # let result = Evaluator::eval(r#"
 //! let x = 5;
 //! let y = 10;
-//! x + y // 15
+//! assert_eq(x, 5);
+//! assert_eq(y, 10);
 //! # "#, &mut Environment::new(), EvalConfig::default());
-//! # assert_eq!(result, Ok(Object::Integer(15)));
+//! # assert_eq!(result, Ok(Object::Null));
 //! ```
 //!
 //! Variables can be reassigned using the `=` operator.
 //!
 //! ```rust
-//! # use mechylang::evaluator::{eval::Evaluator, environment::Environment, eval::EvalConfig, objects::Object};
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
 //! # let result = Evaluator::eval(r#"
 //! let x = 5;
 //! x = 10;
-//! x // 10
+//! assert_eq(x, 10);
 //! # "#, &mut Environment::new(), EvalConfig::default());
-//! # assert_eq!(result, Ok(Object::Integer(10)));
+//! # assert_eq!(result, Ok(Object::Null));
 //! ```
+//!
+//! Valid variable names are any combination of letters, numbers, and underscores, as long as they don't start with a number.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! let x = 5;
+//! let Y = 10;
+//! let _ = 15;
+//! let _z = 15;
+//! let _1 = 20;
+//! let _1z = 25;
+//! let _z1 = 30;
+//! let _Z_1 = 35;
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
 //!
 //! ### Types
 //!
@@ -140,56 +151,208 @@
 //! - Division (`/`)
 //! - Remainder (`%`)
 //! - Negation (`-`)
-//! - Not (`!`)
 //! - Bitwise Or (`|`)
 //! - Bitwise And (`&`)
 //! - Bitwise Xor (`^`)
-//!
+//! - Bitwise Not (`~`)
 //! - Bitwise Left Shift (`<<`)
 //! - Bitwise Right Shift (`>>`)
 //!
 //! ```rust
-//! # use mechylang::evaluator::{eval::Evaluator, environment::Environment, eval::EvalConfig, objects::Object};
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
 //! # let result = Evaluator::eval(r#"
 //! let a = 5;
 //! let b = 10;
-//! [
-//!     a + b, // 15
-//!     a - b, // -5
-//!     a * b, // 50
-//!     a / b, // 0 (integer division)
-//!     a % b, // 5
-//!     -a, // -5
-//!     !a, // false
-//!     a | b, // 15
-//!     a & b, // 0
-//!     a ^ b, // 15
-//!     a << b, // 5120
-//!     a >> b, // 0
-//!     0.5 + 0.5, // 1.0
-//!     33.7 / 0.7, // 48.14285714285715
-//! ]
+//! assert_eq(a + b, 15);
+//! assert_eq(a - b, -5);
+//! assert_eq(a * b, 50);
+//! assert_eq(a / b, 0);
+//! assert_eq(a % b, 5);
+//! assert_eq(-a, -5);
+//! assert_eq(10 | 3, 11);
+//! assert_eq(10 & 3, 2);
+//! assert_eq(10 ^ 3, 9);
+//! assert_eq(~10, -11);
+//! assert_eq(10 << 1, 20);
+//! assert_eq(10 >> 1, 5);
 //! # "#, &mut Environment::new(), EvalConfig::default());
-//! # assert_eq!(result, Ok(Object::Array(vec![
-//! #     Object::Integer(15),
-//! #     Object::Integer(-5),
-//! #     Object::Integer(50),
-//! #     Object::Integer(0),
-//! #     Object::Integer(5),
-//! #     Object::Integer(-5),
-//! #     Object::Boolean(false),
-//! #     Object::Integer(15),
-//! #     Object::Integer(0),
-//! #     Object::Integer(15),
-//! #     Object::Integer(5120),
-//! #     Object::Integer(0),
-//! #     Object::Float(1.0),
-//! #     Object::Float(48.14285714285715),
-//! # ])));
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! ### Comparison Operations
+//!
+//! `mechylang` supports the following comparison operations:
+//! - Equal (`==`)
+//! - Not Equal (`!=`)
+//! - Less Than (`<`)
+//! - Less Than Or Equal (`<=`)
+//! - Greater Than (`>`)
+//! - Greater Than Or Equal (`>=`)
+//! - Logical And (`&&`)
+//! - Logical Or (`||`)
+//! - Logical Not (`!`)
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! assert_eq(5 == 5, true);
+//! assert_eq(5 != 5, false);
+//! assert_eq(5 < 10, true);
+//! assert_eq(5 <= 10, true);
+//! assert_eq(5 > 10, false);
+//! assert_eq(5 >= 10, false);
+//! assert_eq(true && false, false);
+//! assert_eq(false || true, true);
+//! assert_eq(!true, false);
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! ### Functions
+//!
+//! In `mechylang`, functions are variables that can be called. Making them first class citizens.
+//!
+//! Functions can be declared using the `fn` keyword.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! let add = fn(a, b) {
+//!    a + b
+//!    // The last expression in a block is returned
+//!    // so there is no need to use the `return` keyword
+//! }
+//!
+//! assert_eq(add(5, 10), 15);
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! The `return` keyword can be used to return early from a function.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! let add = fn(a, b) {
+//!   return a + b;
+//!   // This line is never reached
+//!   a - b
+//! }
+//!
+//! assert_eq(add(5, -10), -5);
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! Functions can be passed as arguments to other functions.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! let apply = fn(f, a, b) {
+//!  f(a, b)
+//! }
+//!
+//! let add = fn(a, b) {
+//!  a + b
+//! }
+//!
+//! assert_eq(apply(add, 5, 10), 15);
+//! // Anonymous functions are also supported!
+//! assert_eq(apply(fn(a, b) { a - b }, 5, 10), -5);
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! Functions can be returned from other functions.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! let make_adder = fn(a) {
+//!     fn(b) {
+//!         a + b
+//!     }
+//! }
+//!
+//! let add_five = make_adder(5);
+//! let remove_five = make_adder(-5);
+//!
+//! assert_eq(add_five(10), 15);
+//! assert_eq(remove_five(10), 5);
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! ### Built in functions:
+//!
+//! `mechylang` has a few built in functions, to learn more about them, check out the [builtins module](crate::evaluator::builtins).
+//!
+//! Built in functions can be called like any other function. And even passed as arguments to other functions.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! let apply = fn(f, x) {
+//!     f(x)
+//! }
+//!
+//! assert_eq(apply(len, "Hello World!"), 12);
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! ### Arrays
+//!
+//! Arrays are declared using the `[]` syntax.
+//! Arrays can contain any type of object, including other arrays and functions.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! let a = [1, 2, 3];
+//! let b = [1, 2, 3, [4, 5, 6]];
+//! let c = [1, 2, 3, fn(a, b) { a + b }];
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! Arrays can be accessed using the `[]` operator.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! assert_eq([1, 2, 3][0], 1);
+//! assert_eq([1, 2, 3][1], 2);
+//! assert_eq([1, 2, 3][2], 3);
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! To push an item to the end of an array, use the `push` method.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! let a = [1, 2, 3];
+//! a.push(4);
+//! assert_eq(a, [1, 2, 3, 4]);
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
 //! ```
 
-pub mod errors;
+mod errors;
 pub mod evaluator;
-pub mod lexer;
-pub mod parser;
-pub mod tracer;
+mod lexer;
+mod parser;
+mod tracer;
+
+pub use errors::Error;
+pub use evaluator::environment::Environment;
+pub use evaluator::eval::EvalConfig;
+pub use evaluator::eval::Evaluator;
+pub use evaluator::eval_file;
+pub use evaluator::objects::Object;
+pub use lexer::lexer::Lexer;
+pub use lexer::tokens::Token;
+pub use parser::parser::Parser;

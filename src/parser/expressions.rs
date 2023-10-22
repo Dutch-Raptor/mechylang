@@ -305,6 +305,7 @@ impl Display for PrefixExpression {
 pub enum PrefixOperator {
     Bang,
     Minus,
+    BitwiseNot,
 }
 
 impl Display for PrefixOperator {
@@ -312,6 +313,7 @@ impl Display for PrefixOperator {
         match self {
             PrefixOperator::Bang => write!(f, "!"),
             PrefixOperator::Minus => write!(f, "-"),
+            PrefixOperator::BitwiseNot => write!(f, "~"),
         }
     }
 }
@@ -340,6 +342,7 @@ pub enum InfixOperator {
 
     LogicalAnd,
     LogicalOr,
+
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,

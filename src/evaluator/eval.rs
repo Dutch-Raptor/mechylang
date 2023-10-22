@@ -49,7 +49,7 @@ pub struct EvalConfig {
 impl Default for EvalConfig {
     fn default() -> Self {
         Self {
-            output_fn: Box::new(|string| println!("{}", string)),
+            output_fn: Box::new(|string| print!("{}", string)),
         }
     }
 }
@@ -66,16 +66,21 @@ impl EvalConfig {
     ///
     /// # Examples
     /// ```
-    /// use mechylang::evaluator::EvalConfig;
-    /// use mechylang::evaluator::Evaluator;
+    /// use mechylang::EvalConfig;
+    /// use mechylang::Evaluator;
+    /// use std::sync::Arc;
+    /// use std::sync::Mutex;
     ///
-    /// let mut output = String::new();
+    /// let (sender, receiver) = std::sync::mpsc::channel();
     ///
-    /// let config = EvalConfig::with_output(|string| output.push_str(&string));
+    /// let config = EvalConfig::with_output(move |string| {
+    ///    sender.send(string).unwrap();
+    ///    // You can also do other things with the string here, like write it to a file.
+    /// });
     ///
     /// Evaluator::eval("print(\"Hello, world!\")", &mut Default::default(), config).unwrap();
     ///
-    /// assert_eq!(output, "Hello, world!\n");
+    /// assert_eq!(receiver.recv().unwrap(), "Hello, world!");
     /// ```
     pub fn with_output(output_fn: impl Fn(String) + Send + 'static) -> Self {
         Self {
@@ -145,9 +150,7 @@ impl Evaluator {
                 Ok(Object::ReturnValue(Box::new(val)))
             }
             Statement::Let(let_statement) => {
-                let name = let_statement.name.clone();
-                let val = self.eval_let_statement(let_statement, env)?;
-                Ok(Object::Let(name, Box::new(val)))
+                self.eval_let_statement(let_statement, env)
             }
             Statement::Break(break_statement) => {
                 match &break_statement.value {
@@ -159,14 +162,33 @@ impl Evaluator {
         }
     }
 
+    /// Evaluates a let statement.
+    ///
+    /// Assigns a value to a variable in the current environment.
+    ///
+    /// Returns null.
+    ///
+    /// # Examples
+    /// ```
+    /// use mechylang::{Evaluator, Environment, Object};
+    /// assert_eq!(
+    ///    Evaluator::eval("let x = 5", &mut Default::default(), Default::default()).unwrap(),
+    ///    Object::Null
+    /// );
+    /// assert_eq!(
+    ///    Evaluator::eval("let x = 5; x", &mut Default::default(), Default::default()).unwrap(),
+    ///    Object::Integer(5)
+    /// );
+    /// ```
     fn eval_let_statement(
         &mut self,
         let_statement: &LetStatement,
         env: &mut Environment,
     ) -> Result<Object, Error> {
+        let _trace = trace!(&format!("eval_let_statement: {}", let_statement));
         let val = self.eval_expression(&let_statement.value, env)?;
-        env.set(let_statement.name.value.clone(), val.clone());
-        Ok(val)
+        env.set(let_statement.name.value.clone(), val);
+        Ok(Object::Null)
     }
 
     fn eval_expression(
@@ -186,6 +208,7 @@ impl Evaluator {
                 match prefix.operator {
                     PrefixOperator::Bang => Ok(self.eval_bang_operator_expression(right)),
                     PrefixOperator::Minus => Ok(self.eval_minus_prefix_operator_expression(right)?),
+                    PrefixOperator::BitwiseNot => Ok(self.eval_bitwise_not_operator_expression(right)?),
                 }
             }
             Expression::Infix(infix) => self.eval_infix_expression(infix, env),
@@ -576,6 +599,8 @@ impl Evaluator {
 
         let arguments = self.eval_expressions(&call.arguments, env)?;
 
+        println!("function: {}", function);
+
         self.apply_function(function, arguments, None).map_err(|err| {
             self.error(
                 Some(call.function.token()),
@@ -603,7 +628,7 @@ impl Evaluator {
         &mut self,
         function: Object,
         arguments: Vec<Object>,
-        env: Option<Environment>,
+        extra_env: Option<Environment>,
     ) -> Result<Object, Error> {
         let _trace = trace!(&format!("apply_function({}, {:?})", function, arguments));
         let function = match function {
@@ -621,7 +646,7 @@ impl Evaluator {
 
         // if any external environment was passed, extend the function environment with it
         // this is used to pass mutable variables to functions in method calls
-        if let Some(mut env) = env {
+        if let Some(mut env) = extra_env {
             let new_outer = Environment::new_enclosed(&extended_env);
             env.set_outer(&new_outer);
             extended_env = env;
@@ -817,17 +842,6 @@ impl Evaluator {
 
     fn eval_assignment_expression(&mut self, infix: &InfixExpression, env: &mut Environment) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_assignment_expression: {}", infix));
-
-        let left = match infix.left.as_ref() {
-            Expression::Identifier(ident) => ident.value.clone(),
-            _ => {
-                return Err(self.error(
-                    Some(&infix.token),
-                    &format!("Invalid left hand side of assignment: {:?}", infix.left).to_string(),
-                    ErrorKind::InvalidLeftHandSide,
-                ))
-            }
-        };
         
         // set current token to the identifier token
         self.current_token = Some(infix.left.token().clone());
@@ -862,15 +876,67 @@ impl Evaluator {
             }
         };
 
-        env.mutate(left, new_value.clone()).map_err(|err| {
-            self.error(
-                Some(&infix.token),
-                &format!("Error mutating variable: {}", err).to_string(),
-                ErrorKind::MutateError,
-            )
-        })?;
+        match infix.left.as_ref() {
+            Expression::Identifier(ident) => {
+                env.mutate(ident.value.clone(), new_value).map_err(|err| {
+                    self.error(
+                        Some(&infix.token),
+                        &format!("Error mutating variable: {}", err).to_string(),
+                        ErrorKind::MutateError,
+                    )
+                })?;
+            },
+            Expression::Index(index) => {
+                let ident = match index.left.as_ref() {
+                    Expression::Identifier(ident) => ident.value.clone(),
+                    _ => {
+                        return Err(self.error(
+                            Some(&infix.token),
+                            &format!("Cannot assign to index of non-identifier: {:?}", infix.left).to_string(),
+                            ErrorKind::InvalidLeftHandSide,
+                        ))
+                    }
+                };
 
-        Ok(new_value)
+                let index = self.eval_expression(&index.index, env)?;
+                env.update(ident.clone(), |obj| {
+                    match obj {
+                        Object::Array(arr) => {
+                            let index = match index {
+                                Object::Integer(i) => i as usize,
+                                _ => {
+                                    return Err(
+                                        format!("Cannot index array with {:?}", index).to_string().into()
+                                    )
+                                }
+                            };
+
+                            if index >= arr.len() {
+                                return Err(
+                                    format!("Index out of bounds: {}, {} has len({})", index, ident, arr.len()).to_string().into())
+                            }
+
+                            arr[index] = new_value;
+                            Ok(Object::Null)
+                        },
+                        _ => {
+                            Err(format!("Cannot index non-array: {:?}", obj).to_string().into())
+                        }
+                    }
+                }).map_err(|err| {
+                    self.error(
+                        Some(&infix.token),
+                        &format!("Error mutating variable: {}", err).to_string(),
+                        ErrorKind::MutateError,
+                    )
+                })?;
+            }
+
+            _ => {}
+        }
+
+
+        Ok(Object::Null)
     }
 
     fn eval_for_expression(&mut self, for_expr: &ForExpression, env: &mut Environment) -> Result<Object, Error> {
@@ -1008,6 +1074,17 @@ impl Evaluator {
         let args = self.eval_expressions(arguments, env)?;
 
         (method.function)(*method.obj, method.ident.as_deref(), args, env, self.eval_config.clone()).map_err(|err| self.error(self.current_token.as_ref(), &format!("Error evaluating method: {}", err), ErrorKind::MethodError))
+    }
+
+    fn eval_bitwise_not_operator_expression(&self, right: Object) -> Result<Object, Error> {
+        match right {
+            Object::Integer(integer) => Ok(Object::Integer(!integer)),
+            _ => Err(self.error(
+                self.current_token.as_ref(),
+                &format!("Invalid operator: ~{:?}", right).to_string(),
+                ErrorKind::InvalidOperator,
+            )),
+        }
     }
 }
 
@@ -1162,6 +1239,32 @@ mod tests {
             test_boolean_object(evaluated, expected);
         }
     }
+
+    #[test]
+    fn test_bitwise_operations() {
+        let tests = vec![
+            ("~0", -1),
+            ("~1", -2),
+            ("~-5", 4),
+            ("~5", -6),
+            ("~~5", 5),
+            ("~~~5", -6),
+            ("~~~~5", 5),
+            ("~~~~~5", -6),
+            ("1 | 2", 3),
+            ("1 & 2", 0),
+            ("1 ^ 2", 3),
+            ("1 << 2", 4),
+            ("4 >> 2", 1),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            test_integer_object(evaluated, expected);
+        }
+    }
+
+
 
     #[test]
     fn test_if_else_expressions() {
@@ -1976,5 +2079,36 @@ mod tests {
             let evaluated = test_eval(input);
             assert_eq!(evaluated, expected);
         }
+    }
+
+    #[test]
+    fn test_eval_array_assignment() {
+        let tests = vec![
+            (r#"
+            let a = [1, 2, 3];
+            a[0] = 4;
+            a;
+            "#, Object::Array(vec![
+                Object::Integer(4),
+                Object::Integer(2),
+                Object::Integer(3),
+            ])),
+
+            (r#"
+            let a = [1, 2, 3];
+            a[1] = 4;
+            a;
+            "#, Object::Array(vec![
+                Object::Integer(1),
+                Object::Integer(4),
+                Object::Integer(3),
+            ])),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, expected);
+        }
+
     }
 }

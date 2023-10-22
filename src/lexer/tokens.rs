@@ -70,6 +70,7 @@ pub enum TokenKind {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
+    BitwiseNot,
 
     // Assignment
     AssignEqual,
