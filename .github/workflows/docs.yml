@@ -33,7 +33,4 @@ jobs:
           branch: gh-pages
           folder: target/doc
           clean: true
-          git-config-email: mail@pieterhuizenga.com
-          repository-name: swc-project/rustdoc
-          commit-message: "Update"
           single-commit: true
