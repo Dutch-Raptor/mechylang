@@ -28,7 +28,7 @@ Thanks to [Writing an Interpreter in Go](https://interpreterbook.com/) for helpi
 First you'll need to install the interpreter.
 
 ```bash
-cargo install --locked --git <TODO>
+cargo install --locked --git https://github.com/Dutch-Raptor/mechylang
 ```
 
 Then you can run a file with the interpreter.
