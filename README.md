@@ -34,19 +34,13 @@ cargo install --locked --git https://github.com/Dutch-Raptor/mechylang
 Then you can run a file with the interpreter.
 
 ```bash
-mechylang file <file>
+mechylang_cli file <file>
 ```
 
 If you want to run a repl, you can do that too.
 
 ```bash
-mechylang repl
-```
-
-You can also run a file and then go into the repl.
-
-```bash
-mechylang repl --file <file>
+mechylang_cli repl
 ```
 
 ## Syntax
