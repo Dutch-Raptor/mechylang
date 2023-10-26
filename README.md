@@ -16,7 +16,7 @@ Thanks to [Writing an Interpreter in Go](https://interpreterbook.com/) for helpi
 - [x] Closures
 - [x] If statements
 - [x] For loops
-- [ ] While loops
+- [x] While loops
 - [x] Arrays
 - [ ] Objects
 - [x] Strings
