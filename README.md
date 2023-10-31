@@ -16,7 +16,7 @@ Thanks to [Writing an Interpreter in Go](https://interpreterbook.com/) for helpi
 - [x] Closures
 - [x] If statements
 - [x] For loops
-- [ ] While loops
+- [x] While loops
 - [x] Arrays
 - [ ] Objects
 - [x] Strings
@@ -28,25 +28,19 @@ Thanks to [Writing an Interpreter in Go](https://interpreterbook.com/) for helpi
 First you'll need to install the interpreter.
 
 ```bash
-cargo install --locked --git <TODO>
+cargo install --locked --git https://github.com/Dutch-Raptor/mechylang
 ```
 
 Then you can run a file with the interpreter.
 
 ```bash
-mechylang file <file>
+mechylang_cli file <file>
 ```
 
 If you want to run a repl, you can do that too.
 
 ```bash
-mechylang repl
-```
-
-You can also run a file and then go into the repl.
-
-```bash
-mechylang repl --file <file>
+mechylang_cli repl
 ```
 
 ## Syntax
