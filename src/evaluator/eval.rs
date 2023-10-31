@@ -14,7 +14,7 @@ use crate::{
 
 use super::{
     environment::Environment,
-    objects::{Function, Object, UnwrapReturnValue}, iterators::IteratorObject, methods::Method, builtins::BuiltinFunction,
+    objects::{Function, Object, UnwrapReturnValue}, iterators::IteratorObject, methods::{Method, MethodError}, builtins::BuiltinFunction,
 };
 
 pub type EvalResult = Result<Object, Rc<[Error]>>;
@@ -1043,9 +1043,17 @@ impl Evaluator {
             _ => None,
         };
 
-        if let Some(method) = object.get_method(&property, ident) {
-            return Ok(Object::Method(method));
-        }
+        match object.get_method(&property, ident) {
+            Ok(method) => return Ok(Object::Method(method)),
+            Err(MethodError::NotFound) => {}
+            Err(err @ MethodError::IterMethodOnIterable(_)) =>
+                return Err(self.error(
+                    Some(&member.token),
+                    &err.to_string(),
+                    ErrorKind::TypeError,
+                )),
+        };
+
 
         // try to read property from object
         Err(self.error(

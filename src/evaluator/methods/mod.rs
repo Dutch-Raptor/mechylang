@@ -4,6 +4,23 @@ use std::{
     rc::Rc,
 };
 
+pub mod array_methods;
+pub mod boolean_methods;
+pub mod numeric_methods;
+pub mod range_methods;
+pub mod string_methods;
+
+pub use self::{
+    array_methods::ARRAY_METHODS,
+    boolean_methods::BOOLEAN_METHODS,
+    numeric_methods::FLOAT_METHODS,
+    range_methods::{
+        RANGE_FROM_METHODS, RANGE_FULL_METHODS, RANGE_INCLUSIVE_METHODS, RANGE_METHODS,
+        RANGE_TO_INCLUSIVE_METHODS, RANGE_TO_METHODS,
+    },
+    string_methods::STRING_METHODS,
+};
+
 use super::{
     environment::Environment,
     eval::{EvalConfig, Evaluator},
@@ -41,56 +58,70 @@ impl Display for Method {
 }
 
 pub trait ObjectMethods {
-    fn get_method(&self, name: &str, obj_identifier: Option<Rc<str>>) -> Option<Method>;
+    fn get_method(
+        &self,
+        name: &str,
+        obj_identifier: Option<Rc<str>>,
+    ) -> Result<Method, MethodError>;
+}
+
+pub enum MethodError {
+    NotFound,
+    IterMethodOnIterable(String),
+}
+
+impl Display for MethodError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MethodError::NotFound => write!(f, "No such method for this type"),
+            MethodError::IterMethodOnIterable(method) => {
+                write!(f, "Called iterator method {} on an iterable object instead of on an iterator. Perhaps you meant to call `iter()` first?", method)
+            }
+        }
+    }
 }
 
 impl ObjectMethods for Object {
-    fn get_method(&self, method_name: &str, obj_identifier: Option<Rc<str>>) -> Option<Method> {
+    fn get_method(
+        &self,
+        method_name: &str,
+        obj_identifier: Option<Rc<str>>,
+    ) -> Result<Method, MethodError> {
+        let get_method = |methods: &[MethodInner]| {
+            methods
+                .iter()
+                .find(|m| m.name == method_name)
+                .map(|m| Method {
+                    method_name: m.name,
+                    ident: obj_identifier.clone(),
+                    args_len: m.args_len.clone(),
+                    function: m.function,
+                    obj: Box::new(self.clone()),
+                })
+        };
         // Type specific methods
-        match self {
-            Object::Array(_) => ARRAY_METHODS
-                .iter()
-                .find(|m| m.name == method_name)
-                .map(|m| Method {
-                    method_name: m.name,
-                    ident: obj_identifier.clone(),
-                    args_len: m.args_len.clone(),
-                    function: m.function,
-                    obj: Box::new(self.clone()),
-                }),
-            Object::Integer(_) => INTEGER_METHODS
-                .iter()
-                .find(|m| m.name == method_name)
-                .map(|m| Method {
-                    method_name: m.name,
-                    ident: obj_identifier.clone(),
-                    args_len: m.args_len.clone(),
-                    function: m.function,
-                    obj: Box::new(self.clone()),
-                }),
-            Object::Range(_, _) => RANGE_METHODS
-                .iter()
-                .find(|m| m.name == method_name)
-                .map(|m| Method {
-                    method_name: m.name,
-                    ident: obj_identifier.clone(),
-                    args_len: m.args_len.clone(),
-                    function: m.function,
-                    obj: Box::new(self.clone()),
-                }),
-            Object::Iterator(_) => {
-                ITERATOR_METHODS
-                    .iter()
-                    .find(|m| m.name == method_name)
-                    .map(|m| Method {
-                        method_name: m.name,
-                        ident: obj_identifier.clone(),
-                        args_len: m.args_len.clone(),
-                        function: m.function,
-                        obj: Box::new(self.clone()),
-                    })
-            }
-            _ => None,
+        let method = match self {
+            Object::Array(_) => get_method(&ARRAY_METHODS),
+            Object::Integer(_) => get_method(&INTEGER_METHODS),
+            Object::Range(_, _) => get_method(&RANGE_METHODS),
+            Object::RangeInclusive(_, _) => get_method(&RANGE_INCLUSIVE_METHODS),
+            Object::RangeFull => get_method(&RANGE_FULL_METHODS),
+            Object::RangeFrom(_) => get_method(&RANGE_FROM_METHODS),
+            Object::RangeTo(_) => get_method(&RANGE_TO_METHODS),
+            Object::RangeToInclusive(_) => get_method(&RANGE_TO_INCLUSIVE_METHODS),
+            Object::Iterator(_) => get_method(&ITERATOR_METHODS),
+            Object::Float(_) => get_method(&FLOAT_METHODS),
+            Object::String(_) => get_method(&STRING_METHODS),
+            Object::Boolean(_) => get_method(&BOOLEAN_METHODS),
+
+            // Explicitly return None for these types
+            Object::Null => None,
+            Object::ReturnValue(_) => None,
+            Object::Function(_) => None,
+            Object::BuiltinFunction(_) => None,
+            Object::Break(_) => None,
+            Object::Continue => None,
+            Object::Method(_) => None,
         }
         // Generic methods
         .or_else(|| match method_name {
@@ -111,13 +142,28 @@ impl ObjectMethods for Object {
                 obj: Box::new(self.clone()),
             }),
             _ => None,
-        })
+        });
+        // If no method matches, check if the object is iterable and if the method would match on the iterator
+        // If so, warn the user that they should call the method on the iterator instead
+        if method.is_none() {
+            if let Ok(_) = IteratorObject::try_from(self.clone()) {
+                if ITERATOR_METHODS
+                    .iter()
+                    .find(|m| m.name == method_name)
+                    .is_some()
+                {
+                    return Err(MethodError::IterMethodOnIterable(method_name.to_string()));
+                }
+            }
+        }
+
+        method.ok_or(MethodError::NotFound)
     }
 }
 
-struct MethodInner {
-    name: &'static str,
-    args_len: RangeInclusive<usize>,
+pub struct MethodInner {
+    pub name: &'static str,
+    pub args_len: RangeInclusive<usize>,
     function: fn(
         obj: Object,
         ident: Option<&str>,
@@ -127,9 +173,25 @@ struct MethodInner {
     ) -> Result<Object, String>,
 }
 
-const RANGE_METHODS: [MethodInner; 0] = [];
-
-const ITERATOR_METHODS: [MethodInner; 10] =
+/// Methods for the Iterator type
+///
+/// # Iterator Methods
+///
+/// ## Creating an iterator
+///
+/// To create an iteratos, use the `iter` method on an `array`, `range`, or `string`.
+/// This will return an iterator that can be used to iterate over the object.
+///
+/// ```
+/// # use mechylang::{Evaluator, Object};
+/// # let result = Evaluator::eval(r#"
+/// let array = [1, 2, 3];
+/// let iterator = array.iter();
+/// # "#, &mut Default::default(), Default::default());
+/// # assert_eq!(result, Ok(Object::Null));
+/// ```
+///
+pub const ITERATOR_METHODS: [MethodInner; 10] =
     [
         MethodInner {
             name: "next",
@@ -341,7 +403,22 @@ const ITERATOR_METHODS: [MethodInner; 10] =
         },
     ];
 
-const INTEGER_METHODS: [MethodInner; 1] = [MethodInner {
+/// Methods for the `Object::Integer` type
+///
+/// # Integer Methods
+///
+/// ## Pow
+/// `pow(Integer) -> Integer`
+/// Raises the integer to the power of the given integer
+///
+/// ```rust
+/// # use mechylang::{Evaluator, Environment, Object};
+/// # let result = Evaluator::eval(r#"
+/// assert_eq(2.pow(3), 8);
+/// # "#, &mut Default::default(), Default::default());
+/// # assert_eq!(result, Ok(Object::Null));
+/// ```
+pub const INTEGER_METHODS: [MethodInner; 1] = [MethodInner {
     name: "pow",
     args_len: 1..=1,
     function: |obj, _, args, _, _| {
@@ -359,135 +436,7 @@ const INTEGER_METHODS: [MethodInner; 1] = [MethodInner {
     },
 }];
 
-const ARRAY_METHODS: [MethodInner; 6] = [
-    MethodInner {
-        name: "push",
-        args_len: 1..=1,
-        function: |_, ident, args, env, _| {
-            let value = args[0].clone();
-
-            let ident = get_mutable_ident(ident)?;
-
-            env.update(ident.to_string(), move |arr| {
-                if let Object::Array(ref mut arr) = arr {
-                    arr.push(value.clone());
-                    Ok(Object::Null)
-                } else {
-                    Err(format!("Expected array, got {}", arr))
-                }
-            })
-            .map_err(|e| e.to_string())?;
-            Ok(Object::Null)
-        },
-    },
-    MethodInner {
-        name: "pop",
-        args_len: 0..=0,
-        function: |_, ident, _, env, _| {
-            let ident = get_mutable_ident(ident)?;
-
-            let item = env
-                .update(ident.to_string(), move |arr| {
-                    if let Object::Array(ref mut arr) = arr {
-                        arr.pop()
-                            .map(|v| Ok(v))
-                            .unwrap_or(Err("Array is empty".to_string()))
-                    } else {
-                        Err(format!("Expected array, got {}", arr))
-                    }
-                })
-                .map_err(|e| e.to_string())?;
-            Ok(item)
-        },
-    },
-    MethodInner {
-        name: "first",
-        args_len: 0..=0,
-        function: |_, ident, _, env, _| {
-            let ident = get_mutable_ident(ident)?;
-
-            let item = env
-                .update(ident.to_string(), move |arr| {
-                    if let Object::Array(ref mut arr) = arr {
-                        arr.first()
-                            .map(|v| Ok(v.clone()))
-                            .unwrap_or(Err("Array is empty".to_string()))
-                    } else {
-                        Err(format!("Expected array, got {}", arr))
-                    }
-                })
-                .map_err(|e| e.to_string())?;
-            Ok(item)
-        },
-    },
-    MethodInner {
-        name: "last",
-        args_len: 0..=0,
-        function: |_, ident, _, env, _| {
-            let ident = get_mutable_ident(ident)?;
-
-            let item = env
-                .update(ident.to_string(), move |arr| {
-                    if let Object::Array(ref mut arr) = arr {
-                        arr.last()
-                            .map(|v| Ok(v.clone()))
-                            .unwrap_or(Err("Array is empty".to_string()))
-                    } else {
-                        Err(format!("Expected array, got {}", arr))
-                    }
-                })
-                .map_err(|e| e.to_string())?;
-            Ok(item)
-        },
-    },
-    MethodInner {
-        name: "insert",
-        args_len: 2..=2,
-        function: |obj, ident, args, env, _| {
-            let index = match args[0] {
-                Object::Integer(i) => i,
-                _ => return Err("Expected integer for index".to_string()),
-            };
-
-            let value = args[1].clone();
-
-            let ident = get_mutable_ident(ident)?;
-
-            match obj {
-                Object::Array(arr) => {
-                    if index < 0 || index as usize > arr.len() {
-                        return Err(format!(
-                            "Index {} out of bounds for array of length {}",
-                            index,
-                            arr.len()
-                        ));
-                    }
-                }
-                _ => return Err("Expected array".to_string()),
-            }
-
-            env.update(ident.to_string(), move |arr| {
-                if let Object::Array(ref mut arr) = arr {
-                    arr.insert(index as usize, value.clone());
-                    Ok(Object::Null)
-                } else {
-                    Err(format!("Expected array, got {}", arr))
-                }
-            })?;
-            Ok(Object::Null)
-        },
-    },
-    MethodInner {
-        name: "len",
-        args_len: 0..=0,
-        function: |obj, _, _, _, _| match obj {
-            Object::Array(ref arr) => Ok(Object::Integer(arr.len() as i64)),
-            _ => Err("Argument to `len` not supported".to_string()),
-        },
-    },
-];
-
-fn get_mutable_ident(ident: Option<&str>) -> Result<&str, String> {
+pub fn get_mutable_ident(ident: Option<&str>) -> Result<&str, String> {
     match ident {
         Some(ident) => Ok(ident),
         None => {

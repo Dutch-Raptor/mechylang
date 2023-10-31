@@ -329,6 +329,25 @@
 //! # assert_eq!(result, Ok(Object::Null));
 //! ```
 //!
+//! Array values can be reassigned using the `[]` operator.
+//! This will replace the value at the given index with the new value.
+//! If the index is out of bounds, an error will be returned.
+//! The index must be an integer.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object, Error};
+//! # let result = Evaluator::eval(r#"
+//! let a = [1, 2, 3];
+//! a[0] = 10;
+//! assert_eq(a, [10, 2, 3]);
+//! a[1] = 20;
+//! assert_eq(a, [10, 20, 3]);
+//! a[2] = 30;
+//! assert_eq(a, [10, 20, 30]);
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
 //! To push an item to the end of an array, use the `push` method.
 //!
 //! ```rust
@@ -340,11 +359,33 @@
 //! # "#, &mut Environment::new(), EvalConfig::default());
 //! # assert_eq!(result, Ok(Object::Null));
 //! ```
+//!
+//! Or to remove an item from the end of an array, use the `pop` method.
+//!
+//! ```rust
+//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
+//! # let result = Evaluator::eval(r#"
+//! let a = [1, 2, 3];
+//! assert_eq(a.pop(), 3);
+//! assert_eq(a, [1, 2]);
+//! assert_eq(a.pop(), 2);
+//! assert_eq(a, [1]);
+//! # "#, &mut Environment::new(), EvalConfig::default());
+//! # assert_eq!(result, Ok(Object::Null));
+//! ```
+//!
+//! To learn more about array methods, check out the [array module](crate::evaluator::methods::ARRAY_METHODS).
+//!
+//!
+//! ### Strings
+//!
+//! Strings are declared using the `""` syntax.
 
 mod errors;
 pub mod evaluator;
 mod lexer;
 mod parser;
+pub mod test_utils;
 mod tracer;
 
 pub use errors::Error;

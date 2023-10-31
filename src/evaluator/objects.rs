@@ -23,7 +23,6 @@ pub enum Object {
     Boolean(bool),
     Null,
     ReturnValue(Box<Object>),
-    Let(Identifier, Box<Object>),
     Function(Function),
     String(Rc<str>),
     BuiltinFunction(BuiltinFunction),
@@ -65,6 +64,17 @@ impl UnwrapReturnValue for Object {
         match self {
             Object::ReturnValue(val) => *val,
             _ => self,
+        }
+    }
+}
+
+impl PartialOrd for Object {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Object::Integer(a), Object::Integer(b)) => a.partial_cmp(b),
+            (Object::Float(a), Object::Float(b)) => a.partial_cmp(b),
+            (Object::String(a), Object::String(b)) => a.partial_cmp(b),
+            _ => None,
         }
     }
 }
@@ -127,7 +137,6 @@ impl Display for Object {
             Object::Boolean(boolean) => write!(f, "{}", boolean),
             Object::Null => write!(f, "null"),
             Object::ReturnValue(val) => write!(f, "{}", val),
-            Object::Let(name, val) => write!(f, "{} = {}", name, val),
             Object::String(string) => write!(f, "{}", string),
             Object::Function(function) => {
                 let params = function
