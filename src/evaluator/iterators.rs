@@ -141,10 +141,10 @@ impl Sum for Object {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         // figure out the type of the iterator
         let mut iterator = iter.peekable();
-        let first = iterator.peek().unwrap_or(&Object::Null);
+        let first = iterator.peek().unwrap_or(&Object::Unit);
 
         // if the iterator is empty, return 0
-        if first == &Object::Null {
+        if first == &Object::Unit {
             return Object::Integer(0);
         }
 
@@ -174,7 +174,7 @@ impl Sum for Object {
                     acc
                 })
                 .into(),
-            _ => Object::Null,
+            _ => Object::Unit,
         }
     }
 }

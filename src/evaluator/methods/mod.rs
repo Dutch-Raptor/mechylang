@@ -115,7 +115,7 @@ impl ObjectMethods for Object {
             Object::Boolean(_) => get_method(&BOOLEAN_METHODS),
 
             // Explicitly return None for these types
-            Object::Null => None,
+            Object::Unit => None,
             Object::ReturnValue(_) => None,
             Object::Function(_) => None,
             Object::BuiltinFunction(_) => None,
@@ -183,14 +183,15 @@ pub struct MethodInner {
 /// This will return an iterator that can be used to iterate over the object.
 ///
 /// ```
-/// # use mechylang::{Evaluator, Object};
-/// # let result = Evaluator::eval(r#"
+/// # mechylang::test_utils::test_eval_ok(r#"
 /// let array = [1, 2, 3];
 /// let iterator = array.iter();
-/// # "#, &mut Default::default(), Default::default());
-/// # assert_eq!(result, Ok(Object::Null));
+/// assert(iterator.next() == 1);
+/// assert(iterator.next() == 2);
+/// assert(iterator.next() == 3);
+/// assert(iterator.next() == ());
+/// # "#);
 /// ```
-///
 pub const ITERATOR_METHODS: [MethodInner; 10] =
     [
         MethodInner {
@@ -202,16 +203,16 @@ pub const ITERATOR_METHODS: [MethodInner; 10] =
                     if let Some(ident) = ident {
                         return env.update(ident, |iter| {
                             Ok(if let Object::Iterator(iterator) = iter {
-                                iterator.iterator.next().unwrap_or(Object::Null)
+                                iterator.iterator.next().unwrap_or(Object::Unit)
                             } else {
-                                Object::Null
+                                Object::Unit
                             })
                         });
                     }
 
                     // otherwise just return the next item from the passed iterator
                     let item = iterator.next();
-                    Ok(item.unwrap_or(Object::Null))
+                    Ok(item.unwrap_or(Object::Unit))
                 } else {
                     Err(format!("Expected Iterator, got {}", obj))
                 }
@@ -335,7 +336,7 @@ pub const ITERATOR_METHODS: [MethodInner; 10] =
                             Ok(obj) => obj,
                             Err(e) => {
                                 eprintln!("Error evaluating closure in map {}", e);
-                                Object::Null
+                                Object::Unit
                             }
                         }
                     })),
@@ -393,7 +394,7 @@ pub const ITERATOR_METHODS: [MethodInner; 10] =
                             Ok(obj) => obj,
                             Err(e) => {
                                 eprintln!("Error evaluating closure in fold {}", e);
-                                Object::Null
+                                Object::Unit
                             }
                         };
 
@@ -412,11 +413,10 @@ pub const ITERATOR_METHODS: [MethodInner; 10] =
 /// Raises the integer to the power of the given integer
 ///
 /// ```rust
-/// # use mechylang::{Evaluator, Environment, Object};
-/// # let result = Evaluator::eval(r#"
+/// # mechylang::test_utils::test_eval_ok(r#"
 /// assert_eq(2.pow(3), 8);
-/// # "#, &mut Default::default(), Default::default());
-/// # assert_eq!(result, Ok(Object::Null));
+/// assert_eq(2.pow(0), 1);
+/// # "#);
 /// ```
 pub const INTEGER_METHODS: [MethodInner; 1] = [MethodInner {
     name: "pow",

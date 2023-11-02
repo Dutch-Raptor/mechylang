@@ -1,13 +1,17 @@
-use super::tokens::{Token, TokenKind};
+use super::tokens::{Position, Token, TokenKind};
 
 #[derive(Debug)]
 pub struct Lexer {
     input: String,
+    /// The current position in the input string
     position: usize,
+    /// The next position in the input string
     read_position: usize,
     ch: char,
     line: usize,
     column: usize,
+
+    file: Option<String>,
 }
 
 /// Implement the Lexer struct
@@ -40,6 +44,7 @@ impl Lexer {
             ch: '\0',
             line: 1,
             column: 0,
+            file: None,
         };
 
         l.read_char();
@@ -56,13 +61,12 @@ impl Lexer {
             }
             '\t' => {
                 self.column += 4;
-                dbg!("tab");
             }
             '\r' => self.column = 0,
             _ => self.column += 1,
         }
 
-        if self.read_position >= self.input.len() {
+        if self.read_position >= self.input.chars().count() {
             self.ch = '\0';
         } else {
             self.ch = self.input.chars().nth(self.read_position).unwrap();
@@ -82,7 +86,23 @@ impl Lexer {
         while is_letter(self.peek_char()) || is_digit(self.peek_char()) || self.peek_char() == '_' {
             self.read_char();
         }
-        self.input[position..=self.position].to_string()
+        self.get_string(position, self.position)
+    }
+
+    /// Read a string from the input string.
+    /// * `start` - The index of the first character in the string
+    /// * `end` - The index of the last character in the string
+    fn get_string(&self, start: usize, end: usize) -> String {
+        let (start, _) = self.input.char_indices().nth(start).unwrap();
+        // get the first byte of the character after the string
+        // We do this in case the last character is a multibyte character
+        let (end, _) = self
+            .input
+            .char_indices()
+            .nth(end + 1)
+            .or(Some((self.input.len(), '\0')))
+            .unwrap();
+        self.input[start..end].to_string()
     }
 
     /// Read a number from the input string.
@@ -105,7 +125,7 @@ impl Lexer {
             }
         }
 
-        self.input[position..=self.position].to_string()
+        self.get_string(position, self.position)
     }
 
     fn peek_char(&mut self) -> char {
@@ -133,12 +153,12 @@ impl Lexer {
     pub fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
 
-        if self.read_position > self.input.len() + 1 {
+        if self.read_position > self.input.chars().count() + 1 {
             return None;
         }
 
         let line = self.line;
-        let column = self.column;
+        let column = self.column + 1; // +1 to make it 1-indexed
 
         let mut token_length = 1;
 
@@ -335,9 +355,12 @@ impl Lexer {
 
         token_kind.map(|kind| Token {
             kind,
-            line,
-            column,
-            length: token_length,
+            position: Position {
+                line,
+                column,
+                length: token_length,
+                file: self.file.clone(),
+            },
         })
     }
 
@@ -354,11 +377,13 @@ impl Lexer {
             }
             self.read_char();
         }
+
+        let end_position = self.position;
         // current char is the closing quote
         self.read_char();
 
-        Ok(self.input[position..self.position]
-            .to_string()
+        Ok(self
+            .get_string(position, end_position)
             // replace escaped quotes with regular quotes
             .replace("\\\"", "\"")
             .replace("\\n", "\n")
@@ -385,12 +410,19 @@ impl Iterator for Lexer {
 
 #[cfg(test)]
 mod test {
-    use crate::lexer::tokens::TokenKind;
+    use crate::{
+        lexer::tokens::{Position, TokenKind},
+        Token,
+    };
 
     use super::Lexer;
 
     fn lex_token_kinds(input: &str) -> Vec<TokenKind> {
         Lexer::new(input).map(|token| token.kind).collect()
+    }
+
+    fn lex(input: &str) -> Vec<Token> {
+        Lexer::new(input).collect()
     }
 
     #[test]
@@ -633,5 +665,390 @@ mod test {
 
         let tokens = lex_token_kinds(input);
         assert_eq!(tokens, expected_tokens);
+    }
+
+    #[test]
+    fn test_funky_unicode() {
+        let input = r#"
+            "いろはにほへとちりぬるを"
+            "👍🏿👍🏿"
+            "๏ เป็นมนุษย์สุดประเสริฐเลิศคุณค่า"
+            " Γαζέες καὶ μυρτιὲς δὲν θὰ βρῶ πιὰ στὸ χρυσαφὶ ξέφωτο"
+            にほへとちり = 5;
+        "#;
+
+        let expected_tokens = vec![
+            TokenKind::String("いろはにほへとちりぬるを".to_string()),
+            TokenKind::String("👍🏿👍🏿".to_string()),
+            TokenKind::String("๏ เป็นมนุษย์สุดประเสริฐเลิศคุณค่า".to_string()),
+            TokenKind::String(" Γαζέες καὶ μυρτιὲς δὲν θὰ βρῶ πιὰ στὸ χρυσαφὶ ξέφωτο".to_string()),
+            TokenKind::Identifier("にほへとちり".to_string()),
+            TokenKind::AssignEqual,
+            TokenKind::Number("5".to_string()),
+            TokenKind::Semicolon,
+            TokenKind::EOF,
+        ];
+
+        let tokens = lex_token_kinds(input);
+        assert_eq!(tokens, expected_tokens);
+    }
+
+    #[test]
+    fn test_token_position() {
+        let input = r#"
+            let five = 5;
+                    let ten = 10;
+            let add = 
+
+
+                    fn(x, y) {
+                x + y;
+            };
+            let result = add(five, ten);
+        "#;
+
+        let expected_tokens = vec![
+            Token {
+                kind: TokenKind::Let,
+                position: Position {
+                    line: 2,
+                    column: 13,
+                    length: 3,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("five".to_string()),
+                position: Position {
+                    line: 2,
+                    column: 17,
+                    length: 4,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::AssignEqual,
+                position: Position {
+                    line: 2,
+                    column: 22,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Number("5".to_string()),
+                position: Position {
+                    line: 2,
+                    column: 24,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Semicolon,
+                position: Position {
+                    line: 2,
+                    column: 25,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Let,
+                position: Position {
+                    line: 3,
+                    column: 21,
+                    length: 3,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("ten".to_string()),
+                position: Position {
+                    line: 3,
+                    column: 25,
+                    length: 3,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::AssignEqual,
+                position: Position {
+                    line: 3,
+                    column: 29,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Number("10".to_string()),
+                position: Position {
+                    line: 3,
+                    column: 31,
+                    length: 2,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Semicolon,
+                position: Position {
+                    line: 3,
+                    column: 33,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Let,
+                position: Position {
+                    line: 4,
+                    column: 13,
+                    length: 3,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("add".to_string()),
+                position: Position {
+                    line: 4,
+                    column: 17,
+                    length: 3,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::AssignEqual,
+                position: Position {
+                    line: 4,
+                    column: 21,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Fn,
+                position: Position {
+                    line: 7,
+                    column: 21,
+                    length: 2,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::LeftParen,
+                position: Position {
+                    line: 7,
+                    column: 23,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("x".to_string()),
+                position: Position {
+                    line: 7,
+                    column: 24,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Comma,
+                position: Position {
+                    line: 7,
+                    column: 25,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("y".to_string()),
+                position: Position {
+                    line: 7,
+                    column: 27,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::RightParen,
+                position: Position {
+                    line: 7,
+                    column: 28,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::LeftSquirly,
+                position: Position {
+                    line: 7,
+                    column: 30,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("x".to_string()),
+                position: Position {
+                    line: 8,
+                    column: 17,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Plus,
+                position: Position {
+                    line: 8,
+                    column: 19,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("y".to_string()),
+                position: Position {
+                    line: 8,
+                    column: 21,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Semicolon,
+                position: Position {
+                    line: 8,
+                    column: 22,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::RightSquirly,
+                position: Position {
+                    line: 9,
+                    column: 13,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Semicolon,
+                position: Position {
+                    line: 9,
+                    column: 14,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Let,
+                position: Position {
+                    line: 10,
+                    column: 13,
+                    length: 3,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("result".to_string()),
+                position: Position {
+                    line: 10,
+                    column: 17,
+                    length: 6,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::AssignEqual,
+                position: Position {
+                    line: 10,
+                    column: 24,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("add".to_string()),
+                position: Position {
+                    line: 10,
+                    column: 26,
+                    length: 3,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::LeftParen,
+                position: Position {
+                    line: 10,
+                    column: 29,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("five".to_string()),
+                position: Position {
+                    line: 10,
+                    column: 30,
+                    length: 4,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Comma,
+                position: Position {
+                    line: 10,
+                    column: 34,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("ten".to_string()),
+                position: Position {
+                    line: 10,
+                    column: 36,
+                    length: 3,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::RightParen,
+                position: Position {
+                    line: 10,
+                    column: 39,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Semicolon,
+                position: Position {
+                    line: 10,
+                    column: 40,
+                    length: 1,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::EOF,
+                position: Position {
+                    line: 11,
+                    column: 9,
+                    length: 1,
+                    file: None,
+                },
+            },
+        ];
+
+        let tokens = lex(input);
+
+        for (i, token) in tokens.iter().enumerate() {
+            println!("{:?}", token);
+            assert_eq!(token.kind, expected_tokens[i].kind);
+            assert_eq!(token.position, expected_tokens[i].position);
+        }
     }
 }

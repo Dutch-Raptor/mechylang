@@ -6,11 +6,9 @@
 //! It prints the string representation of the arguments passed to it, separated by spaces.
 //!
 //! ```rust
-//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
-//! # let result = Evaluator::eval(r#"
+//! # mechylang::test_utils::test_eval_ok(r#"
 //! print("Hello", "World!"); // prints "Hello World!"
-//! # "#, &mut Environment::new(), EvalConfig::default());
-//! # assert_eq!(result, Ok(Object::Null));
+//! # "#);
 //! ```
 //!
 //! #### `println`
@@ -19,11 +17,9 @@
 //! It prints the string representation of the arguments passed to it, separated by spaces.
 //!
 //! ```rust
-//! # use mechylang::{Evaluator, Environment, EvalConfig, Object};
-//! # let result = Evaluator::eval(r#"
+//! # mechylang::test_utils::test_eval_ok(r#"
 //! println("Hello", "World!"); // prints "Hello World!\n"
-//! # "#, &mut Environment::new(), EvalConfig::default());
-//! # assert_eq!(result, Ok(Object::Null));
+//! # "#);
 //! ```
 
 use std::ops::RangeInclusive;
@@ -87,7 +83,7 @@ pub const BUILTINS: [BuiltinFunction; 5] = [
                     .collect::<Vec<String>>()
                     .join(" ")
             ));
-            Ok(Object::Null)
+            Ok(Object::Unit)
         },
     },
     BuiltinFunction {
@@ -101,7 +97,7 @@ pub const BUILTINS: [BuiltinFunction; 5] = [
                     .collect::<Vec<String>>()
                     .join(" ")
             ));
-            Ok(Object::Null)
+            Ok(Object::Unit)
         },
     },
     // Assert
@@ -110,7 +106,7 @@ pub const BUILTINS: [BuiltinFunction; 5] = [
         args_len: (1..=1),
         function: |args, _, eval| {
             if args[0] == Object::Boolean(true) {
-                Ok(Object::Null)
+                Ok(Object::Unit)
             } else {
                 eval.print(format!(
                     "Assertion failed: {} is not true",
@@ -132,12 +128,12 @@ pub const BUILTINS: [BuiltinFunction; 5] = [
             for arg in args.iter().skip(1) {
                 if first != *arg {
                     return Err((
-                        format!("Assertion failed: {} != {}", first, arg),
+                        format!("Assertion failed: {:?} != {:?}", first, arg),
                         BuiltinError::AssertionFailed,
                     ));
                 }
             }
-            Ok(Object::Null)
+            Ok(Object::Unit)
         },
     },
 ];

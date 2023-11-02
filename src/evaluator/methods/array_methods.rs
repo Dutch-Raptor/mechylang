@@ -4,6 +4,16 @@ use super::{get_mutable_ident, MethodInner};
 
 /// # Methods for the `Object::Array` type
 ///
+/// [Array] is a mutable, ordered collection of items.
+///
+///
+/// [Array]: crate::Object#variant.Array
+/// [Integer]: crate::Object#variant.Integer
+/// [Boolean]: crate::Object#variant.Boolean
+/// [Null]: crate::Object#variant.Null
+/// [Any]: crate::Object
+///
+///
 /// ## `push(item: Any) -> Null`
 /// Pushes an item to the end of the array
 ///
@@ -73,7 +83,8 @@ use super::{get_mutable_ident, MethodInner};
 /// # "#);
 /// ```
 ///
-/// > remove(index: [Integer](crate::Object#variant.Integer)) -> [Any](crate::Object)
+/// ## Remove
+/// `remove`(item: [Any] ) -> [Any]
 ///
 /// Removes an item at the given index, shifting all items after it to the left
 /// and returns the removed item
@@ -106,13 +117,13 @@ pub const ARRAY_METHODS: [MethodInner; 8] = [
             env.update(ident.to_string(), move |arr| {
                 if let Object::Array(ref mut arr) = arr {
                     arr.push(value.clone());
-                    Ok(Object::Null)
+                    Ok(Object::Unit)
                 } else {
                     Err(format!("Expected array, got {}", arr))
                 }
             })
             .map_err(|e| e.to_string())?;
-            Ok(Object::Null)
+            Ok(Object::Unit)
         },
     },
     MethodInner {
@@ -204,12 +215,12 @@ pub const ARRAY_METHODS: [MethodInner; 8] = [
             env.update(ident.to_string(), move |arr| {
                 if let Object::Array(ref mut arr) = arr {
                     arr.insert(index as usize, value.clone());
-                    Ok(Object::Null)
+                    Ok(Object::Unit)
                 } else {
                     Err(format!("Expected array, got {}", arr))
                 }
             })?;
-            Ok(Object::Null)
+            Ok(Object::Unit)
         },
     },
     MethodInner {

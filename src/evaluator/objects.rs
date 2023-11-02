@@ -21,7 +21,7 @@ pub enum Object {
     Integer(i64),
     Float(f64),
     Boolean(bool),
-    Null,
+    Unit,
     ReturnValue(Box<Object>),
     Function(Function),
     String(Rc<str>),
@@ -112,7 +112,7 @@ impl Debug for Function {
             .collect::<Vec<String>>()
             .join(", ");
 
-        write!(f, "fn({}) {{\n{}\n}}", params, self.body)
+        write!(f, "fn({})", params)
     }
 }
 
@@ -135,7 +135,7 @@ impl Display for Object {
             Object::Integer(int) => write!(f, "{}", int),
             Object::Float(float) => write!(f, "{}", float),
             Object::Boolean(boolean) => write!(f, "{}", boolean),
-            Object::Null => write!(f, "null"),
+            Object::Unit => write!(f, "()"),
             Object::ReturnValue(val) => write!(f, "{}", val),
             Object::String(string) => write!(f, "{}", string),
             Object::Function(function) => {
@@ -146,7 +146,7 @@ impl Display for Object {
                     .collect::<Vec<String>>()
                     .join(", ");
 
-                write!(f, "fn({}) {{\n{}\n}}", params, function.body)
+                write!(f, "fn({})", params)
             }
             Object::BuiltinFunction(builtin) => write!(f, "builtin function {}", builtin.name),
             Object::Array(array) => {

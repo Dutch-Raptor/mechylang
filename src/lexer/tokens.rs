@@ -1,20 +1,24 @@
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Token {
-    pub kind: TokenKind,
+#[derive(Debug, PartialEq, Clone, Default)]
+pub struct Position {
     pub line: usize,
     pub column: usize,
     pub length: usize,
+    pub file: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub position: Position,
 }
 
 impl Default for Token {
     fn default() -> Self {
         Self {
             kind: TokenKind::EOF,
-            line: 1,
-            column: 0,
-            length: 0,
+            position: Position::default(),
         }
     }
 }
@@ -47,6 +51,7 @@ pub enum TokenKind {
     Number(String),
     String(String),
     Char(char),
+    Unit,
 
     // Operators
     Plus,

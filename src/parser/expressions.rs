@@ -125,6 +125,16 @@ impl PrecedenceTrait for TokenKind {
             TokenKind::For => Precedence::Lowest,
             TokenKind::In => Precedence::Lowest,
             TokenKind::If => Precedence::Lowest,
+            TokenKind::Number(_) => Precedence::Lowest,
+            TokenKind::String(_) => Precedence::Lowest,
+            TokenKind::Fn => Precedence::Lowest,
+            TokenKind::While => Precedence::Lowest,
+            TokenKind::Else => Precedence::Lowest,
+            TokenKind::True => Precedence::Lowest,
+            TokenKind::False => Precedence::Lowest,
+            TokenKind::Unit => Precedence::Lowest,
+            TokenKind::Break => Precedence::Lowest,
+            TokenKind::Continue => Precedence::Lowest,
             _ => {
                 return None;
             }
@@ -162,6 +172,7 @@ pub enum Expression {
     For(ForExpression),
     While(WhileExpression),
     Member(MemberExpression),
+    Unit(Token),
 }
 
 pub trait ExpressionToken {
@@ -191,6 +202,7 @@ impl ExpressionToken for Expression {
             Expression::For(for_expr) => &for_expr.token,
             Expression::While(while_expr) => &while_expr.token,
             Expression::Member(member) => &member.token,
+            Expression::Unit(token) => token,
         }
     }
 }
@@ -218,6 +230,7 @@ impl Display for Expression {
             Expression::For(for_expr) => write!(f, "{}", for_expr),
             Expression::While(while_expr) => write!(f, "{}", while_expr),
             Expression::Member(member) => write!(f, "{}", member),
+            Expression::Unit(_) => write!(f, "()"),
         }
     }
 }

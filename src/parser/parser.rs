@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 use std::rc::Rc;
 
 use crate::errors::{Error, ErrorKind};
-use crate::lexer::tokens::Token;
+use crate::lexer::tokens::{Token, Position};
 use crate::lexer::{lexer::Lexer, tokens::TokenKind};
 use crate::parser::expressions::{Expression, Identifier};
 use crate::trace;
@@ -58,15 +58,11 @@ pub struct BlockStatement {
 
 impl Display for BlockStatement {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut len = self.statements.len();
-
+        write!(f, "{{")?;
         for statement in self.statements.iter() {
-            write!(f, "\t{}", statement)?;
-            if len > 1 {
-                write!(f, "\n")?;
-            }
-            len -= 1;
+            write!(f, "\t{}\n", statement)?;
         }
+        write!(f, "}}")?;
         Ok(())
     }
 }
@@ -87,12 +83,15 @@ impl Display for LetStatement {
 #[derive(Debug, PartialEq)]
 pub struct ReturnStatement {
     pub token: Token,
-    pub return_value: Expression,
+    pub return_value: Option<Expression>,
 }
 
 impl Display for ReturnStatement {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{} {};", self.token, self.return_value)
+        match &self.return_value {
+            Some(value) => write!(f, "{} {};", self.token, value),
+            None => write!(f, "{};", self.token),
+        }
     }
 }
 
@@ -167,9 +166,12 @@ impl Parser {
             Some(token) => token,
             None => Token {
                 kind: TokenKind::EOF,
-                line: self.cur_token.line,
-                column: self.cur_token.column + self.cur_token.length,
-                length: 0,
+                position: Position {
+                    line: self.cur_token.position.line,
+                    column: self.cur_token.position.column + self.cur_token.position.length,
+                    length: 0,
+                    file: self.cur_token.position.file.clone(),
+                }
             },
         };
         self.cur_token = std::mem::replace(&mut self.peek_token, next);
@@ -252,8 +254,8 @@ impl Parser {
                     token,
                     self.peek_token.kind
                 ),
-                self.peek_token.line,
-                self.peek_token.column,
+                self.peek_token.position.line,
+                self.peek_token.position.column,
                 None,
             ))
         }
@@ -300,11 +302,19 @@ impl Parser {
         let token = self.cur_token.clone();
         self.next_token();
 
+        if let TokenKind::Semicolon = self.cur_token.kind {
+            let statement = Statement::Return(ReturnStatement {
+                token,
+                return_value: None,
+            });
+            return Ok(statement);
+        }
+
         let expression = self.parse_expression(Precedence::Lowest)?;
 
         let statement = Statement::Return(ReturnStatement {
             token,
-            return_value: expression,
+            return_value: Some(expression),
         });
 
         Ok(statement)
@@ -662,12 +672,9 @@ impl Parser {
         match self.peek_token.precedence() {
             Some(precedence) => precedence,
             None => {
-                self.errors.push(self.error(
+                self.errors.push(self.error_peek(
                     ErrorKind::MissingPrecedence,
                     format!("No precedence found for {:?}", self.peek_token),
-                    self.peek_token.line,
-                    self.peek_token.column,
-                    None,
                 ));
 
                 Precedence::Lowest
@@ -702,6 +709,12 @@ impl Parser {
     fn parse_grouped_expression(&mut self) -> Result<Expression, Error> {
         let _trace = trace!("parse_grouped_expression");
         self.next_token();
+
+        if self.cur_token.kind == TokenKind::RightParen {
+            return Ok(Expression::Unit(
+                self.cur_token.clone()
+            ));
+        }
 
         let expression = self.parse_expression(Precedence::Lowest)?;
 
@@ -785,15 +798,15 @@ impl Parser {
     }
 
     fn error_current(&self, kind: ErrorKind, msg: String) -> Error {
-        self.error(kind, msg, self.cur_token.line, self.cur_token.column, None)
+        self.error(kind, msg, self.cur_token.position.line, self.cur_token.position.column, None)
     }
 
     fn error_current_with_context(&self, kind: ErrorKind, msg: String, context: String) -> Error {
         self.error(
             kind,
             msg,
-            self.cur_token.line,
-            self.cur_token.column,
+            self.cur_token.position.line,
+            self.cur_token.position.column,
             Some(context),
         )
     }
@@ -802,8 +815,8 @@ impl Parser {
         self.error(
             kind,
             msg,
-            self.peek_token.line,
-            self.peek_token.column,
+            self.peek_token.position.line,
+            self.peek_token.position.column,
             None,
         )
     }
@@ -813,8 +826,8 @@ impl Parser {
         self.error(
             kind,
             msg,
-            self.peek_token.line,
-            self.peek_token.column,
+            self.peek_token.position.line,
+            self.peek_token.position.column,
             Some(context),
         )
     }
@@ -1383,7 +1396,7 @@ fn test_operator_precedence_parsing() {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::If(ref if_expr) => {
                     assert_eq!(if_expr.condition.to_string(), "(x < y)");
-                    assert_eq!(if_expr.consequence.to_string().trim(), "x;");
+                    assert_eq!(if_expr.consequence.to_string().split_whitespace().collect::<Vec<&str>>().join(" "), "{ x; }");
                     assert_eq!(if_expr.alternative.is_none(), true);
                 }
                 _ => panic!("expected if expression"),

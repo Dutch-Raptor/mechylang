@@ -124,7 +124,7 @@ impl Evaluator {
         env: &mut Environment,
     ) -> Result<Object, Error> {
         let _trace = trace!("eval_program");
-        let mut result = Object::Null;
+        let mut result = Object::Unit;
 
         for statement in program.into_iter() {
             result = self.eval_statement(&statement, env)?;
@@ -146,7 +146,10 @@ impl Evaluator {
         match statement {
             Statement::Expression(stmt) => self.eval_expression(&stmt.expression, env),
             Statement::Return(stmt) => {
-                let val = self.eval_expression(&stmt.return_value, env)?;
+                let val = match stmt.return_value {
+                    Some(ref expr) => self.eval_expression(expr, env)?,
+                    None => Object::Unit,
+                };
                 Ok(Object::ReturnValue(Box::new(val)))
             }
             Statement::Let(let_statement) => {
@@ -166,14 +169,14 @@ impl Evaluator {
     ///
     /// Assigns a value to a variable in the current environment.
     ///
-    /// Returns null.
+    /// Returns `Object::Unit`.
     ///
     /// # Examples
     /// ```
     /// use mechylang::{Evaluator, Environment, Object};
     /// assert_eq!(
     ///    Evaluator::eval("let x = 5", &mut Default::default(), Default::default()).unwrap(),
-    ///    Object::Null
+    ///    Object::Unit
     /// );
     /// assert_eq!(
     ///    Evaluator::eval("let x = 5; x", &mut Default::default(), Default::default()).unwrap(),
@@ -188,7 +191,7 @@ impl Evaluator {
         let _trace = trace!(&format!("eval_let_statement: {}", let_statement));
         let val = self.eval_expression(&let_statement.value, env)?;
         env.set(let_statement.name.value.clone(), val);
-        Ok(Object::Null)
+        Ok(Object::Unit)
     }
 
     fn eval_expression(
@@ -222,6 +225,7 @@ impl Evaluator {
             })),
             Expression::Call(call) => self.eval_call_expression(call, env),
             Expression::StringLiteral(lit) => Ok(Object::String(lit.value.clone())),
+            Expression::Unit(_) => Ok(Object::Unit),
             Expression::ArrayLiteral(array) => self.eval_array_expression(array, env),
             Expression::Index(index) => self.eval_index_expression(index, env),
             Expression::For(for_expr) => self.eval_for_expression(for_expr, env),
@@ -262,7 +266,7 @@ impl Evaluator {
         let right = self.eval_expression(&infix.right, env)?;
 
         self.current_token = Some(infix.token.clone());
-
+        
         let err = self.error(
             self.current_token.as_ref(),
             format!("Type mismatch: {:?} {} {:?}", left, infix.operator, right).as_str(),
@@ -270,24 +274,27 @@ impl Evaluator {
         );
 
 
-        match (left, right) {
+        match (&left, &right) {
+            (Object::Unit, _) | (_, Object::Unit) => {
+                self.eval_unit_infix_expression(&infix.operator, &left, &right)
+            }
             (Object::Integer(left), Object::Integer(right)) => {
-                self.eval_integer_infix_expression(&infix.operator, left, right)
+                self.eval_integer_infix_expression(&infix.operator, *left, *right)
             }
             (Object::Float(left), Object::Float(right)) => {
-                self.eval_float_infix_expression(&infix.operator, left, right)
+                self.eval_float_infix_expression(&infix.operator, *left, *right)
             }
             (Object::Float(left), Object::Integer(right)) => {
-                self.eval_float_infix_expression(&infix.operator, left, right as f64)
+                self.eval_float_infix_expression(&infix.operator, *left, *right as f64)
             }
             (Object::Integer(left), Object::Float(right)) => {
-                self.eval_float_infix_expression(&infix.operator, left as f64, right)
+                self.eval_float_infix_expression(&infix.operator, *left as f64, *right)
             }
             (Object::Boolean(left), Object::Boolean(right)) => {
-                self.eval_boolean_infix_expression(&infix.operator, left, right)
+                self.eval_boolean_infix_expression(&infix.operator, *left, *right)
             }
             (Object::String(left), Object::String(right)) => {
-                self.eval_string_infix_expression(&infix.operator, left, right)
+                self.eval_string_infix_expression(&infix.operator, left.clone(), right.clone())
             }
             _ => Err(err),
         }
@@ -298,7 +305,7 @@ impl Evaluator {
         block: &BlockStatement,
         env: &mut Environment,
     ) -> Result<Object, Error> {
-        let mut result = Object::Null;
+        let mut result = Object::Unit;
 
         for statement in block.statements.iter() {
             result = self.eval_statement(statement, env)?;
@@ -334,13 +341,13 @@ impl Evaluator {
         } else if let Some(alternative) = &if_expr.alternative {
             self.eval_block_statement(alternative, env)
         } else {
-            Ok(Object::Null)
+            Ok(Object::Unit)
         }
     }
 
     pub fn is_truthy(condition: &Object) -> bool {
         match condition {
-            Object::Null => false,
+            Object::Unit => false,
             Object::Boolean(boolean) => *boolean,
             _ => true,
         }
@@ -519,7 +526,7 @@ impl Evaluator {
         let _trace = trace!(&format!("eval_bang_operator_expression({})", right).to_string());
         match right {
             Object::Boolean(boolean) => (!boolean).into(),
-            Object::Null => true.into(),
+            Object::Unit => true.into(),
             _ => false.into(),
         }
     }
@@ -528,13 +535,13 @@ impl Evaluator {
         let _trace = trace!(&format!("error({:?}, {}, {:?})", token, message, error_kind).to_string());
         let (line_nr, line, column) = if let Some(token) = token {
             (
-                token.line,
+                token.position.line,
                 self.lines
                     // line is 1-indexed
-                    .get(token.line - 1)
+                    .get(token.position.line - 1)
                     .unwrap_or(&"Failed to get line".to_string())
                     .clone(),
-                token.column,
+                token.position.column,
             )
         } else {
             (0, "".to_string(), 0)
@@ -556,7 +563,8 @@ impl Evaluator {
     ) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_identifier({})", ident));
         if let Some(object) = env.get(ident.value.clone()) {
-            Ok(object)
+            // If the value is a return value, unwrap it
+            Ok(object.unwrap_return_value())
         } else if let Some(object) = self.globals.get(&ident.value) {
             Ok(object.clone())
         } else if let Ok(builtin) = BuiltinFunction::try_from(ident) {
@@ -589,7 +597,7 @@ impl Evaluator {
             return self.apply_method(method, &call.arguments, env);
         }
 
-        if let Object::Null = function {
+        if let Object::Unit = function {
             return Err(self.error(
                 Some(call.function.token()),
                 "Cannot call null",
@@ -599,10 +607,13 @@ impl Evaluator {
 
         let arguments = self.eval_expressions(&call.arguments, env)?;
 
-        println!("function: {}", function);
-
         self.apply_function(function, arguments, None).map_err(|err| {
-            self.error(
+            // only apply current token if there is no token set
+            if err.line != "" && err.line_nr != 0 && err.column != 0 {
+                return err;
+            }
+             
+            return self.error(
                 Some(call.function.token()),
                 err.message.as_str(),
                 err.kind,
@@ -917,7 +928,7 @@ impl Evaluator {
                             }
 
                             arr[index] = new_value;
-                            Ok(Object::Null)
+                            Ok(Object::Unit)
                         },
                         _ => {
                             Err(format!("Cannot index non-array: {:?}", obj).to_string().into())
@@ -936,13 +947,13 @@ impl Evaluator {
         }
 
 
-        Ok(Object::Null)
+        Ok(Object::Unit)
     }
 
     fn eval_for_expression(&mut self, for_expr: &ForExpression, env: &mut Environment) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_for_expression: {}", for_expr));
 
-        let mut result = Object::Null;
+        let mut result = Object::Unit;
 
         let iterable = self.eval_expression(&for_expr.iterable, env)?;
 
@@ -972,7 +983,7 @@ impl Evaluator {
             match result {
                 Object::ReturnValue(_) => return Ok(result),
                 Object::Break(Some(value)) => return Ok(*value),
-                Object::Break(None) => return Ok(Object::Null),
+                Object::Break(None) => return Ok(Object::Unit),
                 // continue is handled in eval_block_statement
                 _ => {}
             }
@@ -1012,7 +1023,7 @@ impl Evaluator {
     fn eval_while_expression(&mut self, while_expr: &WhileExpression, env: &mut Environment) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_while_expression: {}", while_expr));
 
-        let mut result = Object::Null;
+        let mut result = Object::Unit;
 
         while Self::is_truthy(&self.eval_expression(&while_expr.condition, env)?) {
             let mut new_env = Environment::new_enclosed(env);
@@ -1022,7 +1033,7 @@ impl Evaluator {
             match result {
                 Object::ReturnValue(_) => return Ok(result),
                 Object::Break(Some(value)) => return Ok(*value),
-                Object::Break(None) => return Ok(Object::Null),
+                Object::Break(None) => return Ok(Object::Unit),
                 // continue is handled in eval_block_statement
                 _ => {}
             }
@@ -1090,6 +1101,17 @@ impl Evaluator {
             _ => Err(self.error(
                 self.current_token.as_ref(),
                 &format!("Invalid operator: ~{:?}", right).to_string(),
+                ErrorKind::InvalidOperator,
+            )),
+        }
+    }
+
+    fn eval_unit_infix_expression(&self, operator: &InfixOperator, left: &Object, right: &Object) -> Result<Object, Error> {
+        match operator {
+            InfixOperator::CompareEqual => Ok(Object::Boolean(left == right)),
+            _ => Err(self.error(
+                self.current_token.as_ref(),
+                &format!("Invalid operator: {:?} {:?} {:?}", left, operator, right).to_string(),
                 ErrorKind::InvalidOperator,
             )),
         }
@@ -1278,10 +1300,10 @@ mod tests {
     fn test_if_else_expressions() {
         let tests = vec![
             ("if (true) { 10 }", Object::Integer(10)),
-            ("if (false) { 10 }", Object::Null),
+            ("if (false) { 10 }", Object::Unit),
             ("if (1) { 10 }", Object::Integer(10)),
             ("if (1 < 2) { 10 }", Object::Integer(10)),
-            ("if (1 > 2) { 10 }", Object::Null),
+            ("if (1 > 2) { 10 }", Object::Unit),
             ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
             ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
         ];
@@ -1525,7 +1547,7 @@ mod tests {
                     .collect();
 
                 assert_eq!(params, vec!["x".to_string()]);
-                assert_eq!(function.body.to_string().trim(), "(x + 2);");
+                assert_eq!(function.body.to_string().split_whitespace().collect::<Vec<&str>>().join(" "), "{ (x + 2); }".to_string());
             }
             _ => panic!("Object is not a function. Got: {:?}", evaluated),
         }
@@ -1580,6 +1602,7 @@ mod tests {
         ];
 
         for (input, expected) in tests {
+            println!("Testing: {}", input);
             let evaluated = test_eval(input);
             assert_eq!(evaluated, expected);
         }
