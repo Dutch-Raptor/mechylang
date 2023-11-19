@@ -72,7 +72,7 @@ pub enum TokenKind {
     LogicalOr,
 
     // Bitwise
-    BitwiseAnd,
+    Ampersand,
     BitwiseOr,
     BitwiseXor,
     BitwiseNot,

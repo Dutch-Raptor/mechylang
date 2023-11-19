@@ -108,11 +108,13 @@ impl Lexer {
     /// Read a number from the input string.
     ///
     /// This can be an integer or a floating point number.
+    ///
+    /// Underscores are allowed in numbers, but they are ignored.
     fn read_number(&mut self) -> String {
         let position = self.position;
         // Read all numbers
 
-        while is_digit(self.peek_char()) {
+        while is_digit(self.peek_char()) || self.peek_char() == '_' {
             self.read_char();
         }
 
@@ -126,6 +128,8 @@ impl Lexer {
         }
 
         self.get_string(position, self.position)
+            // Remove underscores
+            .replace("_", "")
     }
 
     fn peek_char(&mut self) -> char {
@@ -278,7 +282,7 @@ impl Lexer {
                     self.read_char();
                     Some(TokenKind::AssignBitwiseAnd)
                 } else {
-                    Some(TokenKind::BitwiseAnd)
+                    Some(TokenKind::Ampersand)
                 }
             }
             '|' => {

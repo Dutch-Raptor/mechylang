@@ -36,6 +36,26 @@ pub enum Statement {
     Expression(ExpressionStatement),
     Break(BreakStatement),
     Continue(ContinueStatement),
+    Function(FunctionStatement),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FunctionStatement {
+    pub token: Token,
+    pub name: Identifier,
+    pub parameters: Rc<[Identifier]>,
+    pub body: BlockStatement,
+}
+
+impl Display for FunctionStatement {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let params = self.parameters.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", ");
+        write!(
+            f,
+            "{} {}({}) {}",
+            self.token, self.name, params, self.body
+        )
+    }
 }
 
 impl Display for Statement {
@@ -46,6 +66,7 @@ impl Display for Statement {
             Statement::Expression(s) => write!(f, "{}", s),
             Statement::Break(s) => write!(f, "{}", s),
             Statement::Continue(s) => write!(f, "{}", s),
+            Statement::Function(s) => write!(f, "{}", s),
         }
     }
 }
@@ -199,19 +220,6 @@ impl Parser {
 
         program.errors.append(&mut self.errors);
 
-        // match self.errors.len() {
-        //     0 => cprintln!("<green>Successfully parsed</green>"),
-        //     _ => {
-        //         cprintln!(
-        //             "<red>Failed to parse with <b>{}</> errors</red>\n",
-        //             self.errors.len()
-        //         );
-        //         for err in &self.errors {
-        //             cprintln!("<red>{}</red>", err);
-        //         }
-        //     }
-        // }
-
         program
     }
 
@@ -227,6 +235,7 @@ impl Parser {
             }
             TokenKind::Break => self.parse_break_statement()?,
             TokenKind::Continue => Statement::Continue(ContinueStatement { token: self.cur_token.clone() }),
+            TokenKind::Fn => self.parse_function_statement()?,
             _ => self.parse_expression_statement()?,
         };
 
@@ -320,6 +329,49 @@ impl Parser {
         Ok(statement)
     }
 
+    fn parse_function_statement(&mut self) -> Result<Statement, Error> {
+        let _trace = trace!("parse_function_statement");
+
+        let token = self.cur_token.clone();
+
+        let name = match self.peek_token.kind {
+            TokenKind::Identifier(ref name) => Identifier {
+                token: self.cur_token.clone(),
+                value: name.clone().into(),
+            },
+            TokenKind::LeftParen => {
+                // Looks like this statement is actually an anonymous function
+                // So we'll just parse it as such
+                return self.parse_expression_statement();
+            }
+            _ => {
+                return Err(self.error_peek(
+                    ErrorKind::UnexpectedToken,
+                    format!("Expected an identifier, got {:?}", self.peek_token.kind),
+                ))
+            }
+        };
+
+        self.next_token();
+
+        self.expect_peek(TokenKind::LeftParen)?;
+
+        let parameters = self.parse_function_parameters()?.into();
+
+        self.expect_peek(TokenKind::LeftSquirly)?;
+
+        let body = self.parse_block_statement()?;
+
+        let statement = Statement::Function(FunctionStatement {
+            name,
+            token,
+            parameters,
+            body,
+        });
+
+        Ok(statement)
+    }
+
     fn parse_expression_statement(&mut self) -> Result<Statement, Error> {
         let _trace = trace!("parse_expression_statement");
         let statement = Statement::Expression(ExpressionStatement {
@@ -377,6 +429,7 @@ impl Parser {
             TokenKind::Bang => true,
             TokenKind::Minus => true,
             TokenKind::BitwiseNot => true,
+            TokenKind::Ampersand => true,
 
             // Control flow expressions
             TokenKind::If => true,
@@ -411,6 +464,7 @@ impl Parser {
             TokenKind::Bang => self.parse_prefix_expression(),
             TokenKind::Minus => self.parse_prefix_expression(),
             TokenKind::BitwiseNot => self.parse_prefix_expression(),
+            TokenKind::Ampersand => self.parse_prefix_expression(),
 
             // Block expressions
             TokenKind::LeftSquirly => self.parse_block_expression(),
@@ -455,7 +509,7 @@ impl Parser {
             | TokenKind::LogicalOr
 
                 // bitwise operators
-            | TokenKind::BitwiseAnd
+            | TokenKind::Ampersand
             | TokenKind::BitwiseOr
             | TokenKind::BitwiseXor
             | TokenKind::BitwiseLeftShift
@@ -500,7 +554,7 @@ impl Parser {
             | TokenKind::CompareLessEqual 
             | TokenKind::LogicalAnd
             | TokenKind::LogicalOr
-            | TokenKind::BitwiseAnd
+            | TokenKind::Ampersand
             | TokenKind::BitwiseOr
             | TokenKind::BitwiseXor
             | TokenKind::BitwiseLeftShift
@@ -591,6 +645,7 @@ impl Parser {
             TokenKind::Bang => PrefixOperator::Bang,
             TokenKind::Minus => PrefixOperator::Minus,
             TokenKind::BitwiseNot => PrefixOperator::BitwiseNot,
+            TokenKind::Ampersand => PrefixOperator::Ampersand,
             _ => {
                 return Err(self.error_current(
                     ErrorKind::MissingPrefix,
@@ -628,7 +683,7 @@ impl Parser {
             TokenKind::CompareGreaterEqual => InfixOperator::CompareGreaterEqual,
 
             TokenKind::BitwiseXor => InfixOperator::BitwiseXor,
-            TokenKind::BitwiseAnd => InfixOperator::BitwiseAnd,
+            TokenKind::Ampersand => InfixOperator::BitwiseAnd,
             TokenKind::BitwiseOr => InfixOperator::BitwiseOr,
             TokenKind::BitwiseLeftShift => InfixOperator::BitwiseLeftShift,
             TokenKind::BitwiseRightShift => InfixOperator::BitwiseRightShift,
@@ -1110,12 +1165,21 @@ impl Parser {
 
         let body = self.parse_block_statement()?;
 
+        let else_block = if self.peek_token.kind == TokenKind::Else {
+            self.next_token();
+            self.expect_peek(TokenKind::LeftSquirly)?;
+            Some(self.parse_block_statement()?)
+        } else {
+            None
+        };
+
         Ok(Expression::For(ForExpression {
             token,
             iterator,
             iterable: Rc::new(iterable),
             body,
             index,
+            else_block,
         }))
 
     }
@@ -1154,10 +1218,19 @@ impl Parser {
 
         let body = self.parse_block_statement()?;
 
+        let else_block = if self.peek_token.kind == TokenKind::Else {
+            self.next_token();
+            self.expect_peek(TokenKind::LeftSquirly)?;
+            Some(self.parse_block_statement()?)
+        } else {
+            None
+        };
+
         Ok(Expression::While(WhileExpression {
             token,
             condition: Rc::new(condition),
             body,
+            else_block,
         }))
     }
 
@@ -1182,6 +1255,7 @@ impl Parser {
             property,
         }))
     }
+
 }
 
 
@@ -1912,5 +1986,20 @@ fn test_operator_precedence_parsing() {
         assert_eq!(program.errors.len(), 0);
         assert_eq!(program.statements.len(), 1);
     }
+
+    #[test]
+    fn test_function_statement() {
+        let input = "fn foo() { 1; }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse();
+
+        println!("{}", program);
+
+        assert_eq!(program.errors.len(), 0);
+        assert_eq!(program.statements.len(), 1);
+    }
+
 }
 

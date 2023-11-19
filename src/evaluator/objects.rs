@@ -18,7 +18,38 @@ const FALSE: Object = Object::Boolean(false);
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Object {
+    /// # Integer
+    ///
+    /// An integer is a whole number. It can be positive or negative.
+    ///
+    /// ```rust
+    /// # mechylang::test_utils::test_eval_ok(r#"
+    /// let x = 5;
+    /// assert_eq(x, 5);
+    /// # "#);
+    /// ```
+    /// ## Max and Min
+    /// Integers have a maximum and minimum value. If you try to assign a value
+    /// that is too large or too small, you will get an error.
+    ///
+    /// Max: 2<sup>63</sup> - 1 = 9,223,372,036,854,775,807
+    /// Min: -2<sup>63</sup> = -9,223,372,036,854,775,808
     Integer(i64),
+    /// # Float
+    ///
+    /// A float is a decimal number. It can be positive or negative.
+    /// ```rust
+    /// # mechylang::test_utils::test_eval_ok(r#"
+    /// let x = 5.5;
+    /// assert_eq(x, 5.5);
+    /// # "#);
+    /// ```
+    /// ## Max and Min
+    /// Floats have a maximum and minimum value. If you try to assign a value
+    /// that is too large or too small, you will get an error.
+    ///
+    /// Max: 1.7976931348623157<sup>308</sup>
+    /// Min: 2.2250738585072014<sup>-308</sup>
     Float(f64),
     Boolean(bool),
     Unit,
@@ -26,6 +57,35 @@ pub enum Object {
     Function(Function),
     String(Rc<str>),
     BuiltinFunction(BuiltinFunction),
+    /// # Array
+    /// An array is a mutable, ordered list of items. It can contain any type of object.
+    ///
+    /// ## Usage
+    ///
+    /// To create an array, use the following syntax:
+    ///
+    /// ```rust
+    /// # mechylang::test_utils::test_eval_ok(r#"
+    /// let arr = [1, 2, 3];
+    /// assert_eq(arr, [1, 2, 3]);
+    /// # "#);
+    /// ```
+    ///
+    /// ## Indexing
+    /// To get an item from an array, use the following syntax:
+    ///
+    /// ```rust
+    /// # mechylang::test_utils::test_eval_ok(r#"
+    /// let arr = [1, 2, 3];
+    /// assert_eq(arr[0], 1);
+    /// assert_eq(arr[1], 2);
+    /// assert_eq(arr[2], 3);
+    /// # "#);
+    /// ```
+    ///
+    /// ## Methods
+    ///
+    /// Arrays have many methods, take a look at the [array methods module](crate::evaluator::methods::array_methods) for more information.
     Array(Vec<Object>),
     RangeFrom(Rc<Object>),
     RangeTo(Rc<Object>),
@@ -39,6 +99,8 @@ pub enum Object {
     Break(Option<Box<Object>>),
     Continue,
     Method(Method),
+
+    Reference(Reference),
 }
 
 /// Trait for unwrapping return values
@@ -169,7 +231,62 @@ impl Display for Object {
             Object::Break(None) => write!(f, "break"),
             Object::Continue => write!(f, "continue"),
             Object::Method(method) => write!(f, "{}", method),
+            Object::Reference(reference) => write!(f, "{}", reference),
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct Reference {
+    pub identifier: Rc<str>,
+    pub env: Environment,
+}
+
+impl Reference {
+    pub fn new(identifier: Rc<str>, env: Environment) -> Self {
+        Self { identifier, env }
+    }
+
+    pub fn get(&self) -> Option<Object> {
+        self.env.get(self.identifier.clone())
+    }
+
+    pub fn mutate<F>(&mut self, f: F) -> Result<Object, String>
+    where
+        F: FnOnce(&mut Object) -> Result<Object, String>,
+    {
+        self.env.mutate(self.identifier.clone(), f)
+    }
+
+    pub fn update(&mut self, val: Object) -> Result<Object, String> {
+        self.env
+            .update(self.identifier.clone(), val)
+            .map(|_| Object::Unit)
+    }
+}
+
+impl Display for Reference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "&{}",
+            match self.env.get(self.identifier.clone()) {
+                Some(obj) => obj.to_string(),
+                None => format!("(dangling reference to {})", self.identifier),
+            }
+        )
+    }
+}
+
+impl PartialEq for Reference {
+    fn eq(&self, other: &Self) -> bool {
+        self.identifier == other.identifier
+    }
+}
+
+impl Debug for Reference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "&{}", self.identifier)
     }
 }
 

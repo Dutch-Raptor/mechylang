@@ -21,6 +21,36 @@
 //! println("Hello", "World!"); // prints "Hello World!\n"
 //! # "#);
 //! ```
+//!
+//! #### `assert`
+//! The `assert` function can be used to assert that a boolean is true.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! assert(true); // ok
+//! # "#);
+//! ```
+//!
+//! ```should_panic
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! assert(false); // panics
+//! # "#);
+//! ```
+//!
+//! #### `assert_eq`
+//! The `assert_eq` function can be used to assert that all arguments are equal.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! assert_eq(1, 1, 1); // ok
+//! # "#);
+//! ```
+//!
+//! ```should_panic
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! assert_eq(1, 2, 1); // panics
+//! # "#);
+//! ```
 
 use std::ops::RangeInclusive;
 

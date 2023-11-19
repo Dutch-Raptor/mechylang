@@ -1,19 +1,10 @@
+//! # Methods for the `Object::Array` type
+//!
+//! For info on the `Object::Array` type, see [the documentation for the `Object` enum](crate::Object#variant.Array).
 use crate::Object;
 
 use super::{get_mutable_ident, MethodInner};
 
-/// # Methods for the `Object::Array` type
-///
-/// [Array] is a mutable, ordered collection of items.
-///
-///
-/// [Array]: crate::Object#variant.Array
-/// [Integer]: crate::Object#variant.Integer
-/// [Boolean]: crate::Object#variant.Boolean
-/// [Null]: crate::Object#variant.Null
-/// [Any]: crate::Object
-///
-///
 /// ## `push(item: Any) -> Null`
 /// Pushes an item to the end of the array
 ///
@@ -24,7 +15,27 @@ use super::{get_mutable_ident, MethodInner};
 /// assert_eq(arr, [1, 2, 3, 4]);
 /// # "#);
 /// ```
-///
+pub const ARRAY_PUSH: MethodInner = MethodInner {
+    name: "push",
+    args_len: 1..=1,
+    function: |_, ident, args, env, _| {
+        let value = args[0].clone();
+
+        let ident = get_mutable_ident(ident)?;
+
+        env.mutate(ident.to_string(), move |arr| {
+            if let Object::Array(ref mut arr) = arr {
+                arr.push(value.clone());
+                Ok(Object::Unit)
+            } else {
+                Err(format!("Expected array, got {}", arr))
+            }
+        })
+        .map_err(|e| e.to_string())?;
+        Ok(Object::Unit)
+    },
+};
+
 /// ## `pop() -> Any`
 /// Removes the last item from the array and returns it
 ///
@@ -35,7 +46,27 @@ use super::{get_mutable_ident, MethodInner};
 /// assert_eq(arr, [1, 2]);
 /// # "#);
 /// ```
-///
+pub const ARRAY_POP: MethodInner = MethodInner {
+    name: "pop",
+    args_len: 0..=0,
+    function: |_, ident, _, env, _| {
+        let ident = get_mutable_ident(ident)?;
+
+        let item = env
+            .mutate(ident.to_string(), move |arr| {
+                if let Object::Array(ref mut arr) = arr {
+                    arr.pop()
+                        .map(|v| Ok(v))
+                        .unwrap_or(Err("Array is empty".to_string()))
+                } else {
+                    Err(format!("Expected array, got {}", arr))
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(item)
+    },
+};
+
 /// ## `first() -> Any`
 /// Returns the first item in the array
 ///
@@ -46,7 +77,27 @@ use super::{get_mutable_ident, MethodInner};
 /// assert_eq(arr, [1, 2, 3]);
 /// # "#);
 /// ```
-///
+pub const ARRAY_FIRST: MethodInner = MethodInner {
+    name: "first",
+    args_len: 0..=0,
+    function: |_, ident, _, env, _| {
+        let ident = get_mutable_ident(ident)?;
+
+        let item = env
+            .mutate(ident.to_string(), move |arr| {
+                if let Object::Array(ref mut arr) = arr {
+                    arr.first()
+                        .map(|v| Ok(v.clone()))
+                        .unwrap_or(Err("Array is empty".to_string()))
+                } else {
+                    Err(format!("Expected array, got {}", arr))
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(item)
+    },
+};
+
 /// ## `last() -> Any`
 ///
 /// Returns the last item in the array
@@ -58,7 +109,27 @@ use super::{get_mutable_ident, MethodInner};
 /// assert_eq(arr, [1, 2, 3]);
 /// # "#);
 /// ```
-///
+pub const ARRAY_LAST: MethodInner = MethodInner {
+    name: "last",
+    args_len: 0..=0,
+    function: |_, ident, _, env, _| {
+        let ident = get_mutable_ident(ident)?;
+
+        let item = env
+            .mutate(ident.to_string(), move |arr| {
+                if let Object::Array(ref mut arr) = arr {
+                    arr.last()
+                        .map(|v| Ok(v.clone()))
+                        .unwrap_or(Err("Array is empty".to_string()))
+                } else {
+                    Err(format!("Expected array, got {}", arr))
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(item)
+    },
+};
+
 /// ## `len() -> Integer`
 ///
 /// Returns the length of the array
@@ -70,7 +141,15 @@ use super::{get_mutable_ident, MethodInner};
 /// assert_eq(arr, [1, 2, 3]);
 /// # "#);
 /// ```
-///
+pub const ARRAY_LEN: MethodInner = MethodInner {
+    name: "len",
+    args_len: 0..=0,
+    function: |obj, _, _, _, _| match obj {
+        Object::Array(ref arr) => Ok(Object::Integer(arr.len() as i64)),
+        _ => Err("Argument to `len` not supported".to_string()),
+    },
+};
+
 /// ## `insert(index: Integer, item: Any) -> Null`
 ///
 /// Inserts an item at the given index, shifting all items after it to the right
@@ -82,9 +161,45 @@ use super::{get_mutable_ident, MethodInner};
 /// assert_eq(arr, [1, 4, 2, 3]);
 /// # "#);
 /// ```
-///
-/// ## Remove
-/// `remove`(item: [Any] ) -> [Any]
+pub const ARRAY_INSERT: MethodInner = MethodInner {
+    name: "insert",
+    args_len: 2..=2,
+    function: |obj, ident, args, env, _| {
+        let index = match args[0] {
+            Object::Integer(i) => i,
+            _ => return Err("Expected integer for index".to_string()),
+        };
+
+        let value = args[1].clone();
+
+        let ident = get_mutable_ident(ident)?;
+
+        match obj {
+            Object::Array(arr) => {
+                if index < 0 || index as usize > arr.len() {
+                    return Err(format!(
+                        "Index {} out of bounds for array of length {}",
+                        index,
+                        arr.len()
+                    ));
+                }
+            }
+            _ => return Err("Expected array".to_string()),
+        }
+
+        env.mutate(ident.to_string(), move |arr| {
+            if let Object::Array(ref mut arr) = arr {
+                arr.insert(index as usize, value.clone());
+                Ok(Object::Unit)
+            } else {
+                Err(format!("Expected array, got {}", arr))
+            }
+        })?;
+        Ok(Object::Unit)
+    },
+};
+
+/// ## `remove(index: Integer) -> Any`
 ///
 /// Removes an item at the given index, shifting all items after it to the left
 /// and returns the removed item
@@ -96,7 +211,43 @@ use super::{get_mutable_ident, MethodInner};
 /// assert_eq(arr, [1, 3]);
 /// # "#);
 /// ```
-///
+pub const ARRAY_REMOVE: MethodInner = MethodInner {
+    name: "remove",
+    args_len: 1..=1,
+    function: |obj, ident, args, env, _| {
+        let index = match args[0] {
+            Object::Integer(i) => i,
+            _ => return Err("Expected integer for index".to_string()),
+        };
+
+        let ident = get_mutable_ident(ident)?;
+
+        match obj {
+            Object::Array(arr) => {
+                if index < 0 || index as usize > arr.len() {
+                    return Err(format!(
+                        "Index {} out of bounds for array of length {}",
+                        index,
+                        arr.len()
+                    ));
+                }
+            }
+            _ => return Err("Expected array".to_string()),
+        }
+
+        let item = env
+            .mutate(ident.to_string(), move |arr| {
+                if let Object::Array(ref mut arr) = arr {
+                    Ok(arr.remove(index as usize))
+                } else {
+                    Err(format!("Expected array, got {}", arr))
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(item)
+    },
+};
+
 /// ## `contains(item: Any) -> Boolean`
 /// Returns true if the array contains the given item
 ///
@@ -105,180 +256,28 @@ use super::{get_mutable_ident, MethodInner};
 /// assert_eq([1, 2, 3].contains(1), true);
 /// assert_eq([1, 2, 3].contains(4), false);
 /// # "#);
-pub const ARRAY_METHODS: [MethodInner; 8] = [
-    MethodInner {
-        name: "push",
-        args_len: 1..=1,
-        function: |_, ident, args, env, _| {
-            let value = args[0].clone();
+pub const ARRAY_CONTAINS: MethodInner = MethodInner {
+    name: "contains",
+    args_len: 1..=1,
+    function: |obj, _, args, _, _| {
+        let value = args[0].clone();
 
-            let ident = get_mutable_ident(ident)?;
-
-            env.update(ident.to_string(), move |arr| {
-                if let Object::Array(ref mut arr) = arr {
-                    arr.push(value.clone());
-                    Ok(Object::Unit)
-                } else {
-                    Err(format!("Expected array, got {}", arr))
-                }
-            })
-            .map_err(|e| e.to_string())?;
-            Ok(Object::Unit)
-        },
+        match obj {
+            Object::Array(arr) => Ok(Object::Boolean(arr.contains(&value))),
+            _ => Err("Argument to `contains` not supported".to_string()),
+        }
     },
-    MethodInner {
-        name: "pop",
-        args_len: 0..=0,
-        function: |_, ident, _, env, _| {
-            let ident = get_mutable_ident(ident)?;
+};
 
-            let item = env
-                .update(ident.to_string(), move |arr| {
-                    if let Object::Array(ref mut arr) = arr {
-                        arr.pop()
-                            .map(|v| Ok(v))
-                            .unwrap_or(Err("Array is empty".to_string()))
-                    } else {
-                        Err(format!("Expected array, got {}", arr))
-                    }
-                })
-                .map_err(|e| e.to_string())?;
-            Ok(item)
-        },
-    },
-    MethodInner {
-        name: "first",
-        args_len: 0..=0,
-        function: |_, ident, _, env, _| {
-            let ident = get_mutable_ident(ident)?;
-
-            let item = env
-                .update(ident.to_string(), move |arr| {
-                    if let Object::Array(ref mut arr) = arr {
-                        arr.first()
-                            .map(|v| Ok(v.clone()))
-                            .unwrap_or(Err("Array is empty".to_string()))
-                    } else {
-                        Err(format!("Expected array, got {}", arr))
-                    }
-                })
-                .map_err(|e| e.to_string())?;
-            Ok(item)
-        },
-    },
-    MethodInner {
-        name: "last",
-        args_len: 0..=0,
-        function: |_, ident, _, env, _| {
-            let ident = get_mutable_ident(ident)?;
-
-            let item = env
-                .update(ident.to_string(), move |arr| {
-                    if let Object::Array(ref mut arr) = arr {
-                        arr.last()
-                            .map(|v| Ok(v.clone()))
-                            .unwrap_or(Err("Array is empty".to_string()))
-                    } else {
-                        Err(format!("Expected array, got {}", arr))
-                    }
-                })
-                .map_err(|e| e.to_string())?;
-            Ok(item)
-        },
-    },
-    MethodInner {
-        name: "insert",
-        args_len: 2..=2,
-        function: |obj, ident, args, env, _| {
-            let index = match args[0] {
-                Object::Integer(i) => i,
-                _ => return Err("Expected integer for index".to_string()),
-            };
-
-            let value = args[1].clone();
-
-            let ident = get_mutable_ident(ident)?;
-
-            match obj {
-                Object::Array(arr) => {
-                    if index < 0 || index as usize > arr.len() {
-                        return Err(format!(
-                            "Index {} out of bounds for array of length {}",
-                            index,
-                            arr.len()
-                        ));
-                    }
-                }
-                _ => return Err("Expected array".to_string()),
-            }
-
-            env.update(ident.to_string(), move |arr| {
-                if let Object::Array(ref mut arr) = arr {
-                    arr.insert(index as usize, value.clone());
-                    Ok(Object::Unit)
-                } else {
-                    Err(format!("Expected array, got {}", arr))
-                }
-            })?;
-            Ok(Object::Unit)
-        },
-    },
-    MethodInner {
-        name: "len",
-        args_len: 0..=0,
-        function: |obj, _, _, _, _| match obj {
-            Object::Array(ref arr) => Ok(Object::Integer(arr.len() as i64)),
-            _ => Err("Argument to `len` not supported".to_string()),
-        },
-    },
-    MethodInner {
-        name: "remove",
-        args_len: 1..=1,
-        function: |obj, ident, args, env, _| {
-            let index = match args[0] {
-                Object::Integer(i) => i,
-                _ => return Err("Expected integer for index".to_string()),
-            };
-
-            let ident = get_mutable_ident(ident)?;
-
-            match obj {
-                Object::Array(arr) => {
-                    if index < 0 || index as usize > arr.len() {
-                        return Err(format!(
-                            "Index {} out of bounds for array of length {}",
-                            index,
-                            arr.len()
-                        ));
-                    }
-                }
-                _ => return Err("Expected array".to_string()),
-            }
-
-            let item = env
-                .update(ident.to_string(), move |arr| {
-                    if let Object::Array(ref mut arr) = arr {
-                        Ok(arr.remove(index as usize))
-                    } else {
-                        Err(format!("Expected array, got {}", arr))
-                    }
-                })
-                .map_err(|e| e.to_string())?;
-            Ok(item)
-        },
-    },
-    MethodInner {
-        name: "contains",
-        args_len: 1..=1,
-        function: |obj, _, args, _, _| {
-            let value = args[0].clone();
-
-            match obj {
-                Object::Array(arr) => Ok(Object::Boolean(arr.contains(&value))),
-                _ => Err("Argument to `contains` not supported".to_string()),
-            }
-        },
-    },
+pub(crate) const ARRAY_METHODS: [MethodInner; 8] = [
+    ARRAY_CONTAINS,
+    ARRAY_REMOVE,
+    ARRAY_PUSH,
+    ARRAY_POP,
+    ARRAY_FIRST,
+    ARRAY_LAST,
+    ARRAY_INSERT,
+    ARRAY_LEN,
 ];
 
 #[cfg(test)]

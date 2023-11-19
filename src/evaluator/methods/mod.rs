@@ -10,7 +10,7 @@ pub mod numeric_methods;
 pub mod range_methods;
 pub mod string_methods;
 
-pub use self::{
+pub(crate) use self::{
     array_methods::ARRAY_METHODS,
     boolean_methods::BOOLEAN_METHODS,
     numeric_methods::FLOAT_METHODS,
@@ -122,6 +122,7 @@ impl ObjectMethods for Object {
             Object::Break(_) => None,
             Object::Continue => None,
             Object::Method(_) => None,
+            Object::Reference(_) => None,
         }
         // Generic methods
         .or_else(|| match method_name {
@@ -201,7 +202,7 @@ pub const ITERATOR_METHODS: [MethodInner; 10] =
                 if let Object::Iterator(mut iterator) = obj {
                     // mutate the object if it has an identifier
                     if let Some(ident) = ident {
-                        return env.update(ident, |iter| {
+                        return env.mutate(ident, |iter| {
                             Ok(if let Object::Iterator(iterator) = iter {
                                 iterator.iterator.next().unwrap_or(Object::Unit)
                             } else {

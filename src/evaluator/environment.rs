@@ -9,7 +9,7 @@ use super::objects::Object;
 
 #[derive(Debug, Default)]
 pub struct Environment {
-    inner: Rc<RwLock<InnerEnvironment>>,
+    pub inner: Rc<RwLock<InnerEnvironment>>,
 }
 
 impl Environment {
@@ -36,6 +36,26 @@ impl Environment {
         env.outer = Some(Rc::downgrade(&outer.inner));
     }
 
+    pub fn get_all_keys(&self) -> Vec<Rc<str>> {
+        let env = self.inner.read().unwrap();
+        let mut keys = env.store.keys().cloned().collect::<Vec<_>>();
+        dbg!(&env.outer);
+        if let Some(outer) = &env.outer {
+            keys.extend(Self::get_all_keys_from_outer(outer));
+        }
+        keys
+    }
+
+    fn get_all_keys_from_outer(outer: &Weak<RwLock<InnerEnvironment>>) -> Vec<Rc<str>> {
+        let outer_ref = outer.upgrade().unwrap();
+        let outer_env = outer_ref.read().unwrap();
+        let mut keys = outer_env.store.keys().cloned().collect::<Vec<_>>();
+        if let Some(outer) = &outer_env.outer {
+            keys.extend(Self::get_all_keys_from_outer(outer));
+        }
+        keys
+    }
+
     /// Recursively get a value from the environment
     ///
     /// Keeps trying to get the value from the outer environment until it succeeds or there are no more outer
@@ -57,7 +77,7 @@ impl Environment {
         env.store.insert(name, val);
     }
 
-    pub fn mutate(&mut self, name: impl Into<Rc<str>>, val: Object) -> Result<(), String> {
+    pub fn update(&mut self, name: impl Into<Rc<str>>, val: Object) -> Result<(), String> {
         let name = name.into();
         let mut env = self.inner.write().unwrap();
         match env.store.get_mut(&name) {
@@ -128,7 +148,7 @@ impl Environment {
     ///
     /// This function takes a name and a function that takes a mutable reference to an Object
     /// It then searches for the value in the environment and applies the function to it
-    pub fn update(
+    pub fn mutate(
         &mut self,
         name: impl Into<Rc<str>>,
         func: impl FnOnce(&mut Object) -> Result<Object, String>,
@@ -169,9 +189,9 @@ impl Environment {
 }
 
 #[derive(Default)]
-struct InnerEnvironment {
-    store: HashMap<Rc<str>, Object>,
-    outer: Option<Weak<RwLock<InnerEnvironment>>>,
+pub struct InnerEnvironment {
+    pub store: HashMap<Rc<str>, Object>,
+    pub outer: Option<Weak<RwLock<InnerEnvironment>>>,
 }
 
 impl Debug for InnerEnvironment {

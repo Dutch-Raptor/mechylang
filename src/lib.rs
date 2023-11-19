@@ -221,17 +221,30 @@
 //!
 //! ### Functions
 //!
-//! In `mechylang`, functions are variables that can be called. Making them first class citizens.
+//! In `mechylang`, functions are first class citizens. This means that they can be passed as arguments to other functions, and returned from other functions.
 //!
-//! Functions can be declared using the `fn` keyword.
+//! Functions can be declared in 2 ways:
+//! - As a function declaration using the `fn <name>(<args>) { <body> }` syntax
+//! - As an "anonymous" function bound to a variable with the `let <name> = fn(<args>) { <body> }` syntax
+//!
+//! A function declaration looks like this:
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! fn add(a, b) {
+//!     a + b
+//! }
+//!
+//! assert_eq(add(5, 10), 15);
+//! # "#);
+//! ```
+//!
+//! An anonymous function looks like this:
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
 //! let add = fn(a, b) {
 //!    a + b
-//!    // The last expression in a block is returned
-//!    // so there is no need to use the `return` keyword.
-//!    // Of course, you can still use it if you want to.
 //! }
 //!
 //! assert_eq(add(5, 10), 15);
@@ -248,7 +261,7 @@
 //!   a - b
 //! }
 //!
-//! assert_eq(add(5, -10), -5);
+//! assert_eq(add(5, 10), 15);
 //! # "#);
 //! ```
 //!
@@ -256,7 +269,7 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let apply = fn(f, a, b) {
+//! fn apply(f, a, b) {
 //!  f(a, b)
 //! }
 //!
@@ -265,7 +278,7 @@
 //! }
 //!
 //! assert_eq(apply(add, 5, 10), 15);
-//! // Anonymous functions are also supported!
+//! // You can also use an anonymous function without binding it to a variable
 //! assert_eq(apply(fn(a, b) { a - b }, 5, 10), -5);
 //! # "#);
 //! ```
@@ -274,8 +287,8 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let make_adder = fn(a) {
-//!     fn(b) {
+//! fn make_adder(a) {
+//!     return fn(b) {
 //!         a + b
 //!     }
 //! }
@@ -287,6 +300,35 @@
 //! assert_eq(remove_five(10), 5);
 //! # "#);
 //! ```
+//!
+//! # Function declarations are hoisted
+//!
+//! Functions declared with the `fn <name>(<args>) { <body> }` syntax are hoisted.
+//!
+//! This means that you can call a function before it is declared.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! assert_eq(add(5, 10), 15);
+//! fn add(a, b) {
+//!    a + b
+//! }
+//! # "#);
+//! ```
+//!
+//! Functions declared with the `let <name> = fn(<args>) { <body> }` syntax are not hoisted.
+//!
+//! ```should_panic
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! assert_eq(add(5, 10), 15); // Results in `Identifier not found: add`
+//! let add = fn(a, b) {
+//!   a + b
+//! }
+//! # "#);
+//! ```
+//!
+//!
+//!
 //!
 //! ### Built in functions:
 //!
@@ -419,7 +461,8 @@
 //! # "#);
 //! ```
 //!
-//! To learn more about array methods, check out the [array module](crate::evaluator::methods::ARRAY_METHODS).
+//! To learn more about array methods, check out the [array
+//! module](crate::evaluator::methods::array_methods)
 //!
 //!
 //! ### Strings
@@ -433,9 +476,17 @@
 //! let b = "👋🌎";
 //! let c = a + b;
 //! assert_eq(c, "Hello World!👋🌎");
-//! "#);
+//! # "#);
 //! ```
+//!
+//!
+//! ### Examples
+//!
+//! To see some examples, check out [examples]
+//!
+//! [examples]: crate::docs::examples
 
+pub mod docs;
 mod errors;
 pub mod evaluator;
 mod lexer;

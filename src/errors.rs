@@ -36,6 +36,8 @@ pub enum ErrorKind {
     MutateError,
     MethodError,
     PropertyNotFound,
+    InvalidDereference,
+    AnonFunction,
 }
 
 impl Display for Error {
@@ -53,6 +55,13 @@ impl Display for Error {
             None => "".to_owned(),
         };
 
+        let message_parts = self.message.split('\n').collect::<Vec<&str>>();
+        let first_line = message_parts[0];
+        let rest = match message_parts.len() {
+            1 => &[],
+            _ => &message_parts[1..],
+        };
+
         write!(
             f,
             "{}\n{}\n{}",
@@ -63,14 +72,12 @@ impl Display for Error {
                 context
             ),
             cformat!("{} | {}", pos, self.line),
-            cformat!(
-                "{:pos_len$} | {:caret_pos$}<r>{}</> {}",
-                "",
-                "",
-                "^",
-                self.message
-            ),
+            cformat!("{:pos_len$} | {:caret_pos$}<r>^</> {}", "", "", first_line),
         )?;
+
+        for line in rest {
+            write!(f, "\n{:pos_len$} | {:caret_pos$}  {}", "", "", line,)?;
+        }
 
         Ok(())
     }

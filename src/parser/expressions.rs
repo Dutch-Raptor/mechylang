@@ -86,7 +86,7 @@ impl PrecedenceTrait for TokenKind {
             TokenKind::BitwiseXor => Precedence::BitwiseXor,
 
             // *** Bitwise And ***
-            TokenKind::BitwiseAnd => Precedence::BitwiseAnd,
+            TokenKind::Ampersand => Precedence::BitwiseAnd,
 
             // *** Bit Shift ***
             TokenKind::BitwiseLeftShift | TokenKind::BitwiseRightShift => Precedence::BitShift,
@@ -319,6 +319,8 @@ pub enum PrefixOperator {
     Bang,
     Minus,
     BitwiseNot,
+    Ampersand,
+    Asterisk,
 }
 
 impl Display for PrefixOperator {
@@ -327,6 +329,8 @@ impl Display for PrefixOperator {
             PrefixOperator::Bang => write!(f, "!"),
             PrefixOperator::Minus => write!(f, "-"),
             PrefixOperator::BitwiseNot => write!(f, "~"),
+            PrefixOperator::Ampersand => write!(f, "&"),
+            PrefixOperator::Asterisk => write!(f, "*"),
         }
     }
 }
@@ -573,6 +577,7 @@ pub struct ForExpression {
     pub iterable: Rc<Expression>,
     pub body: BlockStatement,
     pub index: Option<Identifier>,
+    pub else_block: Option<BlockStatement>,
 }
 
 impl Display for ForExpression {
@@ -595,6 +600,7 @@ pub struct WhileExpression {
     pub token: Token,
     pub condition: Rc<Expression>,
     pub body: BlockStatement,
+    pub else_block: Option<BlockStatement>,
 }
 
 impl Display for WhileExpression {

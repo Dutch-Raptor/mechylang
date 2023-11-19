@@ -1,20 +1,26 @@
-use std::{rc::Rc, collections::HashMap, io::Write};
+use std::{collections::HashMap, io::Write, rc::Rc};
 
 use crate::{
     errors::{Error, ErrorKind},
+    evaluator::methods::ObjectMethods,
     lexer::{lexer::Lexer, tokens::Token},
     parser::{
         expressions::{
-            ArrayLiteral, CallExpression, Expression, ExpressionToken, Identifier, IfExpression,
-            IndexExpression, InfixExpression, InfixOperator, PrefixOperator, ForExpression, WhileExpression, MemberExpression,
+            ArrayLiteral, CallExpression, Expression, ExpressionToken, ForExpression, Identifier,
+            IfExpression, IndexExpression, InfixExpression, InfixOperator, MemberExpression,
+            PrefixExpression, PrefixOperator, WhileExpression,
         },
-        parser::{BlockStatement, LetStatement, Parser, Statement },
-    }, trace, evaluator::methods::ObjectMethods,
+        parser::{BlockStatement, LetStatement, Parser, Statement},
+    },
+    trace,
 };
 
 use super::{
+    builtins::BuiltinFunction,
     environment::Environment,
-    objects::{Function, Object, UnwrapReturnValue}, iterators::IteratorObject, methods::{Method, MethodError}, builtins::BuiltinFunction,
+    iterators::IteratorObject,
+    methods::{Method, MethodError},
+    objects::{Function, Object, Reference, UnwrapReturnValue},
 };
 
 pub type EvalResult = Result<Object, Rc<[Error]>>;
@@ -28,19 +34,19 @@ pub struct Evaluator {
 
 // We have to provide a special trait for our clonable iterator,
 // since Clone requires a Sized type (so we can't call it on a trait object).
-pub trait CloneWriter: Write {
-    fn clone_box(&self) -> Box<dyn CloneWriter>;
-}
-
-// Implement our special trait for all Cloneable Iterators
-impl<T> CloneWriter for T
-where
-    T: 'static + Write + Clone,
-{
-    fn clone_box(&self) -> Box<dyn CloneWriter> {
-        Box::new(self.clone())
-    }
-}
+// pub trait CloneWriter: Write {
+//     fn clone_box(&self) -> Box<dyn CloneWriter>;
+// }
+//
+// // Implement our special trait for all Cloneable Iterators
+// impl<T> CloneWriter for T
+// where
+//     T: 'static + Write + Clone,
+// {
+//     fn clone_box(&self) -> Box<dyn CloneWriter> {
+//         Box::new(self.clone())
+//     }
+// }
 
 pub struct EvalConfig {
     pub output_fn: Box<dyn Fn(String) + Send>,
@@ -90,13 +96,16 @@ impl EvalConfig {
 }
 
 impl Evaluator {
-    pub fn eval(input: impl Into<Rc<str>>, env: &mut Environment, config: EvalConfig) -> EvalResult {
+    pub fn eval(
+        input: impl Into<Rc<str>>,
+        env: &mut Environment,
+        config: EvalConfig,
+    ) -> EvalResult {
         let input: Rc<str> = input.into();
         let lexer = Lexer::new(input);
         let lines = lexer.lines();
         let mut parser = Parser::new(lexer);
         let program = parser.parse();
-
 
         if !program.errors.is_empty() {
             return Err(program.errors.into());
@@ -114,7 +123,7 @@ impl Evaluator {
             .map_err(|err| vec![err].into())
     }
 
-    pub(in super) fn print(&self, string: String) {
+    pub(super) fn print(&self, string: String) {
         (self.eval_config.output_fn)(string);
     }
 
@@ -126,6 +135,8 @@ impl Evaluator {
         let _trace = trace!("eval_program");
         let mut result = Object::Unit;
 
+        self.eval_initial_pass(&program, env)?;
+
         for statement in program.into_iter() {
             result = self.eval_statement(&statement, env)?;
 
@@ -135,6 +146,31 @@ impl Evaluator {
         }
 
         Ok(result)
+    }
+
+    /// Executes the initial pass of the program.
+    ///
+    /// This pass is used to declare functions before they are used.
+    /// This is necessary because Mechyl does not have hoisting.
+    fn eval_initial_pass(
+        &mut self,
+        program: &[Statement],
+        env: &mut Environment,
+    ) -> Result<(), Error> {
+        for statement in program.iter() {
+            match statement {
+                Statement::Function(function) => {
+                    let func = Function {
+                        params: function.parameters.clone(),
+                        body: function.body.clone(),
+                        env: env.clone(),
+                    };
+                    env.set(function.name.value.clone(), Object::Function(func));
+                }
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     fn eval_statement(
@@ -152,16 +188,18 @@ impl Evaluator {
                 };
                 Ok(Object::ReturnValue(Box::new(val)))
             }
-            Statement::Let(let_statement) => {
-                self.eval_let_statement(let_statement, env)
-            }
-            Statement::Break(break_statement) => {
-                match &break_statement.value {
-                    None => Ok(Object::Break(None)),
-                    Some(val) => Ok(Object::Break(Some(Box::new(self.eval_expression(val, env)?)))),
-                }
-            }
+            Statement::Let(let_statement) => self.eval_let_statement(let_statement, env),
+            Statement::Break(break_statement) => match &break_statement.value {
+                None => Ok(Object::Break(None)),
+                Some(val) => Ok(Object::Break(Some(Box::new(
+                    self.eval_expression(val, env)?,
+                )))),
+            },
             Statement::Continue(_) => Ok(Object::Continue),
+            Statement::Function(_) => {
+                // Ignore function declarations after initial pass
+                Ok(Object::Unit)
+            }
         }
     }
 
@@ -211,12 +249,20 @@ impl Evaluator {
                 match prefix.operator {
                     PrefixOperator::Bang => Ok(self.eval_bang_operator_expression(right)),
                     PrefixOperator::Minus => Ok(self.eval_minus_prefix_operator_expression(right)?),
-                    PrefixOperator::BitwiseNot => Ok(self.eval_bitwise_not_operator_expression(right)?),
+                    PrefixOperator::BitwiseNot => {
+                        Ok(self.eval_bitwise_not_operator_expression(right)?)
+                    }
+                    PrefixOperator::Ampersand => {
+                        Ok(self.eval_reference_operator_expression(prefix.right.clone(), env)?)
+                    }
+                    PrefixOperator::Asterisk => {
+                        Ok(self.eval_dereference_operator_expression(right)?)
+                    }
                 }
             }
             Expression::Infix(infix) => self.eval_infix_expression(infix, env),
             Expression::If(if_expr) => self.eval_if_expression(if_expr, env),
-            Expression::Block(block) => self.eval_block_statement(block, env),
+            Expression::Block(block) => self.eval_scoped_block_statement(block, env),
             Expression::Identifier(ident) => self.eval_identifier(ident, env),
             Expression::Function(func) => Ok(Object::Function(Function {
                 params: func.parameters.clone(),
@@ -250,12 +296,11 @@ impl Evaluator {
             | InfixOperator::AssignPlus
             | InfixOperator::AssignMinus
             | InfixOperator::AssignAsterisk
-            | InfixOperator::AssignSlash 
+            | InfixOperator::AssignSlash
             | InfixOperator::AssignPercent
             | InfixOperator::AssignBitwiseOr
             | InfixOperator::AssignBitwiseAnd
-            | InfixOperator::AssignBitwiseXor
-                => {
+            | InfixOperator::AssignBitwiseXor => {
                 return self.eval_assignment_expression(infix, env);
             }
 
@@ -266,13 +311,12 @@ impl Evaluator {
         let right = self.eval_expression(&infix.right, env)?;
 
         self.current_token = Some(infix.token.clone());
-        
+
         let err = self.error(
             self.current_token.as_ref(),
             format!("Type mismatch: {:?} {} {:?}", left, infix.operator, right).as_str(),
-            ErrorKind::TypeMismatch
+            ErrorKind::TypeMismatch,
         );
-
 
         match (&left, &right) {
             (Object::Unit, _) | (_, Object::Unit) => {
@@ -300,12 +344,50 @@ impl Evaluator {
         }
     }
 
+    fn eval_scoped_block_statement(
+        &mut self,
+        block: &BlockStatement,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
+        let mut result = Object::Unit;
+
+        // a block is a new scope, so create a new environment with the current environment as its parent
+        let env = &mut Environment::new_enclosed(env);
+
+        // evaluate the initial pass of the block
+        self.eval_initial_pass(&block.statements, env)?;
+
+        for statement in block.statements.iter() {
+            result = self.eval_statement(statement, env)?;
+
+            // if the result is a return value, bubble it up and stop evaluating the block
+            if let Object::ReturnValue(_) = result {
+                return Ok(result);
+            }
+
+            // if the result is a break, bubble it up and stop evaluating the block
+            if let Object::Break(_) = result {
+                return Ok(result);
+            }
+
+            // if the result is a continue, bubble it up and stop evaluating the block
+            if let Object::Continue = result {
+                return Ok(result);
+            }
+        }
+
+        Ok(result)
+    }
+
     fn eval_block_statement(
         &mut self,
         block: &BlockStatement,
         env: &mut Environment,
     ) -> Result<Object, Error> {
         let mut result = Object::Unit;
+
+        // evaluate the initial pass of the block
+        self.eval_initial_pass(&block.statements, env)?;
 
         for statement in block.statements.iter() {
             result = self.eval_statement(statement, env)?;
@@ -391,7 +473,7 @@ impl Evaluator {
             | InfixOperator::BitwiseOr
             | InfixOperator::BitwiseXor
             | InfixOperator::BitwiseLeftShift
-            | InfixOperator::BitwiseRightShift 
+            | InfixOperator::BitwiseRightShift
             | InfixOperator::AssignEqual
             | InfixOperator::AssignPlus
             | InfixOperator::AssignMinus
@@ -400,10 +482,7 @@ impl Evaluator {
             | InfixOperator::AssignPercent
             | InfixOperator::AssignBitwiseOr
             | InfixOperator::AssignBitwiseAnd
-            | InfixOperator::AssignBitwiseXor
-
-
-                => Err(invalid()),
+            | InfixOperator::AssignBitwiseXor => Err(invalid()),
         }
     }
 
@@ -445,8 +524,8 @@ impl Evaluator {
             InfixOperator::BitwiseRightShift => Ok((left >> right).into()),
 
             // Explicitly not supported. This ensures that we always handle all possible operators
-            InfixOperator::LogicalAnd 
-            | InfixOperator::LogicalOr 
+            InfixOperator::LogicalAnd
+            | InfixOperator::LogicalOr
             | InfixOperator::AssignEqual
             | InfixOperator::AssignPlus
             | InfixOperator::AssignMinus
@@ -455,13 +534,16 @@ impl Evaluator {
             | InfixOperator::AssignPercent
             | InfixOperator::AssignBitwiseOr
             | InfixOperator::AssignBitwiseAnd
-            | InfixOperator::AssignBitwiseXor
-
-                => Err(invalid()),
+            | InfixOperator::AssignBitwiseXor => Err(invalid()),
         }
     }
 
-    fn eval_float_infix_expression(&self, operator: &InfixOperator, left: f64, right: f64) -> Result<Object, Error> {
+    fn eval_float_infix_expression(
+        &self,
+        operator: &InfixOperator,
+        left: f64,
+        right: f64,
+    ) -> Result<Object, Error> {
         let invalid = || {
             self.error(
                 self.current_token.as_ref(),
@@ -503,9 +585,7 @@ impl Evaluator {
             | InfixOperator::AssignPercent
             | InfixOperator::AssignBitwiseOr
             | InfixOperator::AssignBitwiseAnd
-            | InfixOperator::AssignBitwiseXor
-
-                => Err(invalid()),
+            | InfixOperator::AssignBitwiseXor => Err(invalid()),
         }
     }
 
@@ -532,7 +612,8 @@ impl Evaluator {
     }
 
     fn error(&self, token: Option<&Token>, message: &str, error_kind: ErrorKind) -> Error {
-        let _trace = trace!(&format!("error({:?}, {}, {:?})", token, message, error_kind).to_string());
+        let _trace =
+            trace!(&format!("error({:?}, {}, {:?})", token, message, error_kind).to_string());
         let (line_nr, line, column) = if let Some(token) = token {
             (
                 token.position.line,
@@ -607,21 +688,23 @@ impl Evaluator {
 
         let arguments = self.eval_expressions(&call.arguments, env)?;
 
-        self.apply_function(function, arguments, None).map_err(|err| {
-            // only apply current token if there is no token set
-            if err.line != "" && err.line_nr != 0 && err.column != 0 {
-                return err;
-            }
-             
-            return self.error(
-                Some(call.function.token()),
-                err.message.as_str(),
-                err.kind,
-            )
-        })
+        self.apply_function(function, arguments, None)
+            .map_err(|err| {
+                // only apply current token if there is no token set
+                if err.line != "" && err.line_nr != 0 && err.column != 0 {
+                    return err;
+                }
+
+                return self.error(Some(call.function.token()), err.message.as_str(), err.kind);
+            })
     }
 
-    pub fn eval_function(function: Object, arguments: Vec<Object>, env: Option<Environment>, config: Rc<EvalConfig>) -> Result<Object, String> {
+    pub fn eval_function(
+        function: Object,
+        arguments: Vec<Object>,
+        env: Option<Environment>,
+        config: Rc<EvalConfig>,
+    ) -> Result<Object, String> {
         let mut evaluator = Evaluator {
             globals: HashMap::new(),
             current_token: None,
@@ -655,14 +738,14 @@ impl Evaluator {
 
         let mut extended_env = self.extend_function_env(&function, arguments)?;
 
-        // if any external environment was passed, extend the function environment with it
-        // this is used to pass mutable variables to functions in method calls
-        if let Some(mut env) = extra_env {
-            let new_outer = Environment::new_enclosed(&extended_env);
-            env.set_outer(&new_outer);
-            extended_env = env;
-        }
-
+        // TODO: figure out if this is actually needed
+        // // if any external environment was passed, extend the function environment with it
+        // // this is used to pass mutable variables to functions in method calls
+        // if let Some(mut env) = extra_env {
+        //     let new_outer = Environment::new_enclosed(&extended_env);
+        //     env.set_outer(&new_outer);
+        //     extended_env = env;
+        // }
 
         let evaluated = self.eval_block_statement(&function.body, &mut extended_env)?;
 
@@ -674,7 +757,10 @@ impl Evaluator {
         function: &Function,
         arguments: Vec<Object>,
     ) -> Result<Environment, Error> {
-        let _trace = trace!(&format!("extend_function_env({}, {:?})", function, arguments));
+        let _trace = trace!(&format!(
+            "extend_function_env({}, {:?})",
+            function, arguments
+        ));
         let mut env = Environment::new_enclosed(&function.env);
 
         if function.params.len() != arguments.len() {
@@ -719,7 +805,10 @@ impl Evaluator {
         left: Rc<str>,
         right: Rc<str>,
     ) -> Result<Object, Error> {
-        let _trace = trace!(&format!("eval_string_infix_expression({:?}, {}, {})", operator, left, right));
+        let _trace = trace!(&format!(
+            "eval_string_infix_expression({:?}, {}, {})",
+            operator, left, right
+        ));
         match operator {
             InfixOperator::Plus => Ok((left.to_string() + &right).into()),
             InfixOperator::CompareEqual => Ok((left == right).into()),
@@ -740,7 +829,7 @@ impl Evaluator {
             | InfixOperator::BitwiseAnd
             | InfixOperator::BitwiseXor
             | InfixOperator::BitwiseLeftShift
-            | InfixOperator::BitwiseRightShift 
+            | InfixOperator::BitwiseRightShift
             | InfixOperator::AssignEqual
             | InfixOperator::AssignPlus
             | InfixOperator::AssignMinus
@@ -749,9 +838,7 @@ impl Evaluator {
             | InfixOperator::AssignPercent
             | InfixOperator::AssignBitwiseOr
             | InfixOperator::AssignBitwiseAnd
-            | InfixOperator::AssignBitwiseXor
-
-                => Err(self.error(
+            | InfixOperator::AssignBitwiseXor => Err(self.error(
                 self.current_token.as_ref(),
                 format!(
                     "Invalid operator: String({:?}) {} String({:?})",
@@ -774,16 +861,19 @@ impl Evaluator {
             function.name, arguments
         ));
 
-        if !function.args_len.contains(&arguments.len()){
+        if !function.args_len.contains(&arguments.len()) {
             return Err(self.error(
                 self.current_token.as_ref(),
                 format!(
                     "Wrong number of arguments. Expected {}, got {}",
                     match function.args_len.start() - function.args_len.end() {
                         0 => format!("{} argument(s)", function.args_len.start()),
-                        _ => format!("{} to {} arguments", function.args_len.start(), function.args_len.end())
+                        _ => format!(
+                            "{} to {} arguments",
+                            function.args_len.start(),
+                            function.args_len.end()
+                        ),
                     },
-                
                     arguments.len()
                 )
                 .as_str(),
@@ -837,23 +927,37 @@ impl Evaluator {
                 Some(item) => Ok(item.clone()),
                 None => Err(self.error(
                     Some(index.index.token()),
-                    &format!("Index out of bounds: {}, {} has len({})", i, left, array.len()).to_string(),
+                    &format!(
+                        "Index out of bounds: {}, {} has len({})",
+                        i,
+                        left,
+                        array.len()
+                    )
+                    .to_string(),
                     ErrorKind::IndexOutOfBounds,
                 )),
             },
             _ => {
                 return Err(self.error(
                     Some(index.index.token()),
-                    &format!("Index operator not supported for {:?}[{:?}]", left, evaluated_index).to_string(),
+                    &format!(
+                        "Index operator not supported for {:?}[{:?}]",
+                        left, evaluated_index
+                    )
+                    .to_string(),
                     ErrorKind::IndexOperatorNotSupported,
                 ))
             }
         }
     }
 
-    fn eval_assignment_expression(&mut self, infix: &InfixExpression, env: &mut Environment) -> Result<Object, Error> {
+    fn eval_assignment_expression(
+        &mut self,
+        infix: &InfixExpression,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_assignment_expression: {}", infix));
-        
+
         // set current token to the identifier token
         self.current_token = Some(infix.left.token().clone());
 
@@ -861,80 +965,124 @@ impl Evaluator {
             if infix.operator == InfixOperator::AssignEqual {
                 self.eval_expression(&infix.right, env)?
             } else {
-            self.eval_infix_expression(&InfixExpression {
-                left: infix.left.clone(),
-                operator: match infix.operator {
-                    InfixOperator::AssignPlus => InfixOperator::Plus,
-                    InfixOperator::AssignMinus => InfixOperator::Minus,
-                    InfixOperator::AssignAsterisk => InfixOperator::Asterisk,
-                    InfixOperator::AssignSlash => InfixOperator::Slash,
-                    InfixOperator::AssignPercent => InfixOperator::Percent,
-                    InfixOperator::AssignBitwiseOr => InfixOperator::BitwiseOr,
-                    InfixOperator::AssignBitwiseAnd => InfixOperator::BitwiseAnd,
-                    InfixOperator::AssignBitwiseXor => InfixOperator::BitwiseXor,
+                self.eval_infix_expression(
+                    &InfixExpression {
+                        left: infix.left.clone(),
+                        operator: match infix.operator {
+                            InfixOperator::AssignPlus => InfixOperator::Plus,
+                            InfixOperator::AssignMinus => InfixOperator::Minus,
+                            InfixOperator::AssignAsterisk => InfixOperator::Asterisk,
+                            InfixOperator::AssignSlash => InfixOperator::Slash,
+                            InfixOperator::AssignPercent => InfixOperator::Percent,
+                            InfixOperator::AssignBitwiseOr => InfixOperator::BitwiseOr,
+                            InfixOperator::AssignBitwiseAnd => InfixOperator::BitwiseAnd,
+                            InfixOperator::AssignBitwiseXor => InfixOperator::BitwiseXor,
 
-                    _ => {
-                        return Err(self.error(
-                            Some(&infix.token),
-                            &format!("Invalid operator: {:?}", infix.operator).to_string(),
-                            ErrorKind::InvalidOperator,
-                        ))
-                    }
-                },
-                right: infix.right.clone(),
-                token: infix.token.clone(),
-            }, env)?
+                            _ => {
+                                return Err(self.error(
+                                    Some(&infix.token),
+                                    &format!("Invalid operator: {:?}", infix.operator).to_string(),
+                                    ErrorKind::InvalidOperator,
+                                ))
+                            }
+                        },
+                        right: infix.right.clone(),
+                        token: infix.token.clone(),
+                    },
+                    env,
+                )?
             }
         };
 
         match infix.left.as_ref() {
             Expression::Identifier(ident) => {
-                env.mutate(ident.value.clone(), new_value).map_err(|err| {
+                env.update(ident.value.clone(), new_value).map_err(|err| {
                     self.error(
                         Some(&infix.token),
                         &format!("Error mutating variable: {}", err).to_string(),
                         ErrorKind::MutateError,
                     )
                 })?;
-            },
-            Expression::Index(index) => {
-                let ident = match index.left.as_ref() {
-                    Expression::Identifier(ident) => ident.value.clone(),
+            }
+            Expression::Index(index_expr) => {
+                let index = self.eval_expression(&index_expr.index, env)?;
+
+                let mutate_fn = |ident: String| {
+                    move |obj: &mut Object| {
+                        let array = match obj {
+                            Object::Array(arr) => arr,
+                            _ => {
+                                return Err(format!("Cannot index non-array: {:?}", obj).to_string())
+                            }
+                        };
+
+                        let index = match index {
+                            Object::Integer(i) => i as usize,
+                            _ => {
+                                return Err(
+                                    format!("Cannot index array with {:?}", index).to_string()
+                                )
+                            }
+                        };
+
+                        array
+                            .get_mut(index)
+                            .map(|item| {
+                                *item = new_value.clone();
+                                Ok(Object::Unit)
+                            })
+                            .unwrap_or_else(|| {
+                                Err(format!(
+                                    "Index out of bounds: {}, {} has len({})",
+                                    index,
+                                    ident,
+                                    array.len()
+                                )
+                                .to_string()
+                                .into())
+                            })
+                    }
+                };
+
+                match index_expr.left.as_ref() {
+                    Expression::Identifier(ident) => {
+                        env.mutate(ident.clone(), mutate_fn(ident.value.to_string()))
+                    }
                     _ => {
                         return Err(self.error(
                             Some(&infix.token),
-                            &format!("Cannot assign to index of non-identifier: {:?}", infix.left).to_string(),
-                            ErrorKind::InvalidLeftHandSide,
+                            &format!("Cannot index non-identifier: {:?}", index_expr.left)
+                                .to_string(),
+                            ErrorKind::MutateError,
+                        ))
+                    }
+                }
+                .map_err(|err| {
+                    self.error(
+                        Some(&infix.token),
+                        &format!("Error mutating variable: {}", err).to_string(),
+                        ErrorKind::MutateError,
+                    )
+                })?;
+            }
+
+            Expression::Prefix(PrefixExpression {
+                token,
+                operator: PrefixOperator::Asterisk,
+                right,
+            }) => {
+                let mut reference = match self.eval_expression(right, env)? {
+                    Object::Reference(reference) => reference,
+                    _ => {
+                        return Err(self.error(
+                            Some(token),
+                            &format!("Cannot dereference non-reference: {:?}", right).to_string(),
+                            ErrorKind::InvalidDereference,
                         ))
                     }
                 };
 
-                let index = self.eval_expression(&index.index, env)?;
-                env.update(ident.clone(), |obj| {
-                    match obj {
-                        Object::Array(arr) => {
-                            let index = match index {
-                                Object::Integer(i) => i as usize,
-                                _ => {
-                                    return Err(
-                                        format!("Cannot index array with {:?}", index).to_string().into()
-                                    )
-                                }
-                            };
-
-                            if index >= arr.len() {
-                                return Err(
-                                    format!("Index out of bounds: {}, {} has len({})", index, ident, arr.len()).to_string().into())
-                            }
-
-                            arr[index] = new_value;
-                            Ok(Object::Unit)
-                        },
-                        _ => {
-                            Err(format!("Cannot index non-array: {:?}", obj).to_string().into())
-                        }
-                    }
-                }).map_err(|err| {
+                reference.update(new_value).map_err(|err| {
                     self.error(
                         Some(&infix.token),
                         &format!("Error mutating variable: {}", err).to_string(),
@@ -946,11 +1094,14 @@ impl Evaluator {
             _ => {}
         }
 
-
         Ok(Object::Unit)
     }
 
-    fn eval_for_expression(&mut self, for_expr: &ForExpression, env: &mut Environment) -> Result<Object, Error> {
+    fn eval_for_expression(
+        &mut self,
+        for_expr: &ForExpression,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_for_expression: {}", for_expr));
 
         let mut result = Object::Unit;
@@ -989,18 +1140,32 @@ impl Evaluator {
             }
         }
 
+        if let Some(ref else_block) = for_expr.else_block {
+            result = self.eval_block_statement(else_block, env)?;
+        }
+
         Ok(result)
     }
 
-    fn eval_range_expression(&mut self, expression: &Expression, env: &mut Environment) -> Result<Object, Error> {
+    fn eval_range_expression(
+        &mut self,
+        expression: &Expression,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_range_expression: {}", expression));
 
         Ok(match expression {
             Expression::Range(range) => {
                 if range.inclusive {
-                    Object::RangeInclusive(self.eval_expression(&range.left, env)?.into(), self.eval_expression(&range.right, env)?.into())
+                    Object::RangeInclusive(
+                        self.eval_expression(&range.left, env)?.into(),
+                        self.eval_expression(&range.right, env)?.into(),
+                    )
                 } else {
-                    Object::Range(self.eval_expression(&range.left, env)?.into(), self.eval_expression(&range.right, env)?.into())
+                    Object::Range(
+                        self.eval_expression(&range.left, env)?.into(),
+                        self.eval_expression(&range.right, env)?.into(),
+                    )
                 }
             }
             Expression::RangeTo(range) => {
@@ -1010,17 +1175,25 @@ impl Evaluator {
                     Object::RangeTo(self.eval_expression(&range.right, env)?.into())
                 }
             }
-            Expression::RangeFrom(range) => Object::RangeFrom(self.eval_expression(&range.left, env)?.into()),
+            Expression::RangeFrom(range) => {
+                Object::RangeFrom(self.eval_expression(&range.left, env)?.into())
+            }
             Expression::RangeFull(_) => Object::RangeFull,
-            _ => {return Err(self.error(
-                Some(&expression.token()),
-                &format!("Invalid range expression: {:?}", expression).to_string(),
-                ErrorKind::UnexpectedToken,
-            ));}
+            _ => {
+                return Err(self.error(
+                    Some(&expression.token()),
+                    &format!("Invalid range expression: {:?}", expression).to_string(),
+                    ErrorKind::UnexpectedToken,
+                ));
+            }
         })
     }
 
-    fn eval_while_expression(&mut self, while_expr: &WhileExpression, env: &mut Environment) -> Result<Object, Error> {
+    fn eval_while_expression(
+        &mut self,
+        while_expr: &WhileExpression,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_while_expression: {}", while_expr));
 
         let mut result = Object::Unit;
@@ -1039,12 +1212,20 @@ impl Evaluator {
             }
         }
 
+        if let Some(ref else_block) = while_expr.else_block {
+            result = self.eval_block_statement(else_block, env)?;
+        }
+
         Ok(result)
     }
 
-    fn eval_member_expression(&mut self, member: &MemberExpression, env: &mut Environment) -> Result<Object, Error> {
+    fn eval_member_expression(
+        &mut self,
+        member: &MemberExpression,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_member_expression: {}", member));
-        
+
         let object = self.eval_expression(&member.object, env)?;
 
         let property = member.property.value.clone();
@@ -1057,24 +1238,29 @@ impl Evaluator {
         match object.get_method(&property, ident) {
             Ok(method) => return Ok(Object::Method(method)),
             Err(MethodError::NotFound) => {}
-            Err(err @ MethodError::IterMethodOnIterable(_)) =>
-                return Err(self.error(
-                    Some(&member.token),
-                    &err.to_string(),
-                    ErrorKind::TypeError,
-                )),
+            Err(err @ MethodError::IterMethodOnIterable(_)) => {
+                return Err(self.error(Some(&member.token), &err.to_string(), ErrorKind::TypeError))
+            }
         };
-
 
         // try to read property from object
         Err(self.error(
             Some(&member.token),
-            &format!("Property or method '{}' not found on object: {:?}", property, object).to_string(),
+            &format!(
+                "Property or method '{}' not found on object: {:?}",
+                property, object
+            )
+            .to_string(),
             ErrorKind::PropertyNotFound,
         ))
     }
 
-    fn apply_method(&mut self, method: Method, arguments: &[Expression], env: &mut Environment) -> Result<Object, Error> {
+    fn apply_method(
+        &mut self,
+        method: Method,
+        arguments: &[Expression],
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
         if !method.args_len.contains(&arguments.len()) {
             return Err(self.error(
                 self.current_token.as_ref(),
@@ -1082,7 +1268,11 @@ impl Evaluator {
                     "Wrong number of arguments: expected {}, got {}",
                     match method.args_len.start() - method.args_len.end() {
                         0 => format!("{} argument(s)", method.args_len.start()),
-                        _ => format!("{} to {} arguments", method.args_len.start(), method.args_len.end())
+                        _ => format!(
+                            "{} to {} arguments",
+                            method.args_len.start(),
+                            method.args_len.end()
+                        ),
                     },
                     arguments.len()
                 ),
@@ -1092,7 +1282,20 @@ impl Evaluator {
 
         let args = self.eval_expressions(arguments, env)?;
 
-        (method.function)(*method.obj, method.ident.as_deref(), args, env, self.eval_config.clone()).map_err(|err| self.error(self.current_token.as_ref(), &format!("Error evaluating method: {}", err), ErrorKind::MethodError))
+        (method.function)(
+            *method.obj,
+            method.ident.as_deref(),
+            args,
+            env,
+            self.eval_config.clone(),
+        )
+        .map_err(|err| {
+            self.error(
+                self.current_token.as_ref(),
+                &format!("Error evaluating method: {}", err),
+                ErrorKind::MethodError,
+            )
+        })
     }
 
     fn eval_bitwise_not_operator_expression(&self, right: Object) -> Result<Object, Error> {
@@ -1106,12 +1309,52 @@ impl Evaluator {
         }
     }
 
-    fn eval_unit_infix_expression(&self, operator: &InfixOperator, left: &Object, right: &Object) -> Result<Object, Error> {
+    fn eval_unit_infix_expression(
+        &self,
+        operator: &InfixOperator,
+        left: &Object,
+        right: &Object,
+    ) -> Result<Object, Error> {
         match operator {
+            InfixOperator::CompareNotEqual => Ok(Object::Boolean(left != right)),
             InfixOperator::CompareEqual => Ok(Object::Boolean(left == right)),
             _ => Err(self.error(
                 self.current_token.as_ref(),
                 &format!("Invalid operator: {:?} {:?} {:?}", left, operator, right).to_string(),
+                ErrorKind::InvalidOperator,
+            )),
+        }
+    }
+
+    fn eval_reference_operator_expression(
+        &self,
+        right: Rc<Expression>,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
+        let _trace = trace!(&format!("eval_reference_operator_expression: {}", right));
+
+        match right.as_ref() {
+            Expression::Identifier(ident) => Ok(Object::Reference(Reference {
+                identifier: ident.value.clone(),
+                env: env.clone(),
+            })),
+            _ => Err(self.error(
+                self.current_token.as_ref(),
+                &format!("Reference operator expects identifier, got {:?}", right).to_string(),
+                ErrorKind::InvalidOperator,
+            )),
+        }
+    }
+
+    fn eval_dereference_operator_expression(&self, right: Object) -> Result<Object, Error> {
+        match right {
+            Object::Reference(reference) => Ok(reference
+                .env
+                .get(reference.identifier)
+                .unwrap_or(Object::Unit)),
+            _ => Err(self.error(
+                self.current_token.as_ref(),
+                &format!("Dereference operator expects reference, got {:?}", right).to_string(),
                 ErrorKind::InvalidOperator,
             )),
         }
@@ -1124,16 +1367,13 @@ mod tests {
     use crate::{
         errors::ErrorKind,
         evaluator::{builtins::BuiltinError, environment::Environment, objects::Object},
+        test_utils::test_eval_ok,
     };
 
     use super::{EvalResult, Evaluator};
 
     fn test_eval(input: &str) -> Object {
-        let mut env = Environment::new();
-
-        let result = Evaluator::eval(input, &mut env, Default::default());
-
-        match result {
+        match Evaluator::eval(input, &mut Default::default(), Default::default()) {
             Ok(object) => object,
             Err(errors) => {
                 for error in errors.iter() {
@@ -1146,9 +1386,7 @@ mod tests {
     }
 
     fn test_eval_fallible(input: &str) -> EvalResult {
-        let mut env = Environment::new();
-
-        Evaluator::eval(input, &mut env, Default::default())
+        Evaluator::eval(input, &mut Default::default(), Default::default())
     }
 
     #[test]
@@ -1239,19 +1477,12 @@ mod tests {
 
     #[test]
     fn test_eval_float_expression() {
-        let tests = vec![
-            ("3.0", 3.0),
-            ("3.0 + 1.5", 4.5),
-            ("-29.6", -29.6),
-
-        ];
+        let tests = vec![("3.0", 3.0), ("3.0 + 1.5", 4.5), ("-29.6", -29.6)];
 
         for (input, evaluated) in tests {
             test_float_object(test_eval(input), evaluated);
         }
     }
-        
-        
 
     #[test]
     fn test_bang_operator() {
@@ -1293,8 +1524,6 @@ mod tests {
             test_integer_object(evaluated, expected);
         }
     }
-
-
 
     #[test]
     fn test_if_else_expressions() {
@@ -1490,9 +1719,13 @@ mod tests {
                 "[1, 2, 3][-1]",
                 1,
             ),
-        
-        
-        
+            (
+                "fn(x) { x + 1; }(1, 2)",
+                "Wrong number of arguments: expected 1, got 2",
+                ErrorKind::WrongNumberOfArguments,
+                "fn(x) { x + 1; }(1, 2)",
+                1,
+            ),
         ];
 
         for (input, message, error_kind, line_with_err, line_nr) in tests {
@@ -1502,7 +1735,6 @@ mod tests {
                     for error in errors.iter() {
                         println!("{}", error);
                     }
-                    assert_eq!(errors.len(), 1);
                     let error = errors.first().unwrap();
                     assert_eq!(error.message, message);
                     assert_eq!(error.kind, error_kind);
@@ -1534,7 +1766,7 @@ mod tests {
 
     #[test]
     fn test_function_object() {
-        let input = "fn(x) { x + 2; };";
+        let input = "(fn(x) { x + 2; });";
         let evaluated = test_eval(input);
         match evaluated {
             Object::Function(function) => {
@@ -1547,7 +1779,15 @@ mod tests {
                     .collect();
 
                 assert_eq!(params, vec!["x".to_string()]);
-                assert_eq!(function.body.to_string().split_whitespace().collect::<Vec<&str>>().join(" "), "{ (x + 2); }".to_string());
+                assert_eq!(
+                    function
+                        .body
+                        .to_string()
+                        .split_whitespace()
+                        .collect::<Vec<&str>>()
+                        .join(" "),
+                    "{ (x + 2); }".to_string()
+                );
             }
             _ => panic!("Object is not a function. Got: {:?}", evaluated),
         }
@@ -1576,7 +1816,7 @@ mod tests {
                 "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
                 Object::Integer(20),
             ),
-            ("fn(x) { x; }(5)", Object::Integer(5)),
+            ("(fn(x) { x; })(5)", Object::Integer(5)),
             ("let x = 5;
             let factorial = fn(n) { if (n == 0) { return 1; } return n * factorial(n - 1); }; factorial(5);", Object::Integer(120)),
 
@@ -1710,17 +1950,22 @@ mod tests {
     fn test_mutable_values() {
         let tests = vec![
             ("let one = 1; one = 2; one;", Object::Integer(2)),
-            ("let one = 1; one = 2; let two = one; two;", Object::Integer(2)),
+            (
+                "let one = 1; one = 2; let two = one; two;",
+                Object::Integer(2),
+            ),
             (
                 "let one = 1; one = 2; let two = one; let three = one + two + 5; three;",
                 Object::Integer(9),
             ),
-
-            (r#"
+            (
+                r#"
             let one = 1;
             one += 2;
             one;
-            "#, Object::Integer(3)),
+            "#,
+                Object::Integer(3),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -1731,10 +1976,10 @@ mod tests {
 
     #[test]
     fn test_eval_range_expressions() {
-        let tests = vec![
-            ("1..5", Object::Range(Object::Integer(1).into(), Object::Integer(5).into())
-            ),
-        ];
+        let tests = vec![(
+            "1..5",
+            Object::Range(Object::Integer(1).into(), Object::Integer(5).into()),
+        )];
 
         for (input, expected) in tests {
             let evaluated = test_eval(input);
@@ -1745,25 +1990,32 @@ mod tests {
     #[test]
     fn test_eval_for_expressions() {
         let tests = vec![
-            (r#"let sum = 0;
+            (
+                r#"let sum = 0;
             for i in [1, 2, 3, 4, 5] {
                 sum += i;
             }
-            sum;"#, Object::Integer(15)),
-
-            (r#"let sum = 0;
+            sum;"#,
+                Object::Integer(15),
+            ),
+            (
+                r#"let sum = 0;
             for i in 1..5 {
                 sum += i;
             }
-            sum;"#, Object::Integer(10)),
-
-            (r#"let product = 1;
+            sum;"#,
+                Object::Integer(10),
+            ),
+            (
+                r#"let product = 1;
             for i in 1..5 {
                 product *= i;
             }
-            product;"#, Object::Integer(24)),
-
-            (r#"let fib = fn(n) {
+            product;"#,
+                Object::Integer(24),
+            ),
+            (
+                r#"let fib = fn(n) {
                 if (n == 0) {
                     return 0;
                 }
@@ -1781,7 +2033,9 @@ mod tests {
 
                 return b;
             };
-            fib(10);"#, Object::Integer(55)),
+            fib(10);"#,
+                Object::Integer(55),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -1829,22 +2083,27 @@ mod tests {
     #[test]
     fn test_eval_while_expression() {
         let tests = vec![
-            ("let sum = 0;
+            (
+                "let sum = 0;
             let i = 0;
             while i < 5 {
                 sum += i;
                 i += 1;
             }
-            sum;", Object::Integer(10)),
-
-            ("let n = 10;
+            sum;",
+                Object::Integer(10),
+            ),
+            (
+                "let n = 10;
             let answer = while true {
                 if n == 0 {
                     break 42;
                 }
                 n -= 1;
             };
-            answer;", Object::Integer(42)),
+            answer;",
+                Object::Integer(42),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -1855,33 +2114,39 @@ mod tests {
 
     #[test]
     fn test_eval_break_continue() {
-        let tests = 
-            vec![
-                ("let sum = 0;
+        let tests = vec![
+            (
+                "let sum = 0;
                 for i in 1..5 {
                     if (i == 3) {
                         break;
                     }
                     sum += i;
                 }
-                sum;", Object::Integer(3)),
-
-                ("let sum = 0;
+                sum;",
+                Object::Integer(3),
+            ),
+            (
+                "let sum = 0;
                 for i in 1..5 {
                     if (i == 3) {
                         continue;
                     }
                     sum += i;
                 }
-                sum;", Object::Integer(7)),
-
-                ("let sum = for i in 1..5 {
+                sum;",
+                Object::Integer(7),
+            ),
+            (
+                "let sum = for i in 1..5 {
                     if (i == 3) {
                         break 17;
                     }
                 }
-                sum;", Object::Integer(17)),
-            ];
+                sum;",
+                Object::Integer(17),
+            ),
+        ];
 
         for (input, expected) in tests {
             let evaluated = test_eval(input);
@@ -1892,7 +2157,8 @@ mod tests {
     #[test]
     fn test_eval_basic_program() {
         let tests = vec![
-            (r#"
+            (
+                r#"
                 let fib = fn(n) {
                   if n == 0 {
                     return 0;
@@ -1906,8 +2172,11 @@ mod tests {
                 };
 
                 fib(10);
-            "#, Object::Integer(55)),
-                (r#"
+            "#,
+                Object::Integer(55),
+            ),
+            (
+                r#"
                 // Iterative Fibonacci
                 let fib = fn(n) {
                   let a = 0;
@@ -1922,8 +2191,9 @@ mod tests {
                 };
 
                 fib(10);
-                "#, 
-            Object::Integer(55)),
+                "#,
+                Object::Integer(55),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -1932,28 +2202,26 @@ mod tests {
         }
     }
 
-
     #[test]
     fn test_method_call_expression() {
         let tests = vec![
-            (r#"let a = [1, 2, 3]; a.push(4); a;"#, Object::Array(vec![
-                Object::Integer(1),
-                Object::Integer(2),
-                Object::Integer(3),
-                Object::Integer(4),
-            ])),
-
-            (r#"let a = [1, 2, 3]; let b = a.pop(); [b, a];"#,  
-            Object::Array(vec![
-                Object::Integer(3),
+            (
+                r#"let a = [1, 2, 3]; a.push(4); a;"#,
                 Object::Array(vec![
                     Object::Integer(1),
                     Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
                 ]),
-            ])),
-
-            (r#"let a = [1, 2, 3]; a.len()"#,
-            Object::Integer(3)),
+            ),
+            (
+                r#"let a = [1, 2, 3]; let b = a.pop(); [b, a];"#,
+                Object::Array(vec![
+                    Object::Integer(3),
+                    Object::Array(vec![Object::Integer(1), Object::Integer(2)]),
+                ]),
+            ),
+            (r#"let a = [1, 2, 3]; a.len()"#, Object::Integer(3)),
         ];
 
         for (input, expected) in tests {
@@ -1975,9 +2243,7 @@ mod tests {
             ),
             (
                 r#"let a = [1, 2, 3]; a.iter().filter(fn(x) { x % 2 == 0 }).collect()"#,
-                Object::Array(vec![
-                    Object::Integer(2),
-                ]),
+                Object::Array(vec![Object::Integer(2)]),
             ),
             (
                 r#"
@@ -1993,7 +2259,6 @@ mod tests {
                     Object::Integer(54),
                 ]),
             ),
-
             // sum of first 6 multiples of 9
             (
                 r#"
@@ -2002,7 +2267,6 @@ mod tests {
                 "#,
                 Object::Integer(189),
             ),
-
             (
                 r#"
                 let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).fold("", fn(acc, x) { acc + x.to_string() });
@@ -2010,7 +2274,6 @@ mod tests {
                 "#,
                 Object::String("91827364554".into()),
             ),
-
             (
                 r#"
                 let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).step_by(2).skip(2).take(4).collect();
@@ -2023,7 +2286,6 @@ mod tests {
                     Object::Integer(99),
                 ]),
             ),
-
             (
                 r#"
                 let a = (1..).iter();
@@ -2035,7 +2297,6 @@ mod tests {
                 "#,
                 Object::Integer(5),
             ),
-
             (
                 r#"
                 let iter = (1..).iter();
@@ -2045,7 +2306,6 @@ mod tests {
                 "#,
                 Object::Integer(7),
             ),
-
             (
                 r#"
                 let iter = (1..).iter();
@@ -2055,7 +2315,6 @@ mod tests {
                 "#,
                 Object::Integer(2),
             ),
-
             (
                 r#"
                 let iter = (1..).iter();
@@ -2065,7 +2324,6 @@ mod tests {
                 "#,
                 Object::Integer(3),
             ),
-
             (
                 r#"
                 let n = 1000;
@@ -2101,9 +2359,6 @@ mod tests {
                 "#,
                 Object::Integer(76127),
             ),
-
-
-
         ];
 
         for (input, expected) in tests {
@@ -2115,31 +2370,133 @@ mod tests {
     #[test]
     fn test_eval_array_assignment() {
         let tests = vec![
-            (r#"
+            (
+                r#"
             let a = [1, 2, 3];
             a[0] = 4;
             a;
-            "#, Object::Array(vec![
-                Object::Integer(4),
-                Object::Integer(2),
-                Object::Integer(3),
-            ])),
-
-            (r#"
+            "#,
+                Object::Array(vec![
+                    Object::Integer(4),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                ]),
+            ),
+            (
+                r#"
             let a = [1, 2, 3];
             a[1] = 4;
             a;
-            "#, Object::Array(vec![
-                Object::Integer(1),
-                Object::Integer(4),
-                Object::Integer(3),
-            ])),
+            "#,
+                Object::Array(vec![
+                    Object::Integer(1),
+                    Object::Integer(4),
+                    Object::Integer(3),
+                ]),
+            ),
         ];
 
         for (input, expected) in tests {
             let evaluated = test_eval(input);
             assert_eq!(evaluated, expected);
         }
+    }
 
+    #[test]
+    fn test_iife_functions() {
+        let tests = vec![
+            (
+                r#"
+            (fn() { 1 + 2; })();
+            "#,
+                Object::Integer(3),
+            ),
+            (
+                r#"
+            (fn(x) { x * 2; })(2);
+            "#,
+                Object::Integer(4),
+            ),
+            (
+                r#"
+            (fn(x) { x * 2; })(2) + (fn(x) { x * 3; })(3);
+            "#,
+                Object::Integer(13),
+            ),
+            (
+                r#"
+            let a = 1;
+            (fn() { a = 2; })();
+            a;
+            "#,
+                Object::Integer(2),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, expected);
+        }
+    }
+
+    #[test]
+    /// Test that function declarations are hoisted properly
+    fn test_function_declaration_hoisting() {
+        test_eval_ok(
+            r#"
+                    main();
+                    fn main() {
+                        assert_eq(fib(50), 12586269025);
+                    }
+
+                    fn fib(n) {
+                        let a = 0;
+                        let b = 1;
+
+                        for i in 0..n {
+                            b = add(a, b);
+                            a = b - a;
+                        }
+
+                        return a;
+                    }
+
+                    fn add(a, b) {
+                        a + b
+                    }
+
+            "#,
+        );
+
+        // test that functions within blocks are hoisted properly
+        test_eval_ok(
+            r#"
+                    fn main() {
+                        assert_eq(fib(50), 12586269025);
+                    }
+
+                    let fib = {
+                        fn fib(n) {
+                            let a = 0;
+                            let b = 1;
+
+                            for i in 0..n {
+                                b = add(a, b);
+                                a = b - a;
+                            }
+
+                            return a;
+                        }
+
+                        fn add(a, b) {
+                            a + b
+                        }
+
+                        fib
+                    }
+
+                    main();
+            "#,
+        );
     }
 }
