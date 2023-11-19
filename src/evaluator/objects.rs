@@ -3,6 +3,8 @@ use std::{
     rc::Rc,
 };
 
+use uuid::Uuid;
+
 use crate::parser::{expressions::Identifier, parser::BlockStatement};
 
 use super::{
@@ -238,31 +240,7 @@ impl Display for Object {
 
 #[derive(Clone)]
 pub struct Reference {
-    pub identifier: Rc<str>,
-    pub env: Environment,
-}
-
-impl Reference {
-    pub fn new(identifier: Rc<str>, env: Environment) -> Self {
-        Self { identifier, env }
-    }
-
-    pub fn get(&self) -> Option<Object> {
-        self.env.get(self.identifier.clone())
-    }
-
-    pub fn mutate<F>(&mut self, f: F) -> Result<Object, String>
-    where
-        F: FnOnce(&mut Object) -> Result<Object, String>,
-    {
-        self.env.mutate(self.identifier.clone(), f)
-    }
-
-    pub fn update(&mut self, val: Object) -> Result<Object, String> {
-        self.env
-            .update(self.identifier.clone(), val)
-            .map(|_| Object::Unit)
-    }
+    pub uuid: Uuid,
 }
 
 impl Display for Reference {
@@ -270,23 +248,22 @@ impl Display for Reference {
         write!(
             f,
             "&{}",
-            match self.env.get(self.identifier.clone()) {
-                Some(obj) => obj.to_string(),
-                None => format!("(dangling reference to {})", self.identifier),
-            }
+            self.uuid
+                .hyphenated()
+                .encode_lower(&mut Uuid::encode_buffer())
         )
     }
 }
 
 impl PartialEq for Reference {
     fn eq(&self, other: &Self) -> bool {
-        self.identifier == other.identifier
+        self.uuid == other.uuid
     }
 }
 
 impl Debug for Reference {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "&{}", self.identifier)
+        write!(f, "&{}", self.uuid)
     }
 }
 

@@ -1071,24 +1071,25 @@ impl Evaluator {
                 operator: PrefixOperator::Asterisk,
                 right,
             }) => {
-                let mut reference = match self.eval_expression(right, env)? {
-                    Object::Reference(reference) => reference,
-                    _ => {
-                        return Err(self.error(
-                            Some(token),
-                            &format!("Cannot dereference non-reference: {:?}", right).to_string(),
-                            ErrorKind::InvalidDereference,
-                        ))
-                    }
-                };
-
-                reference.update(new_value).map_err(|err| {
-                    self.error(
-                        Some(&infix.token),
-                        &format!("Error mutating variable: {}", err).to_string(),
-                        ErrorKind::MutateError,
-                    )
-                })?;
+                todo!("Dereference operator not implemented yet");
+                // let mut reference = match self.eval_expression(right, env)? {
+                //     Object::Reference(reference) => reference,
+                //     _ => {
+                //         return Err(self.error(
+                //             Some(token),
+                //             &format!("Cannot dereference non-reference: {:?}", right).to_string(),
+                //             ErrorKind::InvalidDereference,
+                //         ))
+                //     }
+                // };
+                //
+                // reference.update(new_value).map_err(|err| {
+                //     self.error(
+                //         Some(&infix.token),
+                //         &format!("Error mutating variable: {}", err).to_string(),
+                //         ErrorKind::MutateError,
+                //     )
+                // })?;
             }
 
             _ => {}
@@ -1332,32 +1333,15 @@ impl Evaluator {
         env: &mut Environment,
     ) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_reference_operator_expression: {}", right));
-
-        match right.as_ref() {
-            Expression::Identifier(ident) => Ok(Object::Reference(Reference {
-                identifier: ident.value.clone(),
-                env: env.clone(),
-            })),
-            _ => Err(self.error(
-                self.current_token.as_ref(),
-                &format!("Reference operator expects identifier, got {:?}", right).to_string(),
-                ErrorKind::InvalidOperator,
-            )),
-        }
+        todo!()
     }
 
     fn eval_dereference_operator_expression(&self, right: Object) -> Result<Object, Error> {
-        match right {
-            Object::Reference(reference) => Ok(reference
-                .env
-                .get(reference.identifier)
-                .unwrap_or(Object::Unit)),
-            _ => Err(self.error(
-                self.current_token.as_ref(),
-                &format!("Dereference operator expects reference, got {:?}", right).to_string(),
-                ErrorKind::InvalidOperator,
-            )),
-        }
+        let _trace = trace!(&format!(
+            "eval_dereference_operator_expression: {:?}",
+            right
+        ));
+        todo!()
     }
 }
 
