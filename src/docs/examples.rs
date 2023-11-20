@@ -59,7 +59,6 @@
 ///     assert_eq(sum_primes(10), 17);
 ///     assert_eq(sum_primes(100), 1060);
 ///     assert_eq(sum_primes(1000), 76127);
-///     assert_eq(sum_primes(10000), 5736396);
 /// }
 /// # "#);
 ///

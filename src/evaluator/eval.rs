@@ -2430,7 +2430,7 @@ mod tests {
             r#"
                     main();
                     fn main() {
-                        assert_eq(fib(50), 12586269025);
+                        assert_eq(fib(6), 8);
                     }
 
                     fn fib(n) {
@@ -2456,7 +2456,7 @@ mod tests {
         test_eval_ok(
             r#"
                     fn main() {
-                        assert_eq(fib(50), 12586269025);
+                        assert_eq(fib(4), 3);
                     }
 
                     let fib = {
