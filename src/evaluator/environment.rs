@@ -412,18 +412,6 @@ impl InnerEnvironment {
         }
     }
 
-    /// Handles dropping an object, decreases the ref count for any objects that are referenced by the object being dropped
-    fn handle_drop_obj(&mut self, obj: Object) {
-        match obj {
-            Object::Array(arr) => {
-                for obj in arr {
-                    self.handle_drop_obj(obj);
-                }
-            }
-            Object::Reference(reference) => self.handle_drop_for_id(reference.uuid),
-            _ => {}
-        }
-    }
     /// Recursively get a value from the environment
     ///
     /// Keeps trying to get the value from the outer environment until it succeeds or there are no more outer

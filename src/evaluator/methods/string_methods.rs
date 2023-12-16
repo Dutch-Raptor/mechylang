@@ -1,4 +1,4 @@
-use crate::Object;
+use crate::{Object};
 
 use super::MethodInner;
 
@@ -22,7 +22,61 @@ use super::MethodInner;
 /// # test_eval_ok(r#"
 /// assert_eq("hello world".replace("hello", "goodbye"), "goodbye world");
 /// # "#);
-pub const STRING_METHODS: [MethodInner; 2] = [
+/// ```
+///
+/// ## `len() -> Integer`
+///
+/// Returns the length of the string.
+///
+/// ```
+/// # mechylang::test_utils::test_eval_ok(r#"
+/// assert_eq("hello world".len(), 11);
+/// # "#);
+/// ```
+///
+/// ## `split(delimiter: String) -> Array`
+/// Returns an array of strings split by the delimiter.
+///
+/// ```
+/// # mechylang::test_utils::test_eval_ok(r#"
+/// assert_eq("hello world".split(" "), ["hello", "world"]);
+/// # "#);
+/// ```
+///
+/// ## `trim() -> String`
+/// Returns a new string with leading and trailing whitespace removed.
+///
+/// ```
+/// # mechylang::test_utils::test_eval_ok(r#"
+/// assert_eq("  hello world  ".trim(), "hello world");
+/// # "#);
+/// ```
+///
+/// ## `to_uppercase() -> String`
+/// Returns a new string with all characters converted to uppercase.
+///
+/// ```
+/// # mechylang::test_utils::test_eval_ok(r#"
+/// assert_eq("hello world".to_uppercase(), "HELLO WORLD");
+/// # "#);
+/// ```
+///
+/// ## `to_lowercase() -> String`
+/// Returns a new string with all characters converted to lowercase.
+/// ```
+/// # mechylang::test_utils::test_eval_ok(r#"
+/// assert_eq("HELLO WORLD".to_lowercase(), "hello world");
+/// # "#);
+/// ```
+///
+/// ## `chars() -> Array
+/// Returns an array of strings, each containing a single character from the original string.
+/// ```
+/// # mechylang::test_utils::test_eval_ok(r#"
+/// assert_eq("hello world".chars(), ["h", "e", "l", "l", "o", " ", "w", "o", "r", "l", "d"]);
+/// # "#);
+/// ```
+pub const STRING_METHODS: [MethodInner; 8] = [
     MethodInner {
         name: "contains",
         args_len: 1..=1,
@@ -60,6 +114,89 @@ pub const STRING_METHODS: [MethodInner; 2] = [
             };
 
             Ok(Object::String(haystack.replace(needle, replacement).into()))
+        },
+    },
+    MethodInner {
+        name: "len",
+        args_len: 0..=0,
+        function: |obj, _, _, _, _| {
+            let s = match obj {
+                Object::String(s) => s,
+                _ => return invalid_object_err(),
+            };
+
+            Ok(Object::Integer(s.len() as i64))
+        },
+    },
+    MethodInner {
+        name: "split",
+        args_len: 1..=1,
+        function: |obj, _, args, _, _| {
+            let s = match obj {
+                Object::String(s) => s,
+                _ => return invalid_object_err(),
+            };
+
+            let delimiter = match &args[0] {
+                Object::String(s) => s.as_ref(),
+                _ => return Err("Split method called with non-string argument".to_string()),
+            };
+
+            let split: Vec<_> = s.split(delimiter).map(|s| s.into()).collect();
+
+            Ok(Object::Array(split))
+        },
+    },
+    MethodInner {
+        name: "trim",
+        args_len: 0..=0,
+        function: |obj, _, _, _, _| {
+            let s = match obj {
+                Object::String(s) => s,
+                _ => return invalid_object_err(),
+            };
+
+            Ok(Object::String(s.trim().into()))
+        },
+    },
+    MethodInner {
+        name: "to_uppercase",
+        args_len: 0..=0,
+        function: |obj, _, _, _, _| {
+            let s = match obj {
+                Object::String(s) => s,
+                _ => return invalid_object_err(),
+            };
+
+            Ok(Object::String(s.to_uppercase().into()))
+        },
+    },
+    MethodInner {
+        name: "to_lowercase",
+        args_len: 0..=0,
+        function: |obj, _, _, _, _| {
+            let s = match obj {
+                Object::String(s) => s,
+                _ => return invalid_object_err(),
+            };
+
+            Ok(Object::String(s.to_lowercase().into()))
+        },
+    },
+    MethodInner {
+        name: "chars",
+        args_len: 0..=0,
+        function: |obj, _, _, _, _| {
+            let s = match obj {
+                Object::String(s) => s,
+                _ => return invalid_object_err(),
+            };
+
+            Ok(Object::Array(
+                s.chars()
+                    .map(|c| Object::String(c.to_string().into()))
+                    .collect(),
+            ))
         },
     },
 ];

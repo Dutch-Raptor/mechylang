@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Write, rc::Rc};
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
     errors::{Error, ErrorKind},
@@ -20,7 +20,7 @@ use super::{
     environment::Environment,
     iterators::IteratorObject,
     methods::{Method, MethodError},
-    objects::{Function, Object, Reference, UnwrapReturnValue},
+    objects::{Function, Object, UnwrapReturnValue},
 };
 
 pub type EvalResult = Result<Object, Rc<[Error]>>;
@@ -722,7 +722,7 @@ impl Evaluator {
         &mut self,
         function: Object,
         arguments: Vec<Object>,
-        extra_env: Option<Environment>,
+        _extra_env: Option<Environment>,
     ) -> Result<Object, Error> {
         let _trace = trace!(&format!("apply_function({}, {:?})", function, arguments));
         let function = match function {
@@ -1067,9 +1067,9 @@ impl Evaluator {
             }
 
             Expression::Prefix(PrefixExpression {
-                token,
+                token: _,
                 operator: PrefixOperator::Asterisk,
-                right,
+                right: _,
             }) => {
                 todo!("Dereference operator not implemented yet");
                 // let mut reference = match self.eval_expression(right, env)? {
@@ -1330,7 +1330,7 @@ impl Evaluator {
     fn eval_reference_operator_expression(
         &self,
         right: Rc<Expression>,
-        env: &mut Environment,
+        _env: &mut Environment,
     ) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_reference_operator_expression: {}", right));
         todo!()
@@ -1350,7 +1350,7 @@ mod tests {
 
     use crate::{
         errors::ErrorKind,
-        evaluator::{builtins::BuiltinError, environment::Environment, objects::Object},
+        evaluator::{builtins::BuiltinError, objects::Object},
         test_utils::test_eval_ok,
     };
 
