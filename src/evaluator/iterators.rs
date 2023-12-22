@@ -133,7 +133,12 @@ impl TryFrom<Object> for IteratorObject {
 
 impl Display for IteratorObject {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Iterator")
+        let size_hint = self.size_hint();
+        match size_hint {
+            (0, None) => write!(f, "Iterator of unknown size"),
+            (lower, None) => write!(f, "Iterator ({} remaining)", lower),
+            (lower, Some(upper)) => write!(f, "Iterator ({}..{} remaining)", lower, upper),
+        }
     }
 }
 

@@ -158,16 +158,13 @@ impl Evaluator {
         env: &mut Environment,
     ) -> Result<(), Error> {
         for statement in program.iter() {
-            match statement {
-                Statement::Function(function) => {
-                    let func = Function {
-                        params: function.parameters.clone(),
-                        body: function.body.clone(),
-                        env: env.clone(),
-                    };
-                    env.set(function.name.value.clone(), Object::Function(func));
-                }
-                _ => {}
+            if let Statement::Function(function) = statement {
+                let func = Function {
+                    params: function.parameters.clone(),
+                    body: function.body.clone(),
+                    env: env.clone(),
+                };
+                env.set(function.name.value.clone(), Object::Function(func));
             }
         }
         Ok(())
@@ -691,7 +688,7 @@ impl Evaluator {
         self.apply_function(function, arguments, None)
             .map_err(|err| {
                 // only apply current token if there is no token set
-                if err.line != "" && err.line_nr != 0 && err.column != 0 {
+                if !err.line.is_empty() && err.line_nr != 0 && err.column != 0 {
                     return err;
                 }
 
@@ -788,7 +785,7 @@ impl Evaluator {
         arguments: &[Expression],
         env: &mut Environment,
     ) -> Result<Vec<Object>, Error> {
-        let _trace = trace!(&format!("eval_expressions"));
+        let _trace = trace!("eval_expressions");
         let mut result = Vec::with_capacity(arguments.len());
 
         for argument in arguments.iter() {
@@ -883,7 +880,7 @@ impl Evaluator {
 
         let arg_objects = self.eval_expressions(arguments, env)?;
 
-        (function.function)(&arg_objects, env, &self).map_err(|(msg, err_type)| {
+        (function.function)(&arg_objects, env, self).map_err(|(msg, err_type)| {
             self.error(
                 self.current_token.as_ref(),
                 msg.as_str(),
@@ -1037,9 +1034,7 @@ impl Evaluator {
                                     index,
                                     ident,
                                     array.len()
-                                )
-                                .to_string()
-                                .into())
+                                ))
                             })
                     }
                 };
@@ -1109,9 +1104,9 @@ impl Evaluator {
 
         let iterable = self.eval_expression(&for_expr.iterable, env)?;
 
-        let mut iterator = IteratorObject::try_from(iterable).map_err(|err| {
+        let iterator = IteratorObject::try_from(iterable).map_err(|err| {
             self.error(
-                Some(&for_expr.iterable.token()),
+                Some(for_expr.iterable.token()),
                 &format!("Error iterating over object: {}", err).to_string(),
                 ErrorKind::TypeError,
             )
@@ -1119,7 +1114,7 @@ impl Evaluator {
 
         let mut index = 0;
 
-        while let Some(item) = iterator.next() {
+        for item in iterator {
             let mut new_env = Environment::new_enclosed(env);
 
             new_env.set(for_expr.iterator.value.clone(), item.clone());

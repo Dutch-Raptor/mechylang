@@ -106,13 +106,12 @@ pub const BUILTINS: [BuiltinFunction; 5] = [
         name: "print",
         args_len: (1..=usize::MAX),
         function: |args, _, eval| {
-            eval.print(format!(
-                "{}",
+            eval.print(
                 args.iter()
                     .map(|a| a.to_string())
                     .collect::<Vec<String>>()
-                    .join(" ")
-            ));
+                    .join(" "),
+            );
             Ok(Object::Unit)
         },
     },
@@ -138,12 +137,9 @@ pub const BUILTINS: [BuiltinFunction; 5] = [
             if args[0] == Object::Boolean(true) {
                 Ok(Object::Unit)
             } else {
-                eval.print(format!(
-                    "Assertion failed: {} is not true",
-                    args[0].to_string()
-                ));
+                eval.print(format!("Assertion failed: {} is not true", args[0]));
                 Err((
-                    format!("Assertion failed: {} is not true", args[0].to_string()),
+                    format!("Assertion failed: {} is not true", args[0]),
                     BuiltinError::AssertionFailed,
                 ))
             }
