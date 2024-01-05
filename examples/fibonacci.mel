@@ -1,21 +1,5 @@
-let fib = fn(n) {
-  if n == 0 {
-    return 0;
-  }
-
-  if n == 1 {
-    return 1;
-  }
-
-  return fib(n - 1) + fib(n - 2);
-};
-
-let result = fib(10);
-
-print("Recursive Fibonacci: fib(10) = ", result);
-
 // Iterative Fibonacci
-let fib2 = fn(n) {
+fn fib2(n) {
   let a = 0;
   let b = 1;
 
@@ -27,8 +11,24 @@ let fib2 = fn(n) {
   return a;
 };
 
-let result2 = fib2(10);
+let result2 = fib2(50);
 
-print("Iterative Fibonacci: fib(10) = ", result2);
+println("Iterative Fibonacci: fib(50) = ", result2);
 
-[result, result2]
+// This one is realllllllllllllyyyyyyyy inefficient, so dont run it with large values
+fn fib(n) {
+  if n <= 0 {
+    return 0;
+  }
+
+  if n == 1 {
+    return 1;
+  }
+
+  return fib(n - 1) + fib(n - 2);
+};
+
+let result = fib(25);
+
+println("Recursive Fibonacci: fib(25) = ", result);
+

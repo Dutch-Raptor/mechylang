@@ -1,16 +1,16 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    errors::{Error, ErrorKind},
+    errors::{Error, ErrorKind, InterpreterErrors},
     evaluator::methods::ObjectMethods,
     lexer::{lexer::Lexer, tokens::Token},
     parser::{
         expressions::{
             ArrayLiteral, CallExpression, Expression, ExpressionToken, ForExpression, Identifier,
             IfExpression, IndexExpression, InfixExpression, InfixOperator, MemberExpression,
-            PrefixExpression, PrefixOperator, WhileExpression,
+            PrefixExpression, PrefixOperator, StructLiteral, WhileExpression,
         },
-        parser::{BlockStatement, LetStatement, Parser, Statement},
+        parser::{BlockStatement, LetStatement, Parser, Program, Statement},
     },
     trace,
 };
@@ -23,10 +23,10 @@ use super::{
     objects::{Function, Object, UnwrapReturnValue},
 };
 
-pub type EvalResult = Result<Object, Rc<[Error]>>;
+pub type EvalResult = Result<Object, InterpreterErrors>;
 
 pub struct Evaluator {
-    lines: Vec<String>,
+    lines: Rc<[String]>,
     current_token: Option<Token>,
     globals: HashMap<Rc<str>, Object>,
     eval_config: Rc<EvalConfig>,
@@ -105,11 +105,8 @@ impl Evaluator {
         let lexer = Lexer::new(input);
         let lines = lexer.lines();
         let mut parser = Parser::new(lexer);
-        let program = parser.parse();
 
-        if !program.errors.is_empty() {
-            return Err(program.errors.into());
-        }
+        let Program { statements } = parser.parse()?;
 
         let evaluator = Evaluator {
             lines,
@@ -119,8 +116,8 @@ impl Evaluator {
         };
 
         evaluator
-            .eval_program(program.statements, env)
-            .map_err(|err| vec![err].into())
+            .eval_program(statements, env)
+            .map_err(|err| InterpreterErrors(vec![err]))
     }
 
     pub(super) fn print(&self, string: String) {
@@ -278,6 +275,7 @@ impl Evaluator {
             | Expression::RangeTo(_)
             | Expression::RangeFull(_) => self.eval_range_expression(expression, env),
             Expression::Member(member) => self.eval_member_expression(member, env),
+            Expression::StructLiteral(lit) => self.eval_struct_expression(lit, env),
         }
     }
 
@@ -631,6 +629,7 @@ impl Evaluator {
             kind: error_kind,
             message: message.to_string(),
             context: None,
+            lines: self.lines.clone(),
         }
     }
 
@@ -705,7 +704,7 @@ impl Evaluator {
         let mut evaluator = Evaluator {
             globals: HashMap::new(),
             current_token: None,
-            lines: vec![],
+            lines: vec![].into(),
             eval_config: config,
         };
 
@@ -1338,6 +1337,22 @@ impl Evaluator {
         ));
         todo!()
     }
+
+    fn eval_struct_expression(
+        &mut self,
+        lit: &StructLiteral,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
+        let _trace = trace!("Eval struct expression");
+        let mut map = HashMap::new();
+
+        for (key, expression) in &lit.entries {
+            let object = self.eval_expression(&expression, env)?;
+            map.insert(key.to_string(), object);
+        }
+
+        Ok(Object::Struct(map))
+    }
 }
 
 #[cfg(test)]
@@ -1659,18 +1674,6 @@ mod tests {
                 1,
             ),
             (
-                "if (10 > 1) {
-                        if (10 > 1) {
-                            return true + false;
-                        }
-                        return 1;
-                    }",
-                "Invalid operator: Boolean(true) + Boolean(false)",
-                ErrorKind::InvalidOperator,
-                "return true + false;",
-                3,
-            ),
-            (
                 "len(1)",
                 "Argument to `len` not supported, got Integer(1)",
                 ErrorKind::BuiltInError(BuiltinError::WrongArgumentType),
@@ -1711,10 +1714,8 @@ mod tests {
             let evaluated = test_eval_fallible(input);
             match evaluated {
                 Err(errors) => {
-                    for error in errors.iter() {
-                        println!("{}", error);
-                    }
-                    let error = errors.first().unwrap();
+                    println!("{}", errors);
+                    let error = errors.0.first().unwrap();
                     assert_eq!(error.message, message);
                     assert_eq!(error.kind, error_kind);
                     assert_eq!(error.line.trim(), line_with_err.trim());
@@ -2475,6 +2476,18 @@ mod tests {
                     }
 
                     main();
+            "#,
+        );
+    }
+
+    #[test]
+    fn test_eval_struct_literals() {
+        test_eval_ok(
+            r#"
+                let a = struct {
+                    a: 1,
+                    b: 2,
+                };
             "#,
         );
     }

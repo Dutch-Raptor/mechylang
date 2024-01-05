@@ -8,6 +8,7 @@ pub mod methods;
 /// This module contains the evaluator for the language.
 /// It takes the AST and evaluates it.
 pub mod objects;
+pub mod properties;
 
 pub fn eval_file(file: &str) -> Result<(), Vec<String>> {
     let input = std::fs::read_to_string(file).unwrap();

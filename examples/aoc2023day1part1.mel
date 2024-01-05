@@ -1,0 +1,7 @@
+let inp = input();
+
+println(
+  inp
+  .lines()
+  .collect()
+)

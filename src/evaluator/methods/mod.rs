@@ -9,7 +9,9 @@ pub mod boolean_methods;
 pub mod numeric_methods;
 pub mod range_methods;
 pub mod string_methods;
+pub mod struct_methods;
 
+use self::struct_methods::STRUCT_METHODS;
 pub(crate) use self::{
     array_methods::ARRAY_METHODS,
     boolean_methods::BOOLEAN_METHODS,
@@ -113,6 +115,7 @@ impl ObjectMethods for Object {
             Object::Float(_) => get_method(&FLOAT_METHODS),
             Object::String(_) => get_method(&STRING_METHODS),
             Object::Boolean(_) => get_method(&BOOLEAN_METHODS),
+            Object::Struct(_) => get_method(&STRUCT_METHODS),
 
             // Explicitly return None for these types
             Object::Unit => None,

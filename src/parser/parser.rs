@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 use std::rc::Rc;
 
-use crate::errors::{Error, ErrorKind};
+use crate::errors::{Error, ErrorKind, InterpreterErrors};
 use crate::lexer::tokens::{Token, Position};
 use crate::lexer::{lexer::Lexer, tokens::TokenKind};
 use crate::parser::expressions::{Expression, Identifier};
@@ -11,13 +12,12 @@ use color_print::cformat;
 
 use super::expressions::{
     BooleanLiteral, FloatLiteral, FunctionLiteral, IfExpression, InfixExpression, IntegerLiteral,
-    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral, ArrayLiteral, IndexExpression, Precedence, RangeToExpression, RangeExpression, RangeFromExpression, RangeFullExpression, ForExpression, WhileExpression, MemberExpression,
+    PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral, ArrayLiteral, IndexExpression, Precedence, RangeToExpression, RangeExpression, RangeFromExpression, RangeFullExpression, ForExpression, WhileExpression, MemberExpression, StructLiteral,
 };
 
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
-    pub errors: Vec<Error>,
 }
 
 impl Display for Program {
@@ -160,7 +160,7 @@ pub struct Parser {
     cur_token: Token,
     peek_token: Token,
     errors: Vec<Error>,
-    lines: Vec<String>,
+    lines: Rc<[String]>,
 }
 
 impl Parser {
@@ -198,29 +198,17 @@ impl Parser {
         self.cur_token = std::mem::replace(&mut self.peek_token, next);
     }
 
-    pub fn parse(&mut self) -> Program {
-        let mut program = Program {
-            statements: Vec::new(),
-            errors: Vec::new(),
-        };
+    pub fn parse(&mut self) -> Result<Program, InterpreterErrors> {
+        let mut statements = Vec::new();
 
         while self.cur_token.kind != TokenKind::EOF {
-            let statement = match self.parse_statement() {
-                Ok(statement) => statement,
-                Err(err) => {
-                    program.errors.push(err);
-
-                    self.next_token();
-                    continue;
-                }
-            };
-            program.statements.push(statement);
+            let statement = self.parse_statement()
+                .map_err(|err| InterpreterErrors(vec![err]))?;
+            statements.push(statement);
             self.next_token();
         }
 
-        program.errors.append(&mut self.errors);
-
-        program
+        Ok(Program { statements })
     }
 
     fn parse_statement(&mut self) -> Result<Statement, Error> {
@@ -246,11 +234,28 @@ impl Parser {
         Ok(statement)
     }
 
+    /// Checks if the current token is `token`, returns an error if not
+    fn expect_current(&self, token: TokenKind) -> Result<(), Error> {
+        if self.cur_token.kind == token {
+            Ok(())
+        } else {
+            Err(self.error(
+                ErrorKind::UnexpectedToken,
+                cformat!(
+                    "Expected current token to be <i>{:?}</i>, got <i>{:?}</i> instead",
+                    token,
+                    self.cur_token.kind
+                ),
+                self.cur_token.position.line,
+                self.cur_token.position.column,
+                None,
+            ))
+        }
+    }
+
     /// Checks if the peek token is the expected token and advances it to be the current token if it is.
     ///
-    /// Returns true if the peek token was the expected token, false otherwise.
-    ///
-    /// Adds an error to the parser if the peek token was not the expected token.
+    /// If the peek token is not the expected token `expect_peek` returns an Err
     fn expect_peek(&mut self, token: TokenKind) -> Result<(), Error> {
         if self.peek_token.kind == token {
             self.next_token();
@@ -437,6 +442,7 @@ impl Parser {
             TokenKind::While => true,
 
             TokenKind::String(_) => true,
+            TokenKind::Struct => true,
 
             // Block expressions
             TokenKind::LeftSquirly => true,
@@ -466,9 +472,10 @@ impl Parser {
             TokenKind::BitwiseNot => self.parse_prefix_expression(),
             TokenKind::Ampersand => self.parse_prefix_expression(),
 
-            // Block expressions
+            // Block expression
             TokenKind::LeftSquirly => self.parse_block_expression(),
 
+            TokenKind::Struct => self.parse_struct_literal(),
             TokenKind::String(_) => self.parse_string(),
 
             TokenKind::LeftParen => self.parse_grouped_expression(),
@@ -830,14 +837,14 @@ impl Parser {
     fn error(
         &self,
         kind: ErrorKind,
-        msg: String,
+        msg: impl ToString,
         line: usize,
         col: usize,
         context: Option<String>,
     ) -> Error {
         let error = Error {
             kind,
-            message: msg,
+            message: msg.to_string(),
             line_nr: line,
             column: col,
             context,
@@ -847,16 +854,17 @@ impl Parser {
                 .get(line - 1)
                 .unwrap_or(&"Failed to get line".to_string())
                 .clone(),
+            lines: self.lines.clone(),
         };
         trace!(format!("Error: {:?}", error).as_str());
         error
     }
 
-    fn error_current(&self, kind: ErrorKind, msg: String) -> Error {
+    fn error_current(&self, kind: ErrorKind, msg: impl ToString) -> Error {
         self.error(kind, msg, self.cur_token.position.line, self.cur_token.position.column, None)
     }
 
-    fn error_current_with_context(&self, kind: ErrorKind, msg: String, context: String) -> Error {
+    fn error_current_with_context(&self, kind: ErrorKind, msg: impl ToString, context: String) -> Error {
         self.error(
             kind,
             msg,
@@ -866,7 +874,7 @@ impl Parser {
         )
     }
 
-    fn error_peek(&self, kind: ErrorKind, msg: String) -> Error {
+    fn error_peek(&self, kind: ErrorKind, msg: impl ToString) -> Error {
         self.error(
             kind,
             msg,
@@ -877,7 +885,7 @@ impl Parser {
     }
 
     #[allow(dead_code)]
-    fn error_peek_with_context(&self, kind: ErrorKind, msg: String, context: String) -> Error {
+    fn error_peek_with_context(&self, kind: ErrorKind, msg: impl ToString, context: String) -> Error {
         self.error(
             kind,
             msg,
@@ -1234,6 +1242,59 @@ impl Parser {
         }))
     }
 
+    /// Parses a struct literal
+    ///
+    /// valid syntax is:
+    /// ```text
+    /// struct {
+    ///     key: value,
+    ///     otherKey: 3,
+    /// }
+    /// ```
+    ///
+    /// Trailing commas are optional
+    fn parse_struct_literal(&mut self) -> Result<Expression, Error> {
+        // Cur token is `struct`
+        let token = self.cur_token.clone();
+
+        self.expect_peek(TokenKind::LeftSquirly)?;
+
+        self.next_token();
+
+        let mut entries = HashMap::new();
+
+        while self.cur_token.kind != TokenKind::RightSquirly {
+            let key = match self.cur_token.kind {
+                TokenKind::Identifier(ref ident) => ident.clone(),
+                _ => return Err(self.error_current(ErrorKind::TypeError, "Struct keys must be identifiers.")),
+            };
+
+            self.expect_peek(TokenKind::Colon)?;
+
+            self.next_token();
+
+            let value = self.parse_expression(Precedence::Lowest)?;
+            entries.insert(key, value);
+
+            self.next_token();
+
+            if self.cur_token.kind != TokenKind::Comma && self.cur_token.kind != TokenKind::RightSquirly {
+                return Err(self.error_current(ErrorKind::UnexpectedToken, format!("Expected a `,` or `}}`")))
+            }
+
+            if self.cur_token.kind == TokenKind::Comma {
+                self.next_token();
+            }
+        }
+
+        self.expect_current(TokenKind::RightSquirly)?;
+
+        Ok(Expression::StructLiteral(StructLiteral {
+            token,
+            entries
+        }))
+    }
+
     fn parse_member(&mut self, left: Expression) -> Result<Expression, Error> {
         let token = self.cur_token.clone();
 
@@ -1261,9 +1322,27 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
+
+use core::panic;
+
+use color_print::cprintln;
+
 use crate::parser::expressions::Precedence;
 
 use super::*;
+
+    fn parse(input: &str) -> Result<Vec<Statement>, InterpreterErrors> {
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let result = parser.parse();
+
+        if let Err(ref err) = result {
+            cprintln!("{}", err)
+        }
+
+        result.map(|prgrm| prgrm.statements)
+    }
 
 #[test]
 fn test_presedence() {
@@ -1286,15 +1365,10 @@ fn test_presedence() {
 fn test_identifier_expression() {
     let input = "foobar;";
 
-    let lexer = Lexer::new(input);
-    let mut parser = Parser::new(lexer);
+    let statements = parse(input).unwrap();
 
-    let program = parser.parse();
 
-    assert_eq!(program.statements.len(), 1);
-    assert_eq!(program.errors.len(), 0);
-
-    let stmt = &program.statements[0];
+    let stmt = &statements[0];
 
     match stmt {
         Statement::Expression(ref expr) => {
@@ -1368,7 +1442,7 @@ fn test_operator_precedence_parsing() {
         for (input, expected) in tests {
             let lexer = Lexer::new(input);
             let mut parser = Parser::new(lexer);
-            let program = parser.parse();
+            let program = parser.parse().unwrap();
 
             let actual = program.to_string();
             assert_eq!(actual.trim(), expected.trim());
@@ -1382,9 +1456,8 @@ fn test_operator_precedence_parsing() {
 
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let program = parser.parse().unwrap();
 
-        assert_eq!(program.errors.len(), 0);
         assert_eq!(program.statements.len(), 1);
 
         let stmt = &program.statements[0];
@@ -1422,18 +1495,12 @@ fn test_operator_precedence_parsing() {
             x + y;
         }";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
 
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 1);
+        assert_eq!(statements.len(), 1);
 
-        let stmt = &program.statements[0];
+        let stmt = &statements[0];
 
         match stmt {
             Statement::Expression(ref expr) => match expr.expression {
@@ -1453,18 +1520,13 @@ fn test_operator_precedence_parsing() {
     fn test_if_expression() {
         let input = "if x < y { x }";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
+        let statements = parse(input).unwrap();
 
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 1);
 
-        let stmt = &program.statements[0];
+        assert_eq!(statements.len(), 1);
+
+        let stmt = &statements[0];
 
         match stmt {
             Statement::Expression(ref expr) => match expr.expression {
@@ -1483,14 +1545,11 @@ fn test_operator_precedence_parsing() {
     fn test_string_literal_expression() {
         let input = r#""hello world";"#;
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 1);
+        assert_eq!(statements.len(), 1);
 
-        let stmt = &program.statements[0];
+        let stmt = &statements[0];
 
         match stmt {
             Statement::Expression(ref expr) => match expr.expression {
@@ -1511,18 +1570,12 @@ fn test_operator_precedence_parsing() {
     fn test_array_literal_expression() {
         let input = "[1, 2 * 2, 3 + 3]";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
 
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 1);
+        assert_eq!(statements.len(), 1);
 
-        let stmt = &program.statements[0];
+        let stmt = &statements[0];
 
         match stmt {
             Statement::Expression(ref expr) => match expr.expression {
@@ -1542,20 +1595,11 @@ fn test_operator_precedence_parsing() {
     fn test_index_expression() {
         let input = "myArray[1 + 1]";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
+        assert_eq!(statements.len(), 1);
 
-        println!("{}", program.to_string());
-
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 1);
-
-        let stmt = &program.statements[0];
+        let stmt = &statements[0];
 
         match stmt {
             Statement::Expression(ref expr) => match expr.expression {
@@ -1573,20 +1617,12 @@ fn test_operator_precedence_parsing() {
     fn test_mutating_values() {
         let input = "let a = 1; a = 2;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
 
-        println!("{}", program.to_string());
+        assert_eq!(statements.len(), 2);
 
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 2);
-
-        let stmt = &program.statements[1];
+        let stmt = &statements[1];
 
         match stmt {
             Statement::Expression(ref expr) => match expr.expression {
@@ -1605,20 +1641,11 @@ fn test_operator_precedence_parsing() {
     fn test_special_mutation_operators() {
         let input = "let a = 1; a += 2; a -= 3; a *= 4; a /= 5; a %= 6;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
+        assert_eq!(statements.len(), 6);
 
-        println!("{}", program.to_string());
-
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 6);
-
-        match &program.statements[1] {
+        match &statements[1] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::Infix(ref infix) => {
                     assert_eq!(infix.operator, InfixOperator::AssignPlus);
@@ -1630,7 +1657,7 @@ fn test_operator_precedence_parsing() {
             _ => panic!("expected expression statement"),
         };
 
-        match &program.statements[2] {
+        match &statements[2] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::Infix(ref infix) => {
                     assert_eq!(infix.operator, InfixOperator::AssignMinus);
@@ -1642,7 +1669,7 @@ fn test_operator_precedence_parsing() {
             _ => panic!("expected expression statement"),
         };
 
-        match &program.statements[3] {
+        match &statements[3] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::Infix(ref infix) => {
                     assert_eq!(infix.operator, InfixOperator::AssignAsterisk);
@@ -1654,7 +1681,7 @@ fn test_operator_precedence_parsing() {
             _ => panic!("expected expression statement"),
         };
 
-        match &program.statements[4] {
+        match &statements[4] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::Infix(ref infix) => {
                     assert_eq!(infix.operator, InfixOperator::AssignSlash);
@@ -1666,7 +1693,7 @@ fn test_operator_precedence_parsing() {
             _ => panic!("expected expression statement"),
         };
 
-        match &program.statements[5] {
+        match &statements[5] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::Infix(ref infix) => {
                     assert_eq!(infix.operator, InfixOperator::AssignPercent);
@@ -1683,20 +1710,10 @@ fn test_operator_precedence_parsing() {
     fn test_range_expression() {
         let input = "1..5; 1..=5;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
+        assert_eq!(statements.len(), 2);
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
-
-        println!("{}", program.to_string());
-
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 2);
-
-        match &program.statements[0] {
+        match &statements[0] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::Range(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
@@ -1708,7 +1725,7 @@ fn test_operator_precedence_parsing() {
             _ => panic!("expected expression statement"),
         };
 
-        match &program.statements[1] {
+        match &statements[1] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::Range(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
@@ -1725,20 +1742,11 @@ fn test_operator_precedence_parsing() {
     fn test_range_from_expressions() {
         let input = "(1..); (1..=);";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
+        assert_eq!(statements.len(), 2);
 
-        println!("{}", program.to_string());
-
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 2);
-
-        match &program.statements[0] {
+        match &statements[0] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeFrom(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
@@ -1749,7 +1757,7 @@ fn test_operator_precedence_parsing() {
             _ => panic!("expected expression statement"),
         };
 
-        match &program.statements[1] {
+        match &statements[1] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeFrom(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
@@ -1765,20 +1773,11 @@ fn test_operator_precedence_parsing() {
     fn test_range_to_expressions() {
         let input = "..5; ..=5;";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
+        assert_eq!(statements.len(), 2);
 
-        println!("{}", program.to_string());
-
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 2);
-
-        match &program.statements[0] {
+        match &statements[0] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeTo(ref range) => {
                     assert_eq!(range.right.to_string(), "5");
@@ -1789,7 +1788,7 @@ fn test_operator_precedence_parsing() {
             _ => panic!("expected expression statement"),
         };
 
-        match &program.statements[1] {
+        match &statements[1] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeTo(ref range) => {
                     assert_eq!(range.right.to_string(), "5");
@@ -1805,20 +1804,11 @@ fn test_operator_precedence_parsing() {
     fn test_range_full_expression() {
         let input = "(..); array[..];";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
+        assert_eq!(statements.len(), 2);
 
-        println!("{}", program.to_string());
-
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 2);
-
-        match &program.statements[0] {
+        match &statements[0] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeFull(_) => {}
                 _ => panic!("expected range expression"),
@@ -1826,7 +1816,7 @@ fn test_operator_precedence_parsing() {
             _ => panic!("expected expression statement"),
         };
 
-        match &program.statements[1] {
+        match &statements[1] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::Index(ref index) => {
                     assert_eq!(index.left.to_string(), "array");
@@ -1842,20 +1832,11 @@ fn test_operator_precedence_parsing() {
     fn test_for_loop() {
         let input = "for i in 1..5 { i; }";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
+        assert_eq!(statements.len(), 1);
 
-        println!("{}", program.to_string());
-
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 1);
-
-        match &program.statements[0] {
+        match &statements[0] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::For(ref for_loop) => {
                     assert_eq!(for_loop.iterator.to_string(), "i");
@@ -1872,20 +1853,11 @@ fn test_operator_precedence_parsing() {
     fn test_for_loop_with_index() {
         let input = "for (i, j) in 1..5 { i; j; }";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
+        assert_eq!(statements.len(), 1);
 
-        println!("{}", program);
-
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 1);
-
-        match &program.statements[0] {
+        match &statements[0] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::For(ref for_loop) => {
                     println!("{:#?}", for_loop);
@@ -1914,32 +1886,23 @@ fn test_operator_precedence_parsing() {
         break 1;
         "#;
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        for error in &program.errors {
-            println!("{}", error);
-        }
+        assert_eq!(statements.len(), 3);
 
-        println!("{}", program);
-
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 3);
-
-        match &program.statements[0] {
+        match &statements[0] {
             Statement::Break(ref break_stmt) => {
                 assert_eq!(break_stmt.value, None);
             },
             _ => panic!("expected expression statement"),
         };
 
-        match &program.statements[1] {
+        match &statements[1] {
             Statement::Continue(_) => {},
             _ => panic!("expected expression statement"),
         };
 
-        match &program.statements[2] {
+        match &statements[2] {
             Statement::Break(ref break_stmt) => {
                 assert_eq!(break_stmt.value.is_some(), true);
                 assert_eq!(break_stmt.value.as_ref().unwrap().to_string(), "1");
@@ -1952,16 +1915,11 @@ fn test_operator_precedence_parsing() {
     fn test_while_expression() {
         let input = "while true { 1; }";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        println!("{}", program);
+        assert_eq!(statements.len(), 1);
 
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 1);
-
-        match &program.statements[0] {
+        match &statements[0] {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::While(ref while_expr) => {
                     assert_eq!(while_expr.condition.to_string(), "true");
@@ -1977,28 +1935,78 @@ fn test_operator_precedence_parsing() {
     fn test_method_call() {
         let input = "foo.bar(1, 2, 3);";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
+        let statements = parse(input).unwrap();
 
-        println!("{}", program);
+        assert_eq!(statements.len(), 1);
 
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 1);
+        let call_expr = match statements[0] {
+            Statement::Expression(
+                ExpressionStatement { expression: 
+                Expression::Call(ref call_expr), ..}) => call_expr,
+            _ => panic!("Expected a call expresssion")
+        };
+
+        let method = match call_expr.function.as_ref() {
+            Expression::Member(ref member) => member,
+            _ => panic!("Expected call on member function"),
+        };
+
+        match method.object.as_ref() {
+            Expression::Identifier(ident) => assert_eq!(ident.value.as_ref(), "foo"),
+            _ => panic!("foo should be an identifier")
+        };
+
+        assert_eq!(method.property.value.as_ref(), "bar");
+
+        for i in 1..=3 {
+            if let Expression::IntegerLiteral(IntegerLiteral { value, .. }) = call_expr.arguments[i - 1] {
+                assert_eq!(value, i as i64);
+            } else {
+                panic!("Arguments should be integer literals");
+            }
+        }
     }
 
     #[test]
     fn test_function_statement() {
         let input = "fn foo() { 1; }";
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse();
 
-        println!("{}", program);
+    }
+    
 
-        assert_eq!(program.errors.len(), 0);
-        assert_eq!(program.statements.len(), 1);
+    #[test]
+    fn test_struct_literal() {
+        let input = r#"
+            let object = struct {
+                a: 1,
+                b: "Some String"
+            }
+        "#;
+
+        let statements = parse(input).unwrap();
+
+        assert_eq!(statements.len(), 1);
+
+        if let Statement::Let(LetStatement { 
+            name: Identifier {
+                value: name,
+                ..
+            },
+            value: Expression::StructLiteral(StructLiteral { entries,.. }),
+            ..
+        }) = &statements[0] {
+            assert_eq!(name.as_ref(), "object");
+
+            match entries.get("a") {
+                Some(Expression::IntegerLiteral(IntegerLiteral { value: 1, .. })) => {},
+                _ => panic!("Key 'a' should contain integer 1")
+            }
+            match entries.get("b") {
+                Some(Expression::StringLiteral(StringLiteral { value,.. })) if value.as_ref() == "Some String" => {},
+                _ => panic!("Key 'b' should contain string `Some String`")
+            }
+        }
     }
 
 }

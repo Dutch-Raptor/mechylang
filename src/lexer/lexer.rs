@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use super::tokens::{Position, Token, TokenKind};
 
 #[derive(Debug)]
@@ -175,6 +177,7 @@ impl Lexer {
                     Some(TokenKind::AssignEqual)
                 }
             }
+            ':' => Some(TokenKind::Colon),
             ';' => Some(TokenKind::Semicolon),
             '(' => Some(TokenKind::LeftParen),
             ')' => Some(TokenKind::RightParen),
@@ -368,7 +371,7 @@ impl Lexer {
         })
     }
 
-    pub fn lines(&self) -> Vec<String> {
+    pub fn lines(&self) -> Rc<[String]> {
         self.input.lines().map(|s| s.to_string()).collect()
     }
 

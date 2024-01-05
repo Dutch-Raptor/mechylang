@@ -525,6 +525,14 @@ impl InnerEnvironment {
     }
 }
 
+impl Drop for InnerEnvironment {
+    fn drop(&mut self) {
+        for uuid in self.variables.clone().values() {
+            self.handle_drop_for_id(*uuid);
+        }
+    }
+}
+
 pub struct HeapObject {
     ref_count: usize,
     obj: Object,

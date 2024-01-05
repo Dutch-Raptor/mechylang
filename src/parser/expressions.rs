@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 /// # Parsing Expressions
 ///
 /// This module contains the parsing logic for expressions.
@@ -173,6 +174,7 @@ pub enum Expression {
     While(WhileExpression),
     Member(MemberExpression),
     Unit(Token),
+    StructLiteral(StructLiteral),
 }
 
 pub trait ExpressionToken {
@@ -185,6 +187,7 @@ impl ExpressionToken for Expression {
             Expression::Identifier(ident) => &ident.token,
             Expression::IntegerLiteral(lit) => &lit.token,
             Expression::FloatLiteral(lit) => &lit.token,
+            Expression::StructLiteral(lit) => &lit.token,
             Expression::Prefix(expr) => &expr.token,
             Expression::Infix(expr) => &expr.token,
             Expression::Boolean(boolean) => &boolean.token,
@@ -231,6 +234,7 @@ impl Display for Expression {
             Expression::While(while_expr) => write!(f, "{}", while_expr),
             Expression::Member(member) => write!(f, "{}", member),
             Expression::Unit(_) => write!(f, "()"),
+            Expression::StructLiteral(lit) => write!(f, "{}", lit),
         }
     }
 }
@@ -619,5 +623,21 @@ pub struct MemberExpression {
 impl Display for MemberExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}.{}", self.object, self.property)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StructLiteral {
+    pub token: Token,
+    pub entries: HashMap<String, Expression>,
+}
+
+impl Display for StructLiteral {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "struct {{\n")?;
+        for (key, value) in &self.entries {
+            write!(f, "{}: {}\n", key, value)?;
+        }
+        write!(f, "}}\n")
     }
 }

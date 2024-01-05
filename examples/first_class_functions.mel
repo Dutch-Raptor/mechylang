@@ -8,4 +8,3 @@ let add = fn(a, b) {
 
 assert_eq(apply(add, 5, 10), 15);
 assert_eq(apply(fn(a, b) { a - b }, 5, 10), -5);
-

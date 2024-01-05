@@ -1,4 +1,6 @@
-use crate::{Object};
+use itertools::Itertools;
+
+use crate::{evaluator::iterators::IteratorObject, Object};
 
 use super::MethodInner;
 
@@ -76,7 +78,7 @@ use super::MethodInner;
 /// assert_eq("hello world".chars(), ["h", "e", "l", "l", "o", " ", "w", "o", "r", "l", "d"]);
 /// # "#);
 /// ```
-pub const STRING_METHODS: [MethodInner; 8] = [
+pub const STRING_METHODS: [MethodInner; 9] = [
     MethodInner {
         name: "contains",
         args_len: 1..=1,
@@ -197,6 +199,25 @@ pub const STRING_METHODS: [MethodInner; 8] = [
                     .map(|c| Object::String(c.to_string().into()))
                     .collect(),
             ))
+        },
+    },
+    MethodInner {
+        name: "lines",
+        args_len: 0..=0,
+        function: |obj, _, _, _, _| {
+            let s = match obj {
+                Object::String(s) => s,
+                _ => return invalid_object_err(),
+            };
+
+            Ok(Object::Iterator(IteratorObject {
+                iterator: Box::new(
+                    s.lines()
+                        .map(|str| Object::from(str))
+                        .collect_vec()
+                        .into_iter(),
+                ),
+            }))
         },
     },
 ];

@@ -28,9 +28,7 @@ impl Repl {
                     println!("{}", evaluated);
                 }
                 Err(errors) => {
-                    for error in errors.iter() {
-                        cprintln!("{}", error);
-                    }
+                    cprintln!("{}", errors)
                 }
             }
         }

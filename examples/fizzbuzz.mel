@@ -1,9 +1,8 @@
-let fizzbuzz = fn(n) {
-  
+fn fizzbuzz(n) {
   let config = [
     [3, "Fizz"],
     [5, "Buzz"],
-    [7, "Bazz"],
+    //[7, "Bazz"],
   ];
 
   for i in 1..=n {

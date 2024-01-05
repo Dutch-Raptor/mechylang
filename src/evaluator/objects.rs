@@ -1,8 +1,10 @@
 use std::{
+    collections::HashMap,
     fmt::{Debug, Display},
     rc::Rc,
 };
 
+use itertools::Itertools;
 use uuid::Uuid;
 
 use crate::parser::{expressions::Identifier, parser::BlockStatement};
@@ -103,6 +105,8 @@ pub enum Object {
     Method(Method),
 
     Reference(Reference),
+
+    Struct(HashMap<String, Object>),
 }
 
 /// Trait for unwrapping return values
@@ -221,6 +225,13 @@ impl Display for Object {
                     .join(", ");
 
                 write!(f, "[{}]", elements)
+            }
+            Object::Struct(map) => {
+                let items = map
+                    .iter()
+                    .map(|(key, value)| format!("{}: {}", key, value.to_string()))
+                    .join(", ");
+                write!(f, "{{{}}}", items)
             }
             Object::RangeFrom(from) => write!(f, "{}..", from),
             Object::RangeTo(to) => write!(f, "..{}", to),

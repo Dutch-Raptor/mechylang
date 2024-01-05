@@ -52,11 +52,18 @@
 //! # "#);
 //! ```
 
-use std::ops::RangeInclusive;
+use std::{
+    io::{stdin, BufRead, Error, Read},
+    ops::RangeInclusive,
+};
+
+use itertools::Itertools;
 
 use crate::parser::expressions::Identifier;
 
-use super::{environment::Environment, eval::Evaluator, objects::Object};
+use super::{
+    environment::Environment, eval::Evaluator, iterators::IteratorObject, objects::Object,
+};
 
 /// A builtin function that can be called from `mechylang`
 #[derive(Debug, PartialEq, Clone)]
@@ -79,7 +86,7 @@ pub struct BuiltinFunction {
 type BuiltinResult = Result<Object, (String, BuiltinError)>;
 
 /// A list of all the builtin functions in `mechylang`
-pub const BUILTINS: [BuiltinFunction; 5] = [
+pub const BUILTINS: [BuiltinFunction; 7] = [
     // The `len` function
     //
     // `Mechylang` arguments:
@@ -162,12 +169,56 @@ pub const BUILTINS: [BuiltinFunction; 5] = [
             Ok(Object::Unit)
         },
     },
+    // input_read_all
+    BuiltinFunction {
+        name: "input_read_all",
+        args_len: (0..=usize::MAX),
+        function: |args, _, eval| {
+            if args.len() > 0 {
+                eval.print(format!(
+                    "{}",
+                    args.iter()
+                        .map(|a| a.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                ));
+            }
+
+            stdin()
+                .lock()
+                .lines()
+                .collect::<Result<Vec<String>, Error>>()
+                .map(|val| Object::String(val.iter().join("\n").into()))
+                .map_err(|_| ("Failed to get input".to_string(), BuiltinError::IOError))
+        },
+    },
+    // input_read_line
+    BuiltinFunction {
+        name: "input_read_line",
+        args_len: (0..=usize::MAX),
+        function: |args, _, eval| {
+            if args.len() > 0 {
+                eval.print(format!(
+                    "{}",
+                    args.iter()
+                        .map(|a| a.to_string())
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                ));
+            }
+
+            // stdin().read_line();
+
+            todo!()
+        },
+    },
 ];
 
 #[derive(Debug, PartialEq)]
 pub enum BuiltinError {
     WrongArgumentType,
     AssertionFailed,
+    IOError,
 }
 
 impl TryFrom<&Identifier> for BuiltinFunction {

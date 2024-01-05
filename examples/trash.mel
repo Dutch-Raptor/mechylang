@@ -1,12 +1,17 @@
-// Mechylang is not that great at recursion, but it can do it.
-// It reaches it's recursion limit quite quickly, so be careful.
+// Generate a lot of memory
 
-let counter = fn(x) {
-  if (x > 61) {
-    return true;
-  } else {
-    let foobar = 9999;
-    counter(x + 1);
+fn memory_hog(n) {
+  for i in (0..n) {
+    let big_array = []
+    println(i, " ")
+    for j in (0..1000) {
+      big_array.push("Some string that is large")
+      big_array.push("Another string but as an array".iter().collect())
+    }
+    // Do nothing with this
   }
-};
-print(counter(0));
+}
+
+
+print("Hello World!")
+memory_hog(1000)
