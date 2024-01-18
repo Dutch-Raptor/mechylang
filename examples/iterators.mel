@@ -4,26 +4,34 @@
 
 // Map and filter are supported
 let a = [1, 2, 3].iter().map(fn(x) { x * 2 }).collect()
-print(a) // [2, 4, 6]
+println(a) // [2, 4, 6]
 
 let a = [1, 2, 3];
 a = a.iter().filter(fn(x) { x % 2 == 0 }).collect()
-print(a) // [2]
+println(a) // [2]
 
 // Iterators can be infinite
 let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).collect();
-print(a) // [9, 18, 27, 36, 45, 54]
+println(a) // [9, 18, 27, 36, 45, 54]
 
 // Sum and fold are supported
-let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).sum();
-print(a) // 189
+let a = (1..)
+    .iter()
+    .filter(fn(x) { x % 9 == 0 })
+    .take(6)
+    .sum();
+println(a) // 189
 
-let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).fold(0, fn(sum, x) { sum + x });
-print(a) // 189
+let a = (1..)
+    .iter()
+    .filter(fn(x) { x % 9 == 0 })
+    .take(6)
+    .fold(0, fn(sum, x) { sum + x });
+println(a) // 189
 
 // you can combine iterator methods to do more complex things
 let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).fold("", fn(acc, x) { acc + x.to_string() });
-print(a) // "91827364554"
+println(a) // "91827364554"
 
 // let's use iterators to calculage the sum of all primes <= n
 let n = 1000;
@@ -55,5 +63,5 @@ let sum_primes = fn(n) {
       .sum()
 };
 
-print(sum_primes(n)) // 76127
+println(sum_primes(n)) // 76127
 

@@ -38,7 +38,7 @@ impl Lexer {
     /// let lexer = Lexer::new(input);
     /// ```
     pub fn new<T: AsRef<str>>(input: T) -> Lexer {
-        let input = input.as_ref().to_string();
+        let input = input.as_ref().trim_end().to_string();
         let mut l = Lexer {
             input,
             position: 0,
@@ -59,12 +59,12 @@ impl Lexer {
         match self.ch {
             '\n' => {
                 self.line += 1;
-                self.column = 0;
+                self.column = 1;
             }
             '\t' => {
                 self.column += 4;
             }
-            '\r' => self.column = 0,
+            '\r' => self.column = 1,
             _ => self.column += 1,
         }
 
@@ -164,14 +164,20 @@ impl Lexer {
         }
 
         let line = self.line;
-        let column = self.column + 1; // +1 to make it 1-indexed
+        let column = self.column;
 
         let mut token_length = 1;
+
+        // Read a character and increment the token length
+        let mut read_char = |lex: &mut Lexer| {
+            lex.read_char();
+            token_length += 1;
+        };
 
         let token_kind = match self.ch {
             '=' => {
                 if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::CompareEqual)
                 } else {
                     Some(TokenKind::AssignEqual)
@@ -184,7 +190,7 @@ impl Lexer {
             ',' => Some(TokenKind::Comma),
             '+' => {
                 if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::AssignPlus)
                 } else {
                     Some(TokenKind::Plus)
@@ -192,7 +198,7 @@ impl Lexer {
             }
             '-' => {
                 if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::AssignMinus)
                 } else {
                     Some(TokenKind::Minus)
@@ -200,7 +206,7 @@ impl Lexer {
             }
             '!' => {
                 if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::CompareNotEqual)
                 } else {
                     Some(TokenKind::Bang)
@@ -210,8 +216,8 @@ impl Lexer {
             '/' => {
                 // Support comments
                 if self.peek_char() == '/' {
-                    self.read_char();
-                    while self.ch != '\n' && self.read_position < self.input.len() {
+                    read_char(self);
+                    while self.ch != '\n' && self.read_position <= self.input.len() {
                         self.read_char();
                     }
                     match self.next_token() {
@@ -220,20 +226,20 @@ impl Lexer {
                     }
                 // Support multiline comments
                 } else if self.peek_char() == '*' {
-                    self.read_char();
+                    read_char(self);
                     while !(self.ch == '*' && self.peek_char() == '/')
                         && self.read_position < self.input.len()
                     {
-                        self.read_char();
+                        read_char(self);
                     }
-                    self.read_char();
-                    self.read_char();
+                    read_char(self);
+                    read_char(self);
                     match self.next_token() {
                         Some(token) => return Some(token),
                         None => return None,
                     }
                 } else if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::AssignDivide)
                 } else {
                     Some(TokenKind::Divide)
@@ -241,7 +247,7 @@ impl Lexer {
             }
             '*' => {
                 if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::AssignMultiply)
                 } else {
                     Some(TokenKind::Multiply)
@@ -249,10 +255,10 @@ impl Lexer {
             }
             '<' => {
                 if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::CompareLessEqual)
                 } else if self.peek_char() == '<' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::BitwiseLeftShift)
                 } else {
                     Some(TokenKind::CompareLess)
@@ -260,7 +266,7 @@ impl Lexer {
             }
             '%' => {
                 if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::AssignModulo)
                 } else {
                     Some(TokenKind::Modulo)
@@ -268,10 +274,10 @@ impl Lexer {
             }
             '>' => {
                 if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::CompareGreaterEqual)
                 } else if self.peek_char() == '>' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::BitwiseRightShift)
                 } else {
                     Some(TokenKind::CompareGreater)
@@ -279,10 +285,10 @@ impl Lexer {
             }
             '&' => {
                 if self.peek_char() == '&' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::LogicalAnd)
                 } else if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::AssignBitwiseAnd)
                 } else {
                     Some(TokenKind::Ampersand)
@@ -290,10 +296,10 @@ impl Lexer {
             }
             '|' => {
                 if self.peek_char() == '|' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::LogicalOr)
                 } else if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::AssignBitwiseOr)
                 } else {
                     Some(TokenKind::BitwiseOr)
@@ -301,7 +307,7 @@ impl Lexer {
             }
             '^' => {
                 if self.peek_char() == '=' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::AssignBitwiseXor)
                 } else {
                     Some(TokenKind::BitwiseXor)
@@ -309,15 +315,15 @@ impl Lexer {
             }
             '.' => {
                 if self.peek_char() == '.' && self.peek_second_char() == '.' {
-                    self.read_char();
-                    self.read_char();
+                    read_char(self);
+                    read_char(self);
                     Some(TokenKind::Ellipsis)
                 } else if self.peek_char() == '.' && self.peek_second_char() == '=' {
-                    self.read_char();
-                    self.read_char();
+                    read_char(self);
+                    read_char(self);
                     Some(TokenKind::RangeInclusive)
                 } else if self.peek_char() == '.' {
-                    self.read_char();
+                    read_char(self);
                     Some(TokenKind::RangeExclusive)
                 } else {
                     Some(TokenKind::Dot)
@@ -327,7 +333,7 @@ impl Lexer {
             '}' => Some(TokenKind::RightSquirly),
             '[' => Some(TokenKind::LeftSquare),
             ']' => Some(TokenKind::RightSquare),
-            '\0' => Some(TokenKind::EOF),
+            '\0' => None,
             '\"' => {
                 let literal = match self.read_string() {
                     Ok(literal) => literal,
@@ -358,9 +364,7 @@ impl Lexer {
             }
         };
 
-        self.read_char();
-
-        token_kind.map(|kind| Token {
+        let token = token_kind.map(|kind| Token {
             kind,
             position: Position {
                 line,
@@ -368,7 +372,11 @@ impl Lexer {
                 length: token_length,
                 file: self.file.clone(),
             },
-        })
+        });
+
+        self.read_char();
+
+        token
     }
 
     pub fn lines(&self) -> Rc<[String]> {
@@ -443,7 +451,6 @@ mod test {
                     TokenKind::AssignEqual,
                     TokenKind::Number("5".to_string()),
                     TokenKind::Semicolon,
-                    TokenKind::EOF,
                 ],
             ),
             (
@@ -454,7 +461,6 @@ mod test {
                     TokenKind::AssignEqual,
                     TokenKind::Number("10".to_string()),
                     TokenKind::Semicolon,
-                    TokenKind::EOF,
                 ],
             ),
             (
@@ -476,7 +482,6 @@ mod test {
                     TokenKind::Semicolon,
                     TokenKind::RightSquirly,
                     TokenKind::Semicolon,
-                    TokenKind::EOF,
                 ],
             ),
             (
@@ -492,7 +497,6 @@ mod test {
                     TokenKind::Identifier("ten".to_string()),
                     TokenKind::RightParen,
                     TokenKind::Semicolon,
-                    TokenKind::EOF,
                 ],
             ),
             // This starts a multiline comment
@@ -506,7 +510,6 @@ mod test {
                     TokenKind::CompareGreater,
                     TokenKind::Number("5".to_string()),
                     TokenKind::Semicolon,
-                    TokenKind::EOF,
                 ],
             ),
             (
@@ -518,7 +521,6 @@ mod test {
                     TokenKind::CompareGreaterEqual,
                     TokenKind::Number("5".to_string()),
                     TokenKind::Semicolon,
-                    TokenKind::EOF,
                 ],
             ),
             (
@@ -535,7 +537,6 @@ mod test {
                     TokenKind::Number("3".to_string()),
                     TokenKind::RightSquare,
                     TokenKind::Semicolon,
-                    TokenKind::EOF,
                 ],
             ),
             (
@@ -556,7 +557,6 @@ mod test {
                     TokenKind::RightParen,
                     TokenKind::Semicolon,
                     TokenKind::RightSquirly,
-                    TokenKind::EOF,
                 ],
             ),
             (
@@ -568,7 +568,6 @@ mod test {
                     TokenKind::Number("1".to_string()),
                     TokenKind::RangeInclusive,
                     TokenKind::Number("5".to_string()),
-                    TokenKind::EOF,
                 ],
             ),
             (
@@ -613,7 +612,6 @@ mod test {
                     TokenKind::Semicolon,
                     TokenKind::RightSquirly,
                     TokenKind::RightSquirly,
-                    TokenKind::EOF,
                 ],
             ),
         ];
@@ -633,7 +631,6 @@ mod test {
             TokenKind::AssignEqual,
             TokenKind::Number("5".to_string()),
             TokenKind::Semicolon,
-            TokenKind::EOF,
         ];
 
         let lexer = Lexer::new(input);
@@ -667,7 +664,25 @@ mod test {
             TokenKind::AssignEqual,
             TokenKind::Number("10".to_string()),
             TokenKind::Semicolon,
-            TokenKind::EOF,
+        ];
+
+        let tokens = lex_token_kinds(input);
+        assert_eq!(tokens, expected_tokens);
+
+        let input = r#"
+            assert_eq(1, 1, 1); // ok
+        "#;
+
+        let expected_tokens = vec![
+            TokenKind::Identifier("assert_eq".to_string()),
+            TokenKind::LeftParen,
+            TokenKind::Number("1".to_string()),
+            TokenKind::Comma,
+            TokenKind::Number("1".to_string()),
+            TokenKind::Comma,
+            TokenKind::Number("1".to_string()),
+            TokenKind::RightParen,
+            TokenKind::Semicolon,
         ];
 
         let tokens = lex_token_kinds(input);
@@ -693,7 +708,6 @@ mod test {
             TokenKind::AssignEqual,
             TokenKind::Number("5".to_string()),
             TokenKind::Semicolon,
-            TokenKind::EOF,
         ];
 
         let tokens = lex_token_kinds(input);
@@ -1039,15 +1053,6 @@ mod test {
                     file: None,
                 },
             },
-            Token {
-                kind: TokenKind::EOF,
-                position: Position {
-                    line: 11,
-                    column: 9,
-                    length: 1,
-                    file: None,
-                },
-            },
         ];
 
         let tokens = lex(input);
@@ -1057,5 +1062,17 @@ mod test {
             assert_eq!(token.kind, expected_tokens[i].kind);
             assert_eq!(token.position, expected_tokens[i].position);
         }
+    }
+
+    #[test]
+    fn test_newline_token_positions() {
+        let input = r#"
+        let x = 5;
+        return
+        "#;
+
+        let lexed = lex(input);
+
+        println!("{:#?}", lexed);
     }
 }

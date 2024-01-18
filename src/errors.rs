@@ -8,7 +8,7 @@ use std::{
 use color_print::cformat;
 use itertools::Itertools;
 
-use crate::evaluator::builtins::BuiltinError;
+use crate::{evaluator::builtins::BuiltinError, Token};
 
 #[derive(Debug, PartialEq)]
 pub struct InterpreterErrors(pub Vec<Error>);
@@ -27,15 +27,48 @@ impl Deref for InterpreterErrors {
     }
 }
 
+/// Number of lines to print before and after the line with the error
+const CONTEXT_LINES: usize = 2;
+
 #[derive(Debug, PartialEq)]
 pub struct Error {
     pub kind: ErrorKind,
-    pub line_nr: usize,
-    pub column: usize,
+    pub token: Option<Token>,
     pub message: String,
-    pub line: String,
+    pub line: Option<String>,
     pub context: Option<String>,
     pub lines: Rc<[String]>,
+}
+
+impl Error {
+    pub fn new(
+        kind: ErrorKind,
+        message: impl ToString,
+        token: Option<&Token>,
+        lines: &[impl ToString],
+        context: Option<String>,
+    ) -> Self {
+        let message = message.to_string();
+
+        let line = token
+            .map(|token| lines.get(token.position.line - 1))
+            .flatten()
+            .map(|line| line.to_string());
+
+        Self {
+            kind,
+            token: token.cloned(),
+            message,
+            line,
+            context,
+            lines: Rc::from(
+                lines
+                    .iter()
+                    .map(|line| line.to_string())
+                    .collect::<Vec<_>>(),
+            ),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -65,12 +98,27 @@ pub enum ErrorKind {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let caret_offset = match self.column {
-            c if c < 2 => 0,
-            _ => self.column - 2, // -1 for 1 indexing, -1 becuase it is an offset
+        match &self.token {
+            Some(ref token) => self.fmt_with_token(f, token),
+            None => self.fmt_without_token(f),
+        }
+    }
+}
+
+impl Error {
+    fn fmt_without_token(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
+
+    fn fmt_with_token(&self, f: &mut Formatter<'_>, token: &Token) -> fmt::Result {
+        let caret_offset = match token.position.column {
+            c if c < 1 => 0,
+            _ => token.position.column - 1,
         };
 
-        let pos = format!("{}:{}", self.line_nr, self.column);
+        let caret_len = token.position.length;
+
+        let pos = format!("{}:{}", token.position.line, token.position.column);
         let pos_len = pos.len();
 
         let context = match &self.context {
@@ -86,15 +134,15 @@ impl Display for Error {
         };
 
         // Print context before line with error
-        if self.line_nr > 1 {
+        if token.position.line > 1 {
             let lines_before = 2;
-            let start_idx = if self.line_nr - 1 < lines_before {
+            let start_idx = if token.position.line - 1 < lines_before {
                 0
             } else {
-                self.line_nr - lines_before - 1
+                token.position.line - lines_before - 1
             };
 
-            for i in start_idx..self.line_nr - 1 {
+            for i in start_idx..token.position.line - 1 {
                 let line = match self.lines.get(i) {
                     Some(line) => line,
                     None => continue,
@@ -115,13 +163,17 @@ impl Display for Error {
             ),
         )?;
 
-        writeln!(f, "{}", cformat!("{} | {}", pos, self.line),)?;
+        self.line
+            .as_ref()
+            .map(|line| writeln!(f, "{}", cformat!("{:pos_len$} | {}", pos, line)))
+            .unwrap_or(Ok(()))?;
 
         writeln!(
             f,
             "{}",
             cformat!(
-                "{:pos_len$} | {:caret_offset$}<r>^</> {}",
+                "{:pos_len$} | {:caret_offset$}<r>{:^<caret_len$}</> {}",
+                "",
                 "",
                 "",
                 first_line
@@ -133,15 +185,15 @@ impl Display for Error {
         }
 
         // Print context after line with error
-        if self.lines.len() >= self.line_nr - 1 {
+        if self.lines.len() >= token.position.line - 1 {
             let lines_after = 2;
-            let end_idx = if self.line_nr + lines_after - 1 > self.lines.len() {
+            let end_idx = if token.position.line + lines_after - 1 > self.lines.len() {
                 self.lines.len()
             } else {
-                self.line_nr + lines_after
+                token.position.line + lines_after
             };
 
-            for i in self.line_nr..end_idx {
+            for i in token.position.line..end_idx {
                 let line = match self.lines.get(i) {
                     Some(line) => line,
                     None => continue,

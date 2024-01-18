@@ -609,28 +609,8 @@ impl Evaluator {
     fn error(&self, token: Option<&Token>, message: &str, error_kind: ErrorKind) -> Error {
         let _trace =
             trace!(&format!("error({:?}, {}, {:?})", token, message, error_kind).to_string());
-        let (line_nr, line, column) = if let Some(token) = token {
-            (
-                token.position.line,
-                self.lines
-                    // line is 1-indexed
-                    .get(token.position.line - 1)
-                    .unwrap_or(&"Failed to get line".to_string())
-                    .clone(),
-                token.position.column,
-            )
-        } else {
-            (0, "".to_string(), 0)
-        };
-        Error {
-            line,
-            line_nr,
-            column,
-            kind: error_kind,
-            message: message.to_string(),
-            context: None,
-            lines: self.lines.clone(),
-        }
+
+        Error::new(error_kind, message, token, &self.lines, None)
     }
 
     fn eval_identifier(
@@ -687,7 +667,7 @@ impl Evaluator {
         self.apply_function(function, arguments, None)
             .map_err(|err| {
                 // only apply current token if there is no token set
-                if !err.line.is_empty() && err.line_nr != 0 && err.column != 0 {
+                if err.token.is_some() {
                     return err;
                 }
 
@@ -1234,13 +1214,17 @@ impl Evaluator {
             Ok(method) => return Ok(Object::Method(method)),
             Err(MethodError::NotFound) => {}
             Err(err @ MethodError::IterMethodOnIterable(_)) => {
-                return Err(self.error(Some(&member.token), &err.to_string(), ErrorKind::TypeError))
+                return Err(self.error(
+                    Some(&member.property.token),
+                    &err.to_string(),
+                    ErrorKind::TypeError,
+                ))
             }
         };
 
         // try to read property from object
         Err(self.error(
-            Some(&member.token),
+            Some(&member.property.token),
             &format!(
                 "Property or method '{}' not found on object: {:?}",
                 property, object
@@ -1262,7 +1246,14 @@ impl Evaluator {
                 &format!(
                     "Wrong number of arguments: expected {}, got {}",
                     match method.args_len.start() - method.args_len.end() {
-                        0 => format!("{} argument(s)", method.args_len.start()),
+                        0 => format!(
+                            "{} argument{}",
+                            method.args_len.start(),
+                            match method.args_len.start() {
+                                1 => "",
+                                _ => "s",
+                            }
+                        ),
                         _ => format!(
                             "{} to {} arguments",
                             method.args_len.start(),
@@ -1372,6 +1363,7 @@ mod tests {
             Err(errors) => {
                 for error in errors.iter() {
                     println!("{}", error);
+                    println!("{:#?}", error);
                 }
 
                 panic!("Error occured while evaluating input: {}", input);
@@ -1522,13 +1514,13 @@ mod tests {
     #[test]
     fn test_if_else_expressions() {
         let tests = vec![
-            ("if (true) { 10 }", Object::Integer(10)),
-            ("if (false) { 10 }", Object::Unit),
-            ("if (1) { 10 }", Object::Integer(10)),
-            ("if (1 < 2) { 10 }", Object::Integer(10)),
-            ("if (1 > 2) { 10 }", Object::Unit),
-            ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
-            ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
+            ("if (true) { 10; }", Object::Integer(10)),
+            ("if (false) { 10; }", Object::Unit),
+            ("if (1) { 10; }", Object::Integer(10)),
+            ("if (1 < 2) { 10; }", Object::Integer(10)),
+            ("if (1 > 2) { 10; }", Object::Unit),
+            ("if (1 > 2) { 10; } else { 20; }", Object::Integer(20)),
+            ("if (1 < 2) { 10; } else { 20; }", Object::Integer(10)),
         ];
 
         for (input, expected) in tests {
@@ -1541,17 +1533,17 @@ mod tests {
     fn test_block_expressions() {
         let tests = vec![
             ("{ 1; 2; 3; }", Object::Integer(3)),
-            ("4 == { 4 }", Object::Boolean(true)),
-            ("4 == { 5 }", Object::Boolean(false)),
-            ("{ 4 } == 4", Object::Boolean(true)),
-            ("{ 5 } == 4", Object::Boolean(false)),
-            ("{ 4 } == { 4 }", Object::Boolean(true)),
-            ("{ 4 } == { 5 }", Object::Boolean(false)),
-            ("{ 4; 5 } == { 4; 5 }", Object::Boolean(true)),
-            ("{ 4; 5 } == { 5; 4 }", Object::Boolean(false)),
-            ("{ 4; 5; 6 } == { 4; 5 }", Object::Boolean(false)),
-            ("{ 4; 5 } == { 4; 5; 6 }", Object::Boolean(false)),
-            ("{ 4; 5; 6 } == { 4; 6 }", Object::Boolean(true)),
+            ("4 == { 4; }", Object::Boolean(true)),
+            ("4 == { 5; }", Object::Boolean(false)),
+            ("{ 4; } == 4", Object::Boolean(true)),
+            ("{ 5; } == 4", Object::Boolean(false)),
+            ("{ 4; } == { 4; }", Object::Boolean(true)),
+            ("{ 4; } == { 5; }", Object::Boolean(false)),
+            ("{ 4; 5; } == { 4; 5; }", Object::Boolean(true)),
+            ("{ 4; 5; } == { 5; 4; }", Object::Boolean(false)),
+            ("{ 4; 5; 6; } == { 4; 5; }", Object::Boolean(false)),
+            ("{ 4; 5; } == { 4; 5; 6; }", Object::Boolean(false)),
+            ("{ 4; 5; 6; } == { 4; 6; }", Object::Boolean(true)),
         ];
 
         for (input, expected) in tests {
@@ -1568,19 +1560,19 @@ mod tests {
             ("return 2 * 5; 9;", Object::Integer(10)),
             ("9; return 2 * 5; 9;", Object::Integer(10)),
             (
-                "if (10 > 1) { if (10 > 1) { return 10; } return 1; }",
+                "if (10 > 1) { if (10 > 1) { return 10; }; return 1; }",
                 Object::Integer(10),
             ),
             (
-                "9; if (10 > 1) { if (10 > 1) { return 10; } return 1; }",
+                "9; if (10 > 1) { if (10 > 1) { return 10; }; return 1; }",
                 Object::Integer(10),
             ),
             (
-                "if (10 > 1) { if (10 < 1) { return 10; } return 1; } return 9;",
+                "if (10 > 1) { if (10 < 1) { return 10; }; return 1; }; return 9;",
                 Object::Integer(1),
             ),
             (
-                "if (10 < 1) { if (10 < 1) { return 10; } return 1; } return 9;",
+                "if (10 < 1) { if (10 < 1) { return 10; }; return 1; }; return 9;",
                 Object::Integer(9),
             ),
             // (
@@ -1718,8 +1710,8 @@ mod tests {
                     let error = errors.0.first().unwrap();
                     assert_eq!(error.message, message);
                     assert_eq!(error.kind, error_kind);
-                    assert_eq!(error.line.trim(), line_with_err.trim());
-                    assert_eq!(error.line_nr, line_nr);
+                    assert_eq!(error.line.as_ref().unwrap().trim(), line_with_err);
+                    assert_eq!(error.token.as_ref().unwrap().position.line, line_nr);
                 }
                 _ => panic!("No error object returned. Got: {:?}", evaluated),
             }
@@ -1797,16 +1789,25 @@ mod tests {
                 Object::Integer(20),
             ),
             ("(fn(x) { x; })(5)", Object::Integer(5)),
-            ("let x = 5;
-            let factorial = fn(n) { if (n == 0) { return 1; } return n * factorial(n - 1); }; factorial(5);", Object::Integer(120)),
-
+            (
+                "
+            let x = 5; 
+            let factorial = fn(n) { if (n == 0) { return 1; }; return n * factorial(n - 1); }; factorial(5);",
+                Object::Integer(120),
+            ),
+            (
+                "
+            let x = 5; 
+            let factorial = fn(n) { if (n == 0) { return 1; }; return n * factorial(n - 1); }; factorial(5);",
+                Object::Integer(120),
+            ),
             (
                 "let x = 5;
             let inc_x = fn() { x = x + 1; }; inc_x(); x;",
                 Object::Integer(6),
             ),
             (
-            r#"
+                r#"
                 let adder = fn(x) {
                   return fn(y) {
                     return x + y;
@@ -1817,8 +1818,8 @@ mod tests {
                 let result = add5(10); // result = 15
                 result;
                 "#,
-            Object::Integer(15),
-        ),
+                Object::Integer(15),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -2214,7 +2215,7 @@ mod tests {
     fn test_iter_methods() {
         let tests = vec![
             (
-                r#"let a = [1, 2, 3]; a.iter().map(fn(x) { x * 2 }).collect()"#,
+                r#"let a = [1, 2, 3]; a.iter().map(fn(x) { x * 2; }).collect()"#,
                 Object::Array(vec![
                     Object::Integer(2),
                     Object::Integer(4),
@@ -2222,12 +2223,12 @@ mod tests {
                 ]),
             ),
             (
-                r#"let a = [1, 2, 3]; a.iter().filter(fn(x) { x % 2 == 0 }).collect()"#,
+                r#"let a = [1, 2, 3]; a.iter().filter(fn(x) { x % 2 == 0; }).collect()"#,
                 Object::Array(vec![Object::Integer(2)]),
             ),
             (
                 r#"
-                let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).collect();
+                let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).collect();
                 a;
                 "#,
                 Object::Array(vec![
@@ -2242,21 +2243,21 @@ mod tests {
             // sum of first 6 multiples of 9
             (
                 r#"
-                let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).sum();
+                let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).sum();
                 a;
                 "#,
                 Object::Integer(189),
             ),
             (
                 r#"
-                let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).take(6).fold("", fn(acc, x) { acc + x.to_string() });
+                let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).fold("", fn(acc, x) { acc + x.to_string(); });
                 a;
                 "#,
                 Object::String("91827364554".into()),
             ),
             (
                 r#"
-                let a = (1..).iter().filter(fn(x) { x % 9 == 0 }).step_by(2).skip(2).take(4).collect();
+                let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).step_by(2).skip(2).take(4).collect();
                 a;
                 "#,
                 Object::Array(vec![
@@ -2322,11 +2323,11 @@ mod tests {
                     (5..=n).iter()
                       .step_by(6)
                       .fold([2, 3], fn(primes, i) {
-                          if primes.iter().filter(fn(p) { i % p == 0 }).count() == 0 {
+                          if primes.iter().filter(fn(p) { i % p == 0; }).count() == 0 {
                               primes.push(i);
                           }
 
-                          if i + 2 <= n && primes.iter().filter(fn(p) { (i + 2) % p == 0 }).count() == 0 {
+                          if i + 2 <= n && primes.iter().filter(fn(p) { (i + 2) % p == 0; }).count() == 0 {
                               primes.push(i + 2);
                           }
                           primes;

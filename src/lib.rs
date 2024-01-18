@@ -279,7 +279,7 @@
 //!
 //! assert_eq(apply(add, 5, 10), 15);
 //! // You can also use an anonymous function without binding it to a variable
-//! assert_eq(apply(fn(a, b) { a - b }, 5, 10), -5);
+//! assert_eq(apply(fn(a, b) { a - b; }, 5, 10), -5);
 //! # "#);
 //! ```
 //!
@@ -408,7 +408,7 @@
 //! # mechylang::test_utils::test_eval_ok(r#"
 //! let a = [1, 2, 3];
 //! let b = [1, 2, 3, [4, 5, 6]];
-//! let c = [1, 2, 3, fn(a, b) { a + b }];
+//! let c = [1, 2, 3, fn(a, b) { a + b; }];
 //! # "#);
 //! ```
 //!

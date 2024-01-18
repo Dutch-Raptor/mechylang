@@ -11,6 +11,8 @@ pub mod range_methods;
 pub mod string_methods;
 pub mod struct_methods;
 
+use color_print::cformat;
+
 use self::struct_methods::STRUCT_METHODS;
 pub(crate) use self::{
     array_methods::ARRAY_METHODS,
@@ -331,7 +333,12 @@ pub const ITERATOR_METHODS: [MethodInner; 10] =
 
                 let function = match &args[0] {
                     Object::Function(f) => f.clone(),
-                    _ => return Err("Expected function for map".to_string()),
+                    _ => {
+                        return Err(cformat!(
+                            "map expects <i>`fn(Object) -> Object`</> as it's argument, got {:?}",
+                            args[0]
+                        ))
+                    }
                 };
 
                 Ok(Object::Iterator(IteratorObject {

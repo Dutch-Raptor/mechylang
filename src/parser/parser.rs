@@ -188,10 +188,10 @@ impl Parser {
             None => Token {
                 kind: TokenKind::EOF,
                 position: Position {
-                    line: self.cur_token.position.line,
-                    column: self.cur_token.position.column + self.cur_token.position.length,
-                    length: 0,
-                    file: self.cur_token.position.file.clone(),
+                    line: self.peek_token.position.line,
+                    column: self.peek_token.position.column + self.peek_token.position.length + 1,
+                    length: 1,
+                    file: self.peek_token.position.file.clone(),
                 }
             },
         };
@@ -227,8 +227,28 @@ impl Parser {
             _ => self.parse_expression_statement()?,
         };
 
+        // next statement must be seperated by a semicolon or on a new line
         if self.peek_token.kind == TokenKind::Semicolon {
             self.next_token();
+        } else {
+            // determine if the stament was ended properly
+            // ie. the next token is on a new line or EOF
+            let mut ended_properly = false;
+            if self.cur_token.position.line != self.peek_token.position.line {
+                ended_properly = true;
+            } else if self.peek_token.kind == TokenKind::EOF {
+                ended_properly = true;
+            }
+
+            if !ended_properly {
+                return Err(self.error_peek(
+                    ErrorKind::UnexpectedToken,
+                    cformat!(
+                        "Expected end of statement, got <i>{:?}</i> instead",
+                        self.peek_token.kind
+                    ),
+                ));
+            }
         }
 
         Ok(statement)
@@ -246,8 +266,7 @@ impl Parser {
                     token,
                     self.cur_token.kind
                 ),
-                self.cur_token.position.line,
-                self.cur_token.position.column,
+                Some(&self.cur_token),
                 None,
             ))
         }
@@ -261,16 +280,13 @@ impl Parser {
             self.next_token();
             Ok(())
         } else {
-            Err(self.error(
+            Err(self.error_peek(
                 ErrorKind::UnexpectedToken,
                 cformat!(
                     "Expected next token to be <i>{:?}</i>, got <i>{:?}</i> instead",
                     token,
                     self.peek_token.kind
                 ),
-                self.peek_token.position.line,
-                self.peek_token.position.column,
-                None,
             ))
         }
     }
@@ -324,7 +340,25 @@ impl Parser {
             return Ok(statement);
         }
 
-        let expression = self.parse_expression(Precedence::Lowest)?;
+        let expression = match self.parse_expression(Precedence::Lowest) {
+            Ok(expression) => expression,
+            // If there is no expression, let the user know that they need to return something or
+            // use a semicolon
+            Err(Error {
+                kind: ErrorKind::MissingPrefix, ..
+            }) => {
+                return Err(self.error(
+                    ErrorKind::UnexpectedToken,
+                    cformat!(
+                        "Expected an expression or semicolon after <i>`return`</i>, got <i>{:?}</i> instead",
+                        self.cur_token.kind
+                    ),
+                    Some(&self.cur_token),
+                    None,
+                ));
+            }
+            Err(err) => return Err(err),
+        };
 
         let statement = Statement::Return(ReturnStatement {
             token,
@@ -838,38 +872,23 @@ impl Parser {
         &self,
         kind: ErrorKind,
         msg: impl ToString,
-        line: usize,
-        col: usize,
+        token: Option<&Token>,
         context: Option<String>,
     ) -> Error {
-        let error = Error {
-            kind,
-            message: msg.to_string(),
-            line_nr: line,
-            column: col,
-            context,
-            line: self
-                .lines
-                // line is 1-indexed
-                .get(line - 1)
-                .unwrap_or(&"Failed to get line".to_string())
-                .clone(),
-            lines: self.lines.clone(),
-        };
+        let error = Error::new(kind, msg, token, &self.lines, context);
         trace!(format!("Error: {:?}", error).as_str());
         error
     }
 
     fn error_current(&self, kind: ErrorKind, msg: impl ToString) -> Error {
-        self.error(kind, msg, self.cur_token.position.line, self.cur_token.position.column, None)
+        self.error(kind, msg, Some(&self.cur_token), None)
     }
 
     fn error_current_with_context(&self, kind: ErrorKind, msg: impl ToString, context: String) -> Error {
         self.error(
             kind,
             msg,
-            self.cur_token.position.line,
-            self.cur_token.position.column,
+            Some(&self.cur_token),
             Some(context),
         )
     }
@@ -878,8 +897,7 @@ impl Parser {
         self.error(
             kind,
             msg,
-            self.peek_token.position.line,
-            self.peek_token.position.column,
+            Some(&self.peek_token),
             None,
         )
     }
@@ -889,8 +907,7 @@ impl Parser {
         self.error(
             kind,
             msg,
-            self.peek_token.position.line,
-            self.peek_token.position.column,
+            Some(&self.peek_token),
             Some(context),
         )
     }
@@ -976,7 +993,17 @@ impl Parser {
         }
 
         self.next_token();
-        arguments.push(self.parse_expression(Precedence::Lowest)?);
+
+        arguments.push(match self.parse_expression(Precedence::Lowest) {
+            Err(Error { kind: ErrorKind::MissingPrefix, .. }) => {
+                return Err(self.error_current(
+                    ErrorKind::UnexpectedToken,
+                    format!("Expected an expression or a {:?}, got {:?} instead", end, self.cur_token.kind),
+                ))
+            }
+            Err(e) => return Err(e),
+            Ok(e) => e,
+        });
 
         while self.peek_token.kind == TokenKind::Comma {
             self.next_token();
@@ -1296,9 +1323,9 @@ impl Parser {
     }
 
     fn parse_member(&mut self, left: Expression) -> Result<Expression, Error> {
-        let token = self.cur_token.clone();
 
         self.next_token();
+        let token = self.cur_token.clone();
 
         let property = match self.parse_identifier()? {
             Expression::Identifier(ident) => ident,
@@ -1518,7 +1545,7 @@ fn test_operator_precedence_parsing() {
 
     #[test]
     fn test_if_expression() {
-        let input = "if x < y { x }";
+        let input = "if x < y { x; }";
 
 
         let statements = parse(input).unwrap();
