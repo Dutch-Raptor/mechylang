@@ -257,6 +257,21 @@
 //! # "#);
 //! ```
 //!
+//! The last expression in a function is implicitly returned.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! fn is_even(x) {
+//!   if x % 2 == 0 {
+//!     return true
+//!   }
+//!   false
+//! }
+//! assert_eq(is_even(10), true)
+//! assert_eq(is_even(11), false)
+//! # "#);
+//! ```
+//!
 //! Functions can be passed as arguments to other functions.
 //!
 //! ```rust

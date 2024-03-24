@@ -13,7 +13,7 @@ pub fn defer<F: FnOnce()>(f: F) -> impl Drop {
 
 static mut INDENT: usize = 0;
 #[cfg(not(test))]
-const TRACE_ENABLED: bool = true;
+const TRACE_ENABLED: bool = false;
 #[cfg(test)]
 const TRACE_ENABLED: bool = false;
 
