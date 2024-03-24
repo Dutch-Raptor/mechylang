@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":["cformat","cprint","cprintln","cstr","untagged"]};
