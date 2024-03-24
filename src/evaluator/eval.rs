@@ -1,3 +1,7 @@
+use crate::evaluator::objects::function::Function;
+use crate::evaluator::objects::iterators::IteratorObject;
+use crate::evaluator::runtime::builtins::BuiltinFunction;
+use crate::Environment;
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
@@ -12,15 +16,12 @@ use crate::{
         },
         parser::{BlockStatement, LetStatement, Parser, Program, Statement},
     },
-    trace,
+    trace, Object,
 };
 
 use super::{
-    builtins::BuiltinFunction,
-    environment::Environment,
-    iterators::IteratorObject,
     methods::{Method, MethodError},
-    objects::{Function, Object, UnwrapReturnValue},
+    objects::traits::UnwrapReturnValue,
 };
 
 pub type EvalResult = Result<Object, InterpreterErrors>;
@@ -307,12 +308,6 @@ impl Evaluator {
 
         self.current_token = Some(infix.token.clone());
 
-        let err = self.error(
-            self.current_token.as_ref(),
-            format!("Type mismatch: {:?} {} {:?}", left, infix.operator, right).as_str(),
-            ErrorKind::TypeMismatch,
-        );
-
         match (&left, &right) {
             (Object::Unit, _) | (_, Object::Unit) => {
                 self.eval_unit_infix_expression(&infix.operator, &left, &right)
@@ -335,7 +330,11 @@ impl Evaluator {
             (Object::String(left), Object::String(right)) => {
                 self.eval_string_infix_expression(&infix.operator, left.clone(), right.clone())
             }
-            _ => Err(err),
+            _ => Err(self.error(
+                self.current_token.as_ref(),
+                format!("Type mismatch: {:?} {} {:?}", left, infix.operator, right).as_str(),
+                ErrorKind::TypeMismatch,
+            )),
         }
     }
 
@@ -657,7 +656,7 @@ impl Evaluator {
         if let Object::Unit = function {
             return Err(self.error(
                 Some(call.function.token()),
-                "Cannot call null",
+                "Cannot call unit value",
                 ErrorKind::TypeError,
             ));
         }
@@ -1349,11 +1348,10 @@ impl Evaluator {
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        errors::ErrorKind,
-        evaluator::{builtins::BuiltinError, objects::Object},
-        test_utils::test_eval_ok,
-    };
+    use crate::evaluator::runtime::builtins::BuiltinError;
+    use crate::test_utils::test_eval_err;
+    use crate::Object;
+    use crate::{errors::ErrorKind, test_utils::test_eval_ok};
 
     use super::{EvalResult, Evaluator};
 
@@ -2095,44 +2093,59 @@ mod tests {
 
     #[test]
     fn test_eval_break_continue() {
-        let tests = vec![
-            (
-                "let sum = 0;
-                for i in 1..5 {
-                    if (i == 3) {
-                        break;
-                    }
-                    sum += i;
+        test_eval_ok(
+            r#"
+            let sum = 0
+            for i in 1..5 {
+                if (i == 3) {
+                    break
                 }
-                sum;",
-                Object::Integer(3),
-            ),
-            (
-                "let sum = 0;
-                for i in 1..5 {
-                    if (i == 3) {
-                        continue;
-                    }
-                    sum += i;
-                }
-                sum;",
-                Object::Integer(7),
-            ),
-            (
-                "let sum = for i in 1..5 {
-                    if (i == 3) {
-                        break 17;
-                    }
-                }
-                sum;",
-                Object::Integer(17),
-            ),
-        ];
+                sum += i
+            }
 
-        for (input, expected) in tests {
-            let evaluated = test_eval(input);
-            assert_eq!(evaluated, expected);
-        }
+            assert_eq(sum, 3)
+        "#,
+        );
+
+        test_eval_ok(
+            r#"
+            let sum = 0
+            for i in 1..5 {
+                if (i == 3) {
+                    continue
+                }
+                sum += i
+            }
+
+            assert_eq(sum, 7)
+            "#,
+        );
+
+        test_eval_ok(
+            r#"
+            let sum = for i in 1..5 {
+                if (i == 3) {
+                    break 17
+                }
+            }
+            assert_eq(sum, 17)
+            "#,
+        );
+
+        test_eval_ok(
+            r#"
+            let running_sum = 0
+            let sum = for i in 1..5 {
+                if (i == 3) {
+                    continue
+                }
+                running_sum += i
+                i
+            }
+            assert_eq(sum, 4)
+            assert_eq(running_sum, 7)
+            "#,
+        );
     }
 
     #[test]
@@ -2490,6 +2503,37 @@ mod tests {
                     b: 2,
                 };
             "#,
+        );
+    }
+
+    #[test]
+    fn test_function_declaration_in_block() {
+        test_eval_ok(
+            r#"
+                let a = {
+                    fn add(a, b) {
+                        a + b
+                    }
+
+                    add(1, 2)
+                };
+
+                assert_eq(a, 3);
+            "#,
+        );
+
+        // cannot access function outside of block as it does not exist
+        test_eval_err(
+            r#"
+                let a = {
+                    fn add(a, b) {
+                        a + b
+                    }
+                };
+
+                assert_eq(a(1, 2), 3);
+            "#,
+            &[ErrorKind::TypeError],
         );
     }
 }

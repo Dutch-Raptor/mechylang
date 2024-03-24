@@ -25,7 +25,7 @@ enum Command {
     Repl,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = CommandArgs::parse();
 
     if let Some(command) = args.command {
@@ -41,15 +41,19 @@ fn main() {
                     }
                 }
             }
-            Command::Repl => repl(),
+            Command::Repl => repl()?,
         }
     } else {
         let mut repl = Repl::new();
-        repl.run();
-    }
+        repl.run()?;
+    };
+
+    Ok(())
 }
 
-fn repl() {
+fn repl() -> Result<(), Box<dyn std::error::Error>> {
     let mut repl = Repl::new();
-    repl.run();
+    repl.run()?;
+
+    Ok(())
 }

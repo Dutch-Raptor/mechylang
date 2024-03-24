@@ -8,7 +8,7 @@ use std::{
 use color_print::cformat;
 use itertools::Itertools;
 
-use crate::{evaluator::builtins::BuiltinError, Token};
+use crate::{evaluator::runtime::builtins::BuiltinError, Token};
 
 #[derive(Debug, PartialEq)]
 pub struct InterpreterErrors(pub Vec<Error>);
@@ -26,9 +26,6 @@ impl Deref for InterpreterErrors {
         &self.0
     }
 }
-
-/// Number of lines to print before and after the line with the error
-const CONTEXT_LINES: usize = 2;
 
 #[derive(Debug, PartialEq)]
 pub struct Error {
@@ -106,7 +103,7 @@ impl Display for Error {
 }
 
 impl Error {
-    fn fmt_without_token(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt_without_token(&self, _f: &mut Formatter<'_>) -> fmt::Result {
         todo!()
     }
 

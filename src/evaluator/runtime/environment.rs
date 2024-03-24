@@ -108,8 +108,8 @@
 //! # Example
 //!
 //! ```rust
-//! use mechylang::evaluator::environment::Environment;
-//! use mechylang::evaluator::objects::Object;
+//! use mechylang::Environment;
+//! use mechylang::Object;
 //!
 //! let mut env = Environment::new();
 //! env.set("x", Object::Integer(1));
@@ -142,6 +142,7 @@
 //! For more info on [`Environment::set`](Environment::set), [`Environment::update`](Environment::update),
 //! [`Environment::get`](Environment::get) and [`Environment::new_enclosed`](Environment::new_enclosed)
 //! see their respective documentation.
+use crate::Object;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -151,16 +152,14 @@ use std::{
 
 use uuid::Uuid;
 
-use super::objects::Object;
-
 #[derive(Debug, Default)]
 /// An environment is a representation of a scope, which also has access to any outer scopes.
 ///
 /// # Usage
 ///
 /// ```rust
-/// use mechylang::evaluator::environment::Environment;
-/// use mechylang::evaluator::objects::Object;
+/// use mechylang::Environment;
+/// use mechylang::Object;
 ///
 /// let mut env = Environment::new();
 /// env.set("x", Object::Integer(1));
@@ -187,8 +186,8 @@ impl Environment {
     /// # Example
     ///
     /// ```rust
-    /// use mechylang::evaluator::environment::Environment;
-    /// use mechylang::evaluator::objects::Object;
+    /// use mechylang::Environment;
+    /// use mechylang::Object;
     ///
     /// let mut env = Environment::new();
     /// env.set("x", Object::Integer(1));
@@ -265,8 +264,8 @@ impl Environment {
     /// # Example
     ///
     /// ```rust
-    /// use mechylang::evaluator::environment::Environment;
-    /// use mechylang::evaluator::objects::Object;
+    /// use mechylang::Environment;
+    /// use mechylang::Object;
     ///
     /// let mut env = Environment::new();
     ///
@@ -305,8 +304,8 @@ impl Environment {
     /// # Example
     ///
     /// ```rust
-    /// use mechylang::evaluator::environment::Environment;
-    /// use mechylang::evaluator::objects::Object;
+    /// use mechylang::Environment;
+    /// use mechylang::Object;
     ///
     /// let mut env = Environment::new();
     /// env.set("x", Object::Integer(1));
@@ -331,8 +330,8 @@ impl Environment {
     ///
     /// # Example
     /// ```
-    /// use mechylang::evaluator::environment::Environment;
-    /// use mechylang::evaluator::objects::Object;
+    /// use mechylang::Environment;
+    /// use mechylang::Object;
     ///
     /// let mut env = Environment::new();
     /// env.set("x", Object::Integer(1));

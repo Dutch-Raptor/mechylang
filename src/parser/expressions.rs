@@ -18,6 +18,8 @@ use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 use std::rc::Rc;
 
+use serde::Serialize;
+
 use crate::lexer::tokens::{Token, TokenKind};
 
 use super::parser::BlockStatement;
@@ -151,7 +153,7 @@ impl PrecedenceTrait for Token {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum Expression {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
@@ -239,7 +241,7 @@ impl Display for Expression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Identifier {
     pub token: Token,
     pub value: Rc<str>,
@@ -257,7 +259,7 @@ impl Into<Rc<str>> for Identifier {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: i64,
@@ -269,7 +271,7 @@ impl Display for IntegerLiteral {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FloatLiteral {
     pub token: Token,
     pub value: f64,
@@ -281,7 +283,7 @@ impl Display for FloatLiteral {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct BooleanLiteral {
     pub token: Token,
     pub value: bool,
@@ -293,7 +295,7 @@ impl Display for BooleanLiteral {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StringLiteral {
     pub token: Token,
     pub value: Rc<str>,
@@ -305,7 +307,7 @@ impl Display for StringLiteral {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: PrefixOperator,
@@ -318,7 +320,7 @@ impl Display for PrefixExpression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum PrefixOperator {
     Bang,
     Minus,
@@ -339,7 +341,7 @@ impl Display for PrefixOperator {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct InfixExpression {
     pub token: Token,
     pub left: Rc<Expression>,
@@ -347,7 +349,7 @@ pub struct InfixExpression {
     pub right: Rc<Expression>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum InfixOperator {
     Plus,
     Minus,
@@ -416,7 +418,7 @@ impl Display for InfixOperator {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Rc<Expression>,
@@ -426,9 +428,9 @@ pub struct IfExpression {
 
 impl Display for IfExpression {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "if ({}) {{\n{}\n}}", self.condition, self.consequence)?;
+        write!(f, "if {} {}", self.condition, self.consequence)?;
         if let Some(alt) = &self.alternative {
-            write!(f, " else {{\n{}\n}}", alt)?;
+            write!(f, " else {}", alt)?;
         }
         Ok(())
     }
@@ -440,7 +442,7 @@ impl Display for InfixExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Rc<[Identifier]>,
@@ -460,7 +462,7 @@ impl Display for FunctionLiteral {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct CallExpression {
     pub token: Token,
     pub function: Rc<Expression>,
@@ -480,7 +482,7 @@ impl Display for CallExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct ArrayLiteral {
     pub token: Token,
     pub elements: Rc<[Expression]>,
@@ -499,7 +501,7 @@ impl Display for ArrayLiteral {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct IndexExpression {
     pub token: Token,
     pub left: Rc<Expression>,
@@ -512,7 +514,7 @@ impl Display for IndexExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RangeExpression {
     pub token: Token,
     pub left: Rc<Expression>,
@@ -532,7 +534,7 @@ impl Display for RangeExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RangeToExpression {
     pub token: Token,
     pub right: Rc<Expression>,
@@ -545,7 +547,7 @@ impl Display for RangeToExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RangeFromExpression {
     pub token: Token,
     pub left: Rc<Expression>,
@@ -563,7 +565,7 @@ impl Display for RangeFromExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RangeFullExpression {
     pub token: Token,
 }
@@ -574,7 +576,7 @@ impl Display for RangeFullExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct ForExpression {
     pub token: Token,
     pub iterator: Identifier,
@@ -588,7 +590,7 @@ impl Display for ForExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "for {} in {} {{\n{}\n}}",
+            "for {} in {} {}",
             match &self.index {
                 Some(index) => format!("({}, {})", index, self.iterator),
                 None => format!("{}", self.iterator),
@@ -599,7 +601,7 @@ impl Display for ForExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct WhileExpression {
     pub token: Token,
     pub condition: Rc<Expression>,
@@ -613,7 +615,7 @@ impl Display for WhileExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct MemberExpression {
     pub token: Token,
     pub object: Rc<Expression>,
@@ -626,7 +628,7 @@ impl Display for MemberExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StructLiteral {
     pub token: Token,
     pub entries: HashMap<String, Expression>,

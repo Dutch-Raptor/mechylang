@@ -1,3 +1,8 @@
+pub(crate) mod function;
+pub(crate) mod iterators;
+pub(crate) mod reference;
+pub(crate) mod traits;
+
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -5,17 +10,10 @@ use std::{
 };
 
 use itertools::Itertools;
-use uuid::Uuid;
 
-use crate::parser::{expressions::Identifier, parser::BlockStatement};
+use self::{function::Function, iterators::IteratorObject, reference::Reference};
 
-use super::{
-    builtins::BuiltinFunction,
-    environment::Environment,
-    eval::{EvalConfig, Evaluator},
-    iterators::IteratorObject,
-    methods::Method,
-};
+use super::{methods::Method, runtime::builtins::BuiltinFunction};
 
 const TRUE: Object = Object::Boolean(true);
 const FALSE: Object = Object::Boolean(false);
@@ -109,33 +107,6 @@ pub enum Object {
     Struct(HashMap<String, Object>),
 }
 
-/// Trait for unwrapping return values
-///
-/// If the object is a return value, it will unwrap it and return the inner value.
-///
-/// # Examples
-/// ```ignore
-/// use crate::evaluator::objects::{Object, UnwrapReturnValue};
-///
-/// let obj = Object::ReturnValue(Box::new(Object::Integer(5)));
-/// assert_eq!(obj.unwrap_return_value(), Object::Integer(5));
-///
-/// let obj = Object::Integer(5);
-/// assert_eq!(obj.unwrap_return_value(), Object::Integer(5));
-/// ```
-pub trait UnwrapReturnValue {
-    fn unwrap_return_value(self) -> Object;
-}
-
-impl UnwrapReturnValue for Object {
-    fn unwrap_return_value(self) -> Object {
-        match self {
-            Object::ReturnValue(val) => *val,
-            _ => self,
-        }
-    }
-}
-
 impl PartialOrd for Object {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
@@ -144,56 +115,6 @@ impl PartialOrd for Object {
             (Object::String(a), Object::String(b)) => a.partial_cmp(b),
             _ => None,
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct Function {
-    pub params: Rc<[Identifier]>,
-    pub body: BlockStatement,
-    pub env: Environment,
-}
-
-impl Function {
-    pub fn call(
-        &self,
-        args: Vec<Object>,
-        env: Option<Environment>,
-        config: Rc<EvalConfig>,
-    ) -> Result<Object, String> {
-        Evaluator::eval_function(Object::Function(self.clone()), args, env, config)
-    }
-}
-
-impl PartialEq for Function {
-    fn eq(&self, other: &Self) -> bool {
-        self.params == other.params && self.body == other.body
-    }
-}
-
-impl Debug for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let params = self
-            .params
-            .iter()
-            .map(|param| param.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-
-        write!(f, "fn({})", params)
-    }
-}
-
-impl Display for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let params = self
-            .params
-            .iter()
-            .map(|param| param.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-
-        write!(f, "fn({}) {{\n{}\n}}", params, self.body)
     }
 }
 
@@ -246,35 +167,6 @@ impl Display for Object {
             Object::Method(method) => write!(f, "{}", method),
             Object::Reference(reference) => write!(f, "{}", reference),
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct Reference {
-    pub uuid: Uuid,
-}
-
-impl Display for Reference {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "&{}",
-            self.uuid
-                .hyphenated()
-                .encode_lower(&mut Uuid::encode_buffer())
-        )
-    }
-}
-
-impl PartialEq for Reference {
-    fn eq(&self, other: &Self) -> bool {
-        self.uuid == other.uuid
-    }
-}
-
-impl Debug for Reference {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "&{}", self.uuid)
     }
 }
 

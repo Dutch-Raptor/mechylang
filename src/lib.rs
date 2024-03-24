@@ -64,7 +64,7 @@
 //! # mechylang::test_utils::test_eval_ok(r#"
 //! // This is a comment
 //! // With the print function you can print to stdout
-//! print("Hello World!");
+//! print("Hello World!")
 //! # "#);
 //! ```
 //!
@@ -75,7 +75,7 @@
 //! [test_eval_ok]: crate::test_utils::test_eval_ok
 //! ```rust
 //! mechylang::test_utils::test_eval_ok(r#"
-//! assert_eq(2 + 3, 5);
+//! assert_eq(2 + 3, 5)
 //! "#);
 //! ```
 //! Only the mechylang executed code is shown in the examples, not the rust code that runs the tests.
@@ -85,10 +85,10 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let x = 5;
-//! let y = 10;
-//! assert_eq(x, 5);
-//! assert_eq(y, 10);
+//! let x = 5
+//! let y = 10
+//! assert_eq(x, 5)
+//! assert_eq(y, 10)
 //! # "#);
 //! ```
 //!
@@ -96,9 +96,9 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let x = 5;
-//! x = 10;
-//! assert_eq(x, 10);
+//! let x = 5
+//! x = 10
+//! assert_eq(x, 10)
 //! # "#);
 //! ```
 //!
@@ -106,46 +106,15 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let x = 5;
-//! let Y = 10;
-//! let _ = 15;
-//! let _z = 15;
-//! let _Z_1 = 35;
+//! let x = 5
+//! let Y = 10
+//! let _ = 15
+//! let _z = 15
+//! let _Z_1 = 35
 //! let Οι_χαρακτήρες_που_δεν_είναι_ASCII_λειτουργούν_επίσης =
-//! "non-ASCII characters also work";
+//! "non-ASCII characters also work"
 //! # "#);
 //! ```
-//!
-//!
-//! ### To semi-colon or not to semi-colon
-//!
-//! Semi-colons are optional in `mechylang`. If you don't want to use them, you usually don't have to.
-//!
-//! Sometimes, code without semi-colons can be ambiguous, so you can use a semi-colon to make it clear what you want.
-//!
-//! Cases where a semi-colon is required:
-//! - When putting multiple statements on the same line
-//! - When using an empty `return` statement
-//!     ```rust
-//!     # mechylang::test_utils::test_eval_ok(r#"
-//!     // This function returns unit
-//!     let foo = fn() {
-//!         return;
-//!         5
-//!     }
-//!
-//!     assert_eq(foo(), ());
-//!
-//!     // This function returns 5
-//!     let bar = fn() {
-//!         return
-//!         5
-//!     }
-//!
-//!     assert_eq(bar(), 5);
-//!    # "#);
-//!    ```
-//!
 //!
 //! ### Types
 //!
@@ -156,6 +125,7 @@
 //! - String
 //! - Array
 //! - Function
+//! - Unit
 //!
 //!
 //! ### Arithmetic Operations
@@ -175,20 +145,20 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let a = 5;
-//! let b = 10;
-//! assert_eq(a + b, 15);
-//! assert_eq(a - b, -5);
-//! assert_eq(a * b, 50);
-//! assert_eq(a / b, 0);
-//! assert_eq(a % b, 5);
-//! assert_eq(-a, -5);
-//! assert_eq(10 | 3, 11);
-//! assert_eq(10 & 3, 2);
-//! assert_eq(10 ^ 3, 9);
-//! assert_eq(~10, -11);
-//! assert_eq(10 << 1, 20);
-//! assert_eq(10 >> 1, 5);
+//! let a = 5
+//! let b = 10
+//! assert_eq(a + b, 15)
+//! assert_eq(a - b, -5)
+//! assert_eq(a * b, 50)
+//! assert_eq(a / b, 0)
+//! assert_eq(a % b, 5)
+//! assert_eq(-a, -5)
+//! assert_eq(10 | 3, 11)
+//! assert_eq(10 & 3, 2)
+//! assert_eq(10 ^ 3, 9)
+//! assert_eq(~10, -11)
+//! assert_eq(10 << 1, 20)
+//! assert_eq(10 >> 1, 5)
 //! # "#);
 //! ```
 //!
@@ -207,15 +177,32 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! assert_eq(5 == 5, true);
-//! assert_eq(5 != 5, false);
-//! assert_eq(5 < 10, true);
-//! assert_eq(5 <= 10, true);
-//! assert_eq(5 > 10, false);
-//! assert_eq(5 >= 10, false);
-//! assert_eq(true && false, false);
-//! assert_eq(false || true, true);
-//! assert_eq(!true, false);
+//! assert_eq(5 == 5, true)
+//! assert_eq(5 != 5, false)
+//! assert_eq(5 < 10, true)
+//! assert_eq(5 <= 10, true)
+//! assert_eq(5 > 10, false)
+//! assert_eq(5 >= 10, false)
+//! assert_eq(true && false, false)
+//! assert_eq(false || true, true)
+//! assert_eq(!true, false)
+//! # "#);
+//! ```
+//!
+//! #### Unit `()`
+//!
+//! `mechylang` has a special type `()` called `Unit`. It is the bottom type, and is used to represent the absence of a value.
+//! It is similar to `void` in C, or `()` in Rust.
+//!
+//! `Unit` is the return type of a function that doesn't return anything.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! fn foo() {
+//!    // This function returns unit
+//! }
+//!
+//! assert_eq(foo(), ());
 //! # "#);
 //! ```
 //!
@@ -225,7 +212,7 @@
 //!
 //! Functions can be declared in 2 ways:
 //! - As a function declaration using the `fn <name>(<args>) { <body> }` syntax
-//! - As an "anonymous" function bound to a variable with the `let <name> = fn(<args>) { <body> }` syntax
+//! - As an anonymous function using the `fn(<args>) { <body> }` syntax, which can be assigned to a variable
 //!
 //! A function declaration looks like this:
 //!
@@ -235,7 +222,7 @@
 //!     a + b
 //! }
 //!
-//! assert_eq(add(5, 10), 15);
+//! assert_eq(add(5, 10), 15)
 //! # "#);
 //! ```
 //!
@@ -243,11 +230,16 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
+//! fn(a, b) {
+//!    a + b
+//! }
+//!
+//! // You can also assign an anonymous function to a variable
 //! let add = fn(a, b) {
 //!    a + b
 //! }
 //!
-//! assert_eq(add(5, 10), 15);
+//! assert_eq(add(5, 10), 15)
 //! # "#);
 //! ```
 //!
@@ -256,12 +248,12 @@
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
 //! let add = fn(a, b) {
-//!   return a + b;
+//!   return a + b
 //!   // This line is never reached
 //!   a - b
 //! }
 //!
-//! assert_eq(add(5, 10), 15);
+//! assert_eq(add(5, 10), 15)
 //! # "#);
 //! ```
 //!
@@ -277,9 +269,9 @@
 //!  a + b
 //! }
 //!
-//! assert_eq(apply(add, 5, 10), 15);
+//! assert_eq(apply(add, 5, 10), 15)
 //! // You can also use an anonymous function without binding it to a variable
-//! assert_eq(apply(fn(a, b) { a - b; }, 5, 10), -5);
+//! assert_eq(apply(fn(a, b) { a - b }, 5, 10), -5)
 //! # "#);
 //! ```
 //!
@@ -293,11 +285,11 @@
 //!     }
 //! }
 //!
-//! let add_five = make_adder(5);
-//! let remove_five = make_adder(-5);
+//! let add_five = make_adder(5)
+//! let remove_five = make_adder(-5)
 //!
-//! assert_eq(add_five(10), 15);
-//! assert_eq(remove_five(10), 5);
+//! assert_eq(add_five(10), 15)
+//! assert_eq(remove_five(10), 5)
 //! # "#);
 //! ```
 //!
@@ -309,7 +301,7 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! assert_eq(add(5, 10), 15);
+//! assert_eq(add(5, 10), 15)
 //! fn add(a, b) {
 //!    a + b
 //! }
@@ -320,7 +312,7 @@
 //!
 //! ```should_panic
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! assert_eq(add(5, 10), 15); // Results in `Identifier not found: add`
+//! assert_eq(add(5, 10), 15) // Results in `Identifier not found: add`
 //! let add = fn(a, b) {
 //!   a + b
 //! }
@@ -332,7 +324,7 @@
 //!
 //! ### Built in functions:
 //!
-//! `mechylang` has a few built in functions, to learn more about them, check out the [builtins module](crate::evaluator::builtins).
+//! `mechylang` has a few built in functions, to learn more about them, check out the [builtins module](crate::evaluator::runtime::builtins).
 //!
 //! Built in functions can be called like any other function. And even passed as arguments to other functions.
 //!
@@ -342,7 +334,107 @@
 //!     f(x)
 //! }
 //!
-//! assert_eq(apply(len, "Hello World!"), 12);
+//! assert_eq(apply(len, "Hello World!"), 12)
+//! # "#);
+//! ```
+//!
+//! ### Statements and Expressions
+//!
+//! In mechylang, almost all statements are expressions. This means that they return a value.
+//!
+//! #### Blocks
+//! Blocks are expressions and return the value of the last expression in the block.
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let x = {
+//!    let y = 5
+//!    y * 2
+//! }
+//!
+//! assert_eq(x, 10)
+//! # "#);
+//! ```
+//!
+//! #### If/Else
+//!
+//! The `if` statement is an expression and returns a value.
+//! The value of the `if` expression is the value of the last expression in the block that is executed.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let x = if (true) { 5 } else { 10 }
+//! assert_eq(x, 5)
+//! # "#);
+//! ```
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let x = if (false) { 5 } else { 10 }
+//! assert_eq(x, 10)
+//! # "#);
+//! ```
+//!
+//! If none of the branches are executed, the value of the `if` expression is `unit`.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let x = if (false) { 5 } // A false condition without an else branch returns unit
+//! assert_eq(x, ())
+//! # "#);
+//! ```
+//!
+//! #### Loops
+//!
+//! The `while` and `for` loops are also expressions and return a value.
+//! The value of the loop expression is the value of the last iteration.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let x = 0
+//! let y = while (x < 5) {
+//!     x = x + 1
+//!     x * 2
+//! }
+//! assert_eq(y, 10)
+//! # "#);
+//! ```
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let x = for i in 0..5 {
+//!    i * 4
+//!    // loops return the value of the last iteration
+//! }
+//!
+//! assert_eq(x, 16)
+//! # "#);
+//! ```
+//!
+//! ##### Breaking with a value
+//!
+//! You can break out of a loop with a value using the `break` keyword.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let x = for i in 0..5 {
+//!   if i == 3 {
+//!     break i
+//!   }
+//!   i * 4
+//! }
+//!
+//! assert_eq(x, 3)
+//! # "#);
+//! ```
+//!
+//! Statements (like `let`) that do not produce a value return `unit` which is represented by `()`.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let x = {
+//!   let y = 5
+//! }
+//! assert_eq(x, ())
 //! # "#);
 //! ```
 //!
@@ -354,12 +446,12 @@
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
 //! let x = {
-//!    let a = 5;
-//!    let b = 10;
+//!    let a = 5
+//!    let b = 10
 //!    a + b
 //! }
 //!
-//! assert_eq(x, 15);
+//! assert_eq(x, 15)
 //! # "#);
 //! ```
 //!
@@ -368,14 +460,14 @@
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
 //! let x = {
-//!   let a = 5;
-//!   let b = 10;
-//!   return a + b;
+//!   let a = 5
+//!   let b = 10
+//!   return a + b
 //!   // This line is never reached
 //!   a - b
 //! };
 //!
-//! assert_eq(x, 15);
+//! assert_eq(x, 15)
 //! # "#);
 //! ```
 //!
@@ -385,17 +477,17 @@
 //! # mechylang::test_utils::test_eval_ok(r#"
 //! let add = fn(a, b) {
 //!     {
-//!         return a + b;
+//!         return a + b
 //!         // This line is never reached
 //!         a - b
-//!     }; // Since blocks are expressions and we want to evaluate this block as a statement
+//!     } // Since blocks are expressions and we want to evaluate this block as a statement
 //!     // we need to add a semicolon at the end.
 //!
 //!     // This line is never reached
 //!     2 * (a + b)
 //! }
 //!
-//! assert_eq(add(5, 10), 15);
+//! assert_eq(add(5, 10), 15)
 //! # "#);
 //! ```
 //!
@@ -406,9 +498,9 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let a = [1, 2, 3];
-//! let b = [1, 2, 3, [4, 5, 6]];
-//! let c = [1, 2, 3, fn(a, b) { a + b; }];
+//! let a = [1, 2, 3]
+//! let b = [1, 2, 3, [4, 5, 6]]
+//! let c = [1, 2, 3, fn(a, b) { a + b }]
 //! # "#);
 //! ```
 //!
@@ -416,9 +508,9 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! assert_eq([1, 2, 3][0], 1);
-//! assert_eq([1, 2, 3][1], 2);
-//! assert_eq([1, 2, 3][2], 3);
+//! assert_eq([1, 2, 3][0], 1)
+//! assert_eq([1, 2, 3][1], 2)
+//! assert_eq([1, 2, 3][2], 3)
 //! # "#);
 //! ```
 //!
@@ -429,13 +521,13 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let a = [1, 2, 3];
-//! a[0] = 10;
-//! assert_eq(a, [10, 2, 3]);
-//! a[1] = 20;
-//! assert_eq(a, [10, 20, 3]);
-//! a[2] = 30;
-//! assert_eq(a, [10, 20, 30]);
+//! let a = [1, 2, 3]
+//! a[0] = 10
+//! assert_eq(a, [10, 2, 3])
+//! a[1] = 20
+//! assert_eq(a, [10, 20, 3])
+//! a[2] = 30
+//! assert_eq(a, [10, 20, 30])
 //! # "#);
 //! ```
 //!
@@ -443,9 +535,9 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let a = [1, 2, 3];
-//! a.push(4);
-//! assert_eq(a, [1, 2, 3, 4]);
+//! let a = [1, 2, 3]
+//! a.push(4)
+//! assert_eq(a, [1, 2, 3, 4])
 //! # "#);
 //! ```
 //!
@@ -453,11 +545,11 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let a = [1, 2, 3];
-//! assert_eq(a.pop(), 3);
-//! assert_eq(a, [1, 2]);
-//! assert_eq(a.pop(), 2);
-//! assert_eq(a, [1]);
+//! let a = [1, 2, 3]
+//! assert_eq(a.pop(), 3)
+//! assert_eq(a, [1, 2])
+//! assert_eq(a.pop(), 2)
+//! assert_eq(a, [1])
 //! # "#);
 //! ```
 //!
@@ -472,10 +564,10 @@
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"
-//! let a = "Hello World!";
-//! let b = "👋🌎";
-//! let c = a + b;
-//! assert_eq(c, "Hello World!👋🌎");
+//! let a = "Hello World!"
+//! let b = "👋🌎"
+//! let c = a + b
+//! assert_eq(c, "Hello World!👋🌎")
 //! # "#);
 //! ```
 //!
@@ -495,11 +587,11 @@ pub mod test_utils;
 mod tracer;
 
 pub use errors::Error;
-pub use evaluator::environment::Environment;
 pub use evaluator::eval::EvalConfig;
 pub use evaluator::eval::Evaluator;
 pub use evaluator::eval_file;
 pub use evaluator::objects::Object;
+pub use evaluator::runtime::environment::Environment;
 pub use lexer::lexer::Lexer;
 pub use lexer::tokens::Token;
 pub use parser::parser::Parser;

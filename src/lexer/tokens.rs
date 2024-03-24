@@ -1,6 +1,8 @@
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, PartialEq, Clone, Default)]
+use serde::Serialize;
+
+#[derive(Debug, PartialEq, Clone, Default, Serialize)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
@@ -8,10 +10,46 @@ pub struct Position {
     pub file: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Token {
     pub kind: TokenKind,
     pub position: Position,
+}
+
+impl Token {
+    pub(crate) fn is_statement_terminator(&self, previous_token: &Token) -> bool {
+        if self.kind == TokenKind::Semicolon {
+            return true;
+        }
+
+        if self.kind == TokenKind::RightSquirly {
+            return true;
+        }
+
+        if self.kind == TokenKind::EOF {
+            return true;
+        }
+
+        if self.kind == TokenKind::RightParen {
+            return true;
+        }
+
+        if self.kind == TokenKind::RightSquare {
+            return true;
+        }
+
+        if self.kind == TokenKind::Else {
+            return true;
+        }
+
+        // if previous token was on a different line
+
+        if self.position.line != previous_token.position.line {
+            return true;
+        }
+
+        return false;
+    }
 }
 
 impl Default for Token {
@@ -26,7 +64,7 @@ impl Default for Token {
 /// Tokens for the lexer
 // ignore the unused variants for now
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum TokenKind {
     // Keywords
     Let,

@@ -1,6 +1,6 @@
+use crate::evaluator::objects::iterators::IteratorObject;
+use crate::Object;
 use itertools::Itertools;
-
-use crate::{evaluator::iterators::IteratorObject, Object};
 
 use super::MethodInner;
 

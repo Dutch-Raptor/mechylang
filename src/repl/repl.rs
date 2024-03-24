@@ -1,5 +1,3 @@
-use std::io::{self, Write};
-
 use color_print::cprintln;
 
 use mechylang::{Environment, EvalConfig, Evaluator, Object};

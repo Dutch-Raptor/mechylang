@@ -1,10 +1,9 @@
+use crate::Object;
 use std::{
     fmt::{self, Debug, Display, Formatter},
     iter::Sum,
     ops::{Deref, DerefMut},
 };
-
-use super::objects::Object;
 
 // We have to provide a special trait for our clonable iterator,
 // since Clone requires a Sized type (so we can't call it on a trait object).

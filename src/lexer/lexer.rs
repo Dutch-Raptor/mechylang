@@ -54,6 +54,8 @@ impl Lexer {
     }
 
     /// Advance the lexer by one character
+    ///
+    /// This method advances the lexer by one character and updates the line and column
     fn read_char(&mut self) {
         // Update line and column
         match self.ch {
@@ -77,12 +79,14 @@ impl Lexer {
         self.read_position += 1;
     }
 
+    /// Keeps advancing the lexer until it finds a non-whitespace character
     fn skip_whitespace(&mut self) {
         while self.ch == ' ' || self.ch == '\t' || self.ch == '\n' || self.ch == '\r' {
             self.read_char();
         }
     }
 
+    /// Read an identifier from the current position. An identifier is a sequence of letters, digits and underscores.
     fn read_identifier(&mut self) -> String {
         let position = self.position;
         while is_letter(self.peek_char()) || is_digit(self.peek_char()) || self.peek_char() == '_' {

@@ -9,13 +9,14 @@ use crate::parser::expressions::{Expression, Identifier};
 use crate::trace;
 use crate::tracer::reset_trace;
 use color_print::cformat;
+use serde::Serialize;
 
 use super::expressions::{
     BooleanLiteral, FloatLiteral, FunctionLiteral, IfExpression, InfixExpression, IntegerLiteral,
     PrecedenceTrait, PrefixExpression, CallExpression, InfixOperator, PrefixOperator, StringLiteral, ArrayLiteral, IndexExpression, Precedence, RangeToExpression, RangeExpression, RangeFromExpression, RangeFullExpression, ForExpression, WhileExpression, MemberExpression, StructLiteral,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
@@ -29,7 +30,7 @@ impl Display for Program {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -39,7 +40,7 @@ pub enum Statement {
     Function(FunctionStatement),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct FunctionStatement {
     pub token: Token,
     pub name: Identifier,
@@ -71,7 +72,7 @@ impl Display for Statement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Rc<[Statement]>,
@@ -79,7 +80,7 @@ pub struct BlockStatement {
 
 impl Display for BlockStatement {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{{")?;
+        write!(f, "{{\n")?;
         for statement in self.statements.iter() {
             write!(f, "\t{}\n", statement)?;
         }
@@ -88,7 +89,7 @@ impl Display for BlockStatement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct LetStatement {
     pub token: Token,
     pub name: Identifier,
@@ -101,7 +102,7 @@ impl Display for LetStatement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct ReturnStatement {
     pub token: Token,
     pub return_value: Option<Expression>,
@@ -116,7 +117,7 @@ impl Display for ReturnStatement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub expression: Expression,
@@ -128,7 +129,7 @@ impl Display for ExpressionStatement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct BreakStatement {
     pub token: Token,
     pub value: Option<Expression>,
@@ -143,7 +144,7 @@ impl Display for BreakStatement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct ContinueStatement {
     pub token: Token,
 }
@@ -195,6 +196,7 @@ impl Parser {
                 }
             },
         };
+
         self.cur_token = std::mem::replace(&mut self.peek_token, next);
     }
 
@@ -227,30 +229,20 @@ impl Parser {
             _ => self.parse_expression_statement()?,
         };
 
-        // next statement must be seperated by a semicolon or on a new line
-        if self.peek_token.kind == TokenKind::Semicolon {
-            self.next_token();
-        } else {
-            // determine if the stament was ended properly
-            // ie. the next token is on a new line or EOF
-            let mut ended_properly = false;
-            if self.cur_token.position.line != self.peek_token.position.line {
-                ended_properly = true;
-            } else if self.peek_token.kind == TokenKind::EOF {
-                ended_properly = true;
-            }
-
-            if !ended_properly {
-                return Err(self.error_peek(
-                    ErrorKind::UnexpectedToken,
-                    cformat!(
-                        "Expected end of statement, got <i>{:?}</i> instead",
-                        self.peek_token.kind
-                    ),
-                ));
-            }
+        
+        if !self.peek_token.is_statement_terminator(&self.cur_token) {
+            return Err(self.error_peek(
+                ErrorKind::UnexpectedToken,
+                cformat!(
+                "Expected end of statement, got <i>{:?}</i> instead",
+                self.peek_token.kind
+                ),
+            ));
         }
 
+        if self.peek_token.kind == TokenKind::Semicolon {
+            self.next_token();
+        }
         Ok(statement)
     }
 
@@ -820,6 +812,7 @@ impl Parser {
     }
 
     fn parse_if_expression(&mut self) -> Result<Expression, Error> {
+        let _trace = trace!("parse_if_expression");
         let token = self.cur_token.clone();
 
 
@@ -851,6 +844,7 @@ impl Parser {
 
     /// Parses a block statement
     fn parse_block_statement(&mut self) -> Result<BlockStatement, Error> {
+        let _trace = trace!("parse_block_statement");
         // parse_block_statement handles opening and closing braces
         self.next_token();
         let token = self.cur_token.clone();
@@ -864,6 +858,7 @@ impl Parser {
             statements.push(stmt);
             self.next_token();
         }
+
 
         Ok(BlockStatement { token, statements: statements.into() })
     }
@@ -913,6 +908,7 @@ impl Parser {
     }
 
     fn parse_function_literal(&mut self) -> Result<Expression, Error> {
+        let _trace = trace!("parse_function_literal");
         let token = self.cur_token.clone();
 
         self.expect_peek(TokenKind::LeftParen)?;
@@ -1220,14 +1216,14 @@ impl Parser {
     }
 
     fn parse_break_statement(&mut self) -> Result<Statement, Error> {
+        let _trace = trace!("parse_break_statement");
         let token = self.cur_token.clone();
 
-        self.next_token();
 
         // check if we have a value to return
-        let value = if self.cur_token.kind != TokenKind::Semicolon {
-            let value = self.parse_expression(Precedence::Lowest)?;
+        let value = if !self.peek_token.is_statement_terminator(&self.cur_token) {
             self.next_token();
+            let value = self.parse_expression(Precedence::Lowest)?;
             Some(value)
         } else {
             None
@@ -1998,7 +1994,17 @@ fn test_operator_precedence_parsing() {
     fn test_function_statement() {
         let input = "fn foo() { 1; }";
 
+        let statements = parse(input).unwrap();
+        
+        assert_eq!(statements.len(), 1);
 
+        match &statements[0] {
+            Statement::Function(FunctionStatement { name, body, .. }) => {
+                assert_eq!(name.value.as_ref(), "foo");
+                assert_eq!(body.statements.len(), 1);
+            },
+            _ => panic!("expected function statement"),
+        };
     }
     
 
@@ -2036,5 +2042,21 @@ fn test_operator_precedence_parsing() {
         }
     }
 
+    // #[test]
+    // fn test_for_expression() {
+    //     let input = r#"
+    //     let x = for i in 1..5 { if i == 3 { break i } };
+    //     let this_should_be_outside_the_loop = 1;
+    //                     "#;
+    //
+    //     println!("{}", input);
+    //
+    //     let output = parse(input).unwrap();
+    //
+    //     fs::write("output.json", serde_json::to_string_pretty(&output).unwrap()).unwrap();
+    //
+    //     dbg!(parse(input).unwrap());
+    //     panic!();
+    // }
 }
 

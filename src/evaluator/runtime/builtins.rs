@@ -51,9 +51,67 @@
 //! assert_eq(1, 2, 1); // panics
 //! # "#);
 //! ```
+//!
+//! #### `input_read_all`
+//! The `input_read_all` function can be used to read all input from stdin.
+//! It keeps reading until EOF is reached.
+//!
+//! ```ignore
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let input = input_read_all();
+//! assert_eq(input, "Hello\nWorld\n"); // ok
+//! # "#);
+//! ```
+//!
+//! #### `input_read_line`
+//!
+//! The `input_read_line` function can be used to read a single line from stdin.
+//! It reads until a newline is reached.
+//!
+//! ```ignore
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let input = input_read_line();
+//! assert_eq(input, "Hello\n"); // ok
+//! # "#);
+//! ```
+//!
+//! #### `parse_int`
+//! The `parse_int` function can be used to parse a string into an integer.
+//!
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let num = parse_int("123");
+//! assert_eq(num, 123); // ok
+//! # "#);
+//! ```
+//!
+//! It throws an error if the string is not a valid integer.
+//! ```should_panic
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let num = parse_int("123a");
+//! # "#);
+//! ```
+//!
+//! #### `parse_float`
+//! The `parse_float` function can be used to parse a string into a float.
+//! ```rust
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let num = parse_float("123.45");
+//! assert_eq(num, 123.45); // ok
+//! # "#);
+//! ```
+//!
+//! It throws an error if the string is not a valid float.
+//! ```should_panic
+//! # mechylang::test_utils::test_eval_ok(r#"
+//! let num = parse_float("123.45a");
+//! # "#);
+//! ```
 
+use crate::Evaluator;
+use crate::Object;
 use std::{
-    io::{stdin, BufRead, Error, Read},
+    io::{stdin, BufRead, Error},
     ops::RangeInclusive,
 };
 
@@ -61,9 +119,7 @@ use itertools::Itertools;
 
 use crate::parser::expressions::Identifier;
 
-use super::{
-    environment::Environment, eval::Evaluator, iterators::IteratorObject, objects::Object,
-};
+use super::environment::Environment;
 
 /// A builtin function that can be called from `mechylang`
 #[derive(Debug, PartialEq, Clone)]
@@ -86,7 +142,7 @@ pub struct BuiltinFunction {
 type BuiltinResult = Result<Object, (String, BuiltinError)>;
 
 /// A list of all the builtin functions in `mechylang`
-pub const BUILTINS: [BuiltinFunction; 7] = [
+pub const BUILTINS: [BuiltinFunction; 9] = [
     // The `len` function
     //
     // `Mechylang` arguments:
@@ -207,9 +263,46 @@ pub const BUILTINS: [BuiltinFunction; 7] = [
                 ));
             }
 
-            // stdin().read_line();
-
-            todo!()
+            stdin()
+                .lock()
+                .lines()
+                .next()
+                .map(|val| Object::String(val.unwrap_or_default().into()))
+                .ok_or(("Failed to get input".to_string(), BuiltinError::IOError))
+        },
+    },
+    // parse_int
+    BuiltinFunction {
+        name: "parse_int",
+        args_len: (1..=1),
+        function: |args, _, _| match &args[0] {
+            Object::String(s) => s.parse::<i64>().map(Object::Integer).map_err(|e| {
+                (
+                    format!("Failed to parse int: {}", e),
+                    BuiltinError::WrongArgumentType,
+                )
+            }),
+            _ => Err((
+                format!("Argument to `parse_int` not supported, got {:?}", args[0]),
+                BuiltinError::WrongArgumentType,
+            )),
+        },
+    },
+    // parse_float
+    BuiltinFunction {
+        name: "parse_float",
+        args_len: (1..=1),
+        function: |args, _, _| match &args[0] {
+            Object::String(s) => s.parse::<f64>().map(Object::Float).map_err(|e| {
+                (
+                    format!("Failed to parse float: {}", e),
+                    BuiltinError::WrongArgumentType,
+                )
+            }),
+            _ => Err((
+                format!("Argument to `parse_float` not supported, got {:?}", args[0]),
+                BuiltinError::WrongArgumentType,
+            )),
         },
     },
 ];

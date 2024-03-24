@@ -1,3 +1,5 @@
+use crate::evaluator::objects::iterators::IteratorObject;
+use crate::evaluator::Environment;
 use std::{
     fmt::{Display, Formatter},
     ops::RangeInclusive,
@@ -26,9 +28,7 @@ pub(crate) use self::{
 };
 
 use super::{
-    environment::Environment,
     eval::{EvalConfig, Evaluator},
-    iterators::IteratorObject,
     objects::Object,
 };
 
