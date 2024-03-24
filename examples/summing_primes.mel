@@ -34,5 +34,19 @@ fn sum_primes(n) {
 
 
 fn main() {
-    println(sum_primes(10_000));
+    while true {
+        println("Enter a number (or q to exit): ");
+        let input = input_read_line();
+        if input == "q" {
+            break;
+        }
+        println(
+            "The sum of all primes up to " +
+            input.to_string() +
+            " is " +
+            sum_primes(parse_int(input)).to_string() +
+            ".\n"
+        );
+    }
+    println("Goodbye!");
 }
