@@ -1,0 +1,25 @@
+let primes = [2]
+
+fn is_prime(n) {
+    for p in primes {
+        if n % p == 0 {
+            return false
+        }
+    }
+    return true
+}
+
+println("2 is prime")
+println("3 is prime")
+
+for i in (5..).iter().step_by(6) {
+    if is_prime(i) {
+        primes.push(i)
+        println(i, "is prime")
+    }
+
+    if is_prime(i + 2) {
+        primes.push(i + 2)
+        println(i + 2, "is prime")
+    }
+}
