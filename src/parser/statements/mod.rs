@@ -20,13 +20,88 @@ use crate::parser::statements::function_statement::FunctionStatement;
 use crate::parser::statements::let_statement::LetStatement;
 use crate::parser::statements::return_statement::ReturnStatement;
 
+/// Represents the various types of statements in Mechylang.
+///
+/// A statement in Mechylang can be one of the following:
 #[derive(Debug, PartialEq, Serialize)]
 pub enum Statement {
+    /// A `let` statement for variable declarations.
+    ///
+    /// Syntax:
+    /// ```
+    /// # use mechylang::test_utils::test_eval_ok;
+    /// # test_eval_ok(r#"
+    /// let x = 5;
+    /// # "#)
+    /// ```
     Let(LetStatement),
+    /// A `return` statement for returning values from functions.
+    ///
+    /// Syntax:
+    /// ```
+    /// # use mechylang::test_utils::test_eval_ok;
+    /// # test_eval_ok(r#"
+    /// fn add(a, b) {
+    ///     return a + b;
+    /// }
+    /// # "#)
+    /// ```
     Return(ReturnStatement),
+    /// An expression statement for general expressions.
+    ///
+    /// Syntax:
+    /// ```
+    /// # use mechylang::test_utils::test_eval_ok;
+    /// # test_eval_ok(r#"
+    /// 5 + 10;
+    /// # "#)
+    /// ```
     Expression(ExpressionStatement),
+   /// A `break` statement for breaking out of loops.
+    ///
+    /// Syntax:
+    /// ```
+    /// # use mechylang::test_utils::test_eval_ok;
+    /// # test_eval_ok(r#"
+    /// let x = 0;
+    /// while (x < 10) {
+    ///     if (x == 5) {
+    ///         break;
+    ///     }
+    ///     x = x + 1;
+    /// }
+    /// # "#)
+    /// ```
     Break(BreakStatement),
+    /// A `continue` statement for continuing to the next iteration of loops.
+    ///
+    /// Syntax:
+    /// ```
+    /// # use mechylang::test_utils::test_eval_ok;
+    /// # test_eval_ok(r#"
+    /// let x = 0;
+    /// let sum = 0;
+    /// while (x < 10) {
+    ///     x = x + 1;
+    ///     if (x % 2 == 0) {
+    ///         continue;
+    ///     }
+    ///     sum = sum + x;
+    /// }
+    /// # "#)
+    /// ```
     Continue(ContinueStatement),
+    /// A function declaration statement.
+    ///
+    /// Syntax:
+    /// ```
+    /// # use mechylang::test_utils::test_eval_ok;
+    /// # test_eval_ok(r#"
+    /// fn add(a, b) {
+    ///     return a + b;
+    /// }
+    /// # "#)
+    /// ```
     Function(FunctionStatement),
 }
 impl Display for Statement {
@@ -75,5 +150,4 @@ impl Parser {
         }
         Ok(statement)
     }
-
 }

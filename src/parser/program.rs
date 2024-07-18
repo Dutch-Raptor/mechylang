@@ -7,6 +7,7 @@ use crate::parser::statements::Statement;
 pub struct Program {
     pub statements: Vec<Statement>,
 }
+
 impl Display for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for statement in &self.statements {

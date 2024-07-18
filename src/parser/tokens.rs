@@ -5,7 +5,29 @@ use crate::parser::Parser;
 use crate::{Error, Token};
 
 impl Parser {
-    pub(crate) fn next_token(&mut self) {
+    /// Advances the parser to the next token in the input stream.
+    ///
+    /// This method retrieves the next token from the lexer and updates the
+    /// `cur_token` and `peek_token` fields accordingly.
+    ///
+    /// If there are no more tokens available from the lexer, it sets the `cur_token`
+    /// to `EOF` (End of File) and adjusts its position based on the last peeked token.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mechylang::Parser;
+    /// use mechylang::Lexer;
+    /// use mechylang::{Token, TokenKind};
+    ///
+    /// let mut lexer = Lexer::new("let x = 5;");
+    /// let mut parser = Parser::new(lexer);
+    /// assert_eq!(parser.cur_token.kind, TokenKind::Let);
+    ///
+    /// parser.next_token();
+    /// assert_eq!(parser.cur_token.kind, TokenKind::Identifier("x".to_string()));
+    /// ```
+    pub fn next_token(&mut self) {
         let token = self.lexer.next_token();
         let next = match token {
             Some(token) => token,
@@ -23,10 +45,38 @@ impl Parser {
         self.cur_token = std::mem::replace(&mut self.peek_token, next);
     }
 
-
-
-    /// Checks if the current token is `token`, returns an error if not
-    pub(crate) fn expect_current(&self, token: TokenKind) -> Result<(), Error> {
+    /// Checks if the current token matches the expected token kind.
+    ///
+    /// If the current token matches the expected `token`, returns `Ok(())`.
+    /// If the current token does not match the expected `token`, returns an `Error`.
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - The expected `TokenKind` to compare against the current token.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the current token matches the expected `token`.
+    /// Returns an `Error` otherwise, indicating an unexpected token.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mechylang::{Parser, TokenKind, Lexer};
+    ///
+    /// let mut lexer = Lexer::new("let x = 5;");
+    /// let mut parser = Parser::new(lexer);
+    ///
+    /// // Ensure the current token is `TokenKind::Let`
+    /// assert!(parser.expect_current(TokenKind::Let).is_ok());
+    ///
+    /// // Move to the next token
+    /// parser.next_token();
+    ///
+    /// // Ensure the current token is an identifier "x"
+    /// assert!(parser.expect_current(TokenKind::Identifier("x".to_string())).is_ok());
+    /// ```
+    pub fn expect_current(&self, token: TokenKind) -> Result<(), Error> {
         if self.cur_token.kind == token {
             Ok(())
         } else {
@@ -43,10 +93,38 @@ impl Parser {
         }
     }
 
-    /// Checks if the peek token is the expected token and advances it to be the current token if it is.
+    /// Checks if the next token (peek token) matches the expected token kind and advances to the next token.
     ///
-    /// If the peek token is not the expected token `expect_peek` returns an Err
-    pub(crate) fn expect_peek(&mut self, token: TokenKind) -> Result<(), Error> {
+    /// If the next token (peek token) matches the expected `token`, advances to consume it and returns `Ok(())`.
+    /// If the next token (peek token) does not match the expected `token`, returns an `Error`.
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - The expected `TokenKind` to compare against the next token (peek token).
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the next token (peek token) matches the expected `token` and advances to consume it.
+    /// Returns an `Error` otherwise, indicating an unexpected token.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mechylang::{Parser, TokenKind, Lexer};
+    ///
+    /// let mut lexer = Lexer::new("let x = 5;");
+    /// let mut parser = Parser::new(lexer);
+    /// 
+    /// // Ensure the next token (peek token) is `TokenKind::Equal` and consume it
+    /// assert!(parser.expect_peek(TokenKind::Identifier("x".to_string())).is_ok());
+    ///
+    /// // Ensure the next token (peek token) is `TokenKind::Equal` and consume it
+    /// assert!(parser.expect_peek(TokenKind::AssignEqual).is_ok());
+    ///
+    /// // Now ensure the next token (peek token) is `TokenKind::Integer(5)` and consume it
+    /// assert!(parser.expect_peek(TokenKind::Number("5".to_string())).is_ok());
+    /// ```
+    pub fn expect_peek(&mut self, token: TokenKind) -> Result<(), Error> {
         if self.peek_token.kind == token {
             self.next_token();
             Ok(())

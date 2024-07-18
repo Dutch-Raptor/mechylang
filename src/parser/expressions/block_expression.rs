@@ -4,7 +4,6 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::{Error, Token, trace};
 use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
 use crate::parser::Parser;
 use crate::parser::statements::Statement;
 

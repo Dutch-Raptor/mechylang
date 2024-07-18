@@ -52,7 +52,7 @@ impl Into<Rc<str>> for Identifier {
 mod tests {
     use crate::lexer::tokens::TokenKind;
     use crate::parser::expressions::Expression;
-    use crate::parser::expressions::tests::parse;
+    use crate::parser::tests::parse;
     use crate::parser::statements::Statement;
 
     #[test]

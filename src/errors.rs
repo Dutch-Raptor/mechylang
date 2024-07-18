@@ -4,7 +4,7 @@ use std::{
     ops::Deref,
     rc::Rc,
 };
-
+use std::vec::IntoIter;
 use color_print::cformat;
 use itertools::Itertools;
 
@@ -24,6 +24,15 @@ impl Deref for InterpreterErrors {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl IntoIterator for InterpreterErrors {
+    type Item = Error;
+    type IntoIter = IntoIter<Error>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 

@@ -608,5 +608,5 @@ pub use evaluator::eval_file;
 pub use evaluator::objects::Object;
 pub use evaluator::runtime::environment::Environment;
 pub use lexer::lexer::Lexer;
-pub use lexer::tokens::Token;
+pub use lexer::tokens::{Token, TokenKind};
 pub use parser::Parser;

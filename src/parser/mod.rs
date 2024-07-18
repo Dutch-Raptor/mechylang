@@ -11,16 +11,44 @@ pub mod program;
 pub mod errors;
 pub mod tokens;
 
+/// The `Parser` struct is responsible for parsing the source code into an abstract syntax tree (AST).
+/// It uses a lexer to tokenize the input and processes these tokens to produce the AST.
 #[derive(Debug)]
 pub struct Parser {
+    /// The lexer used to tokenize the source code.
     lexer: Lexer,
-    cur_token: Token,
-    peek_token: Token,
+    /// The current token being processed.
+    pub cur_token: Token,
+    /// The next token to be processed.
+    pub peek_token: Token,
+    /// A list of errors encountered during parsing.
     errors: Vec<Error>,
+    /// The lines of source code being parsed, used for error reporting.
     lines: Rc<[String]>,
 }
 
 impl Parser {
+    /// Creates a new `Parser` instance.
+    ///
+    /// This method initializes a new `Parser` with the given `Lexer`. It reads two tokens initially
+    /// to set both `cur_token` and `peek_token`.
+    ///
+    /// # Arguments
+    ///
+    /// * `lexer` - The lexer instance used for tokenizing the input.
+    ///
+    /// # Returns
+    ///
+    /// A new `Parser` instance with the initial state set.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use mechylang::{Lexer, Parser};
+    /// let source_code = r#"print("hello, world!")"#;
+    /// let lexer = Lexer::new(source_code);
+    /// let parser = Parser::new(lexer);
+    /// ```
     pub fn new(lexer: Lexer) -> Self {
         let mut parser = Self {
             lines: lexer.lines(),
@@ -37,7 +65,43 @@ impl Parser {
         parser.next_token();
         parser
     }
-
+    
+    /// Parses the input source code into a `Program` structure.
+    ///
+    /// This method repeatedly reads tokens from the lexer and attempts to parse them into statements
+    /// until the end of the file (`EOF`) is reached. Each successfully parsed statement is collected
+    /// into a `Program` instance.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is:
+    /// * `Ok(Program)` containing the list of parsed statements if successful.
+    /// * `Err(InterpreterErrors)` containing any errors encountered during parsing.
+    ///
+    /// # Errors
+    ///
+    /// If any parsing error occurs, the method returns an `Err` variant with an `InterpreterErrors` 
+    /// containing the encountered error(s).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use mechylang::{Lexer, Parser};
+    /// let source_code = r#"print("hello, world!")"#;
+    /// let lexer = Lexer::new(source_code);
+    /// let mut parser = Parser::new(lexer);
+    /// match parser.parse() {
+    ///     Ok(program) => {
+    ///         // Process the parsed program
+    ///     }
+    ///     Err(errors) => {
+    ///         // Handle parsing errors
+    ///         for error in errors {
+    ///             println!("Error: {}", error);
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub fn parse(&mut self) -> Result<Program, InterpreterErrors> {
         let mut statements = Vec::new();
 

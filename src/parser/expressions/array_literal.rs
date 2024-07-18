@@ -39,7 +39,7 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::parser::expressions::Expression;
-    use crate::parser::expressions::tests::parse;
+    use crate::parser::tests::parse;
     use crate::parser::statements::Statement;
 
     #[test]
