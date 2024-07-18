@@ -1,7 +1,7 @@
 use crate::evaluator::objects::function::Function;
 use crate::evaluator::objects::iterators::IteratorObject;
 use crate::evaluator::runtime::builtins::BuiltinFunction;
-use crate::Environment;
+use crate::{Environment, Parser};
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
@@ -14,11 +14,13 @@ use crate::{
             IfExpression, IndexExpression, InfixExpression, InfixOperator, MemberExpression,
             PrefixExpression, PrefixOperator, StructLiteral, WhileExpression,
         },
-        parser::{BlockStatement, LetStatement, Parser, Program, Statement},
     },
     trace, Object,
 };
-
+use crate::parser::expressions::block_expression::BlockExpression;
+use crate::parser::program::Program;
+use crate::parser::statements::let_statement::LetStatement;
+use crate::parser::statements::Statement;
 use super::{
     methods::{Method, MethodError},
     objects::traits::UnwrapReturnValue,
@@ -257,7 +259,7 @@ impl Evaluator {
             }
             Expression::Infix(infix) => self.eval_infix_expression(infix, env),
             Expression::If(if_expr) => self.eval_if_expression(if_expr, env),
-            Expression::Block(block) => self.eval_scoped_block_statement(block, env),
+            Expression::Block(block) => self.eval_scoped_block_expression(block, env),
             Expression::Identifier(ident) => self.eval_identifier(ident, env),
             Expression::Function(func) => Ok(Object::Function(Function {
                 params: func.parameters.clone(),
@@ -338,9 +340,9 @@ impl Evaluator {
         }
     }
 
-    fn eval_scoped_block_statement(
+    fn eval_scoped_block_expression(
         &mut self,
-        block: &BlockStatement,
+        block: &BlockExpression,
         env: &mut Environment,
     ) -> Result<Object, Error> {
         let mut result = Object::Unit;
@@ -373,9 +375,9 @@ impl Evaluator {
         Ok(result)
     }
 
-    fn eval_block_statement(
+    fn eval_block_expression(
         &mut self,
-        block: &BlockStatement,
+        block: &BlockExpression,
         env: &mut Environment,
     ) -> Result<Object, Error> {
         let mut result = Object::Unit;
@@ -413,9 +415,9 @@ impl Evaluator {
         let condition = self.eval_expression(&if_expr.condition, env)?;
 
         if Self::is_truthy(&condition) {
-            self.eval_block_statement(&if_expr.consequence, env)
+            self.eval_block_expression(&if_expr.consequence, env)
         } else if let Some(alternative) = &if_expr.alternative {
-            self.eval_block_statement(alternative, env)
+            self.eval_block_expression(alternative, env)
         } else {
             Ok(Object::Unit)
         }
@@ -722,7 +724,7 @@ impl Evaluator {
         //     extended_env = env;
         // }
 
-        let evaluated = self.eval_block_statement(&function.body, &mut extended_env)?;
+        let evaluated = self.eval_block_expression(&function.body, &mut extended_env)?;
 
         Ok(evaluated.unwrap_return_value())
     }
@@ -1101,7 +1103,7 @@ impl Evaluator {
                 new_env.set(index_ident.value.clone(), Object::Integer(index));
             }
 
-            result = self.eval_block_statement(&for_expr.body, &mut new_env)?;
+            result = self.eval_block_expression(&for_expr.body, &mut new_env)?;
 
             index += 1;
 
@@ -1115,7 +1117,7 @@ impl Evaluator {
         }
 
         if let Some(ref else_block) = for_expr.else_block {
-            result = self.eval_block_statement(else_block, env)?;
+            result = self.eval_block_expression(else_block, env)?;
         }
 
         Ok(result)
@@ -1175,7 +1177,7 @@ impl Evaluator {
         while Self::is_truthy(&self.eval_expression(&while_expr.condition, env)?) {
             let mut new_env = Environment::new_enclosed(env);
 
-            result = self.eval_block_statement(&while_expr.body, &mut new_env)?;
+            result = self.eval_block_expression(&while_expr.body, &mut new_env)?;
 
             match result {
                 Object::ReturnValue(_) => return Ok(result),
@@ -1187,7 +1189,7 @@ impl Evaluator {
         }
 
         if let Some(ref else_block) = while_expr.else_block {
-            result = self.eval_block_statement(else_block, env)?;
+            result = self.eval_block_expression(else_block, env)?;
         }
 
         Ok(result)

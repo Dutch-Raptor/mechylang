@@ -4,14 +4,15 @@ use std::{
 };
 
 use crate::{
-    parser::{expressions::Identifier, parser::BlockStatement},
+    parser::{expressions::Identifier},
     Environment, EvalConfig, Evaluator, Object,
 };
+use crate::parser::expressions::block_expression::BlockExpression;
 
 #[derive(Clone)]
 pub struct Function {
     pub params: Rc<[Identifier]>,
-    pub body: BlockStatement,
+    pub body: BlockExpression,
     pub env: Environment,
 }
 
