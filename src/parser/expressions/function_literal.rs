@@ -3,11 +3,9 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
 use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
 use crate::parser::expressions::identifier::Identifier;
 use crate::parser::{Parser};
 use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
 use crate::parser::expressions::block_expression::BlockExpression;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -32,7 +30,7 @@ impl Display for FunctionLiteral {
 
 impl Parser {
 
-    pub(super) fn parse_function_literal(&mut self) -> Result<Expression, Error> {
+    pub(super) fn parse_function_literal(&mut self) -> Result<FunctionLiteral, Error> {
         let _trace = trace!("parse_function_literal");
         let token = self.cur_token.clone();
 
@@ -44,11 +42,11 @@ impl Parser {
 
         let body = self.parse_block_expression()?;
 
-        Ok(Expression::Function(FunctionLiteral {
+        Ok(FunctionLiteral {
             token,
             parameters: parameters.into(),
             body,
-        }))
+        })
     }
 
     pub(in crate::parser) fn parse_function_parameters(&mut self) -> Result<Vec<Identifier>, Error> {
@@ -61,15 +59,7 @@ impl Parser {
 
         self.next_token();
 
-        let ident = match self.parse_identifier()? {
-            Expression::Identifier(ident) => ident,
-            _ => {
-                return Err(self.error_current(
-                    ErrorKind::UnexpectedToken,
-                    format!("Expected an identifier, got {:?}", self.cur_token),
-                ))
-            }
-        };
+        let ident = self.parse_identifier()?;
 
         identifiers.push(ident);
 
@@ -77,15 +67,7 @@ impl Parser {
             self.next_token();
             self.next_token();
 
-            let ident = match self.parse_identifier()? {
-                Expression::Identifier(ident) => ident,
-                _ => {
-                    return Err(self.error_current(
-                        ErrorKind::UnexpectedToken,
-                        format!("Expected an identifier, got {:?}", self.cur_token),
-                    ))
-                }
-            };
+            let ident = self.parse_identifier()?;
 
             identifiers.push(ident);
         }

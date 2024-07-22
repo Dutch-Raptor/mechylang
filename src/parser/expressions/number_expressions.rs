@@ -34,6 +34,7 @@ impl Parser {
     pub(super) fn parse_number(&mut self) -> Result<Expression, Error> {
         let _trace = trace!("parse_number");
         let token = self.cur_token.clone();
+        debug_assert!(matches!(token.kind, TokenKind::Number(_)), "Expected current token to be a number");
 
         let literal = match token.kind {
             TokenKind::Number(ref literal) => literal.clone(),

@@ -5,8 +5,7 @@ use serde::Serialize;
 use crate::parser::expressions::Expression;
 use crate::parser::expressions::identifier::Identifier;
 use crate::parser::Parser;
-use crate::{Error, Token};
-use crate::errors::ErrorKind;
+use crate::{Error, Token, TokenKind};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct MemberExpression {
@@ -21,27 +20,43 @@ impl Display for MemberExpression {
     }
 }
 impl Parser {
-    pub(super) fn parse_member(&mut self, left: Expression) -> Result<Expression, Error> {
+    /// Parses a member access expression in Mechylang, where an object is accessed by its property.
+    ///
+    /// This function is used to parse member access expressions, where an object is followed by a dot `.` and then
+    /// an identifier representing the property or method being accessed. For example, in the expression `object.property`,
+    /// `object` is the left expression and `property` is the member being accessed.
+    ///
+    /// # Arguments
+    ///
+    /// * `left` - The left side of the member access expression, which is the object from which the property is being accessed.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` which is:
+    /// * `Ok(MemberExpression)` if the member access was successfully parsed. This includes:
+    ///   - `token`: The token representing the dot `.` in the member access expression.
+    ///   - `object`: The left expression which is being accessed.
+    ///   - `property`: The identifier of the property being accessed.
+    /// * `Err(Error)` if there was an error during parsing, such as an unexpected token or missing identifier.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an error if:
+    /// * The next token is not an identifier, which indicates that the member access syntax is incorrect.
+    /// * An unexpected token is encountered after the dot `.` symbol.
+    pub(super) fn parse_member(&mut self, left: Expression) -> Result<MemberExpression, Error> {
+        debug_assert!(self.is_cur_token(TokenKind::Dot), "Expected current token to be `.`");
         self.next_token();
         let token = self.cur_token.clone();
 
-        let property = match self.parse_identifier()? {
-            Expression::Identifier(ident) => ident,
-            _ => {
-                return Err(self.error_current(
-                    ErrorKind::UnexpectedToken,
-                    format!("Expected a property (identifier), got {:?}", self.cur_token),
-                ))
-            }
-        };
+        let property = self.parse_identifier()?;
 
-        Ok(Expression::Member(MemberExpression {
+        Ok(MemberExpression {
             token,
             object: Rc::new(left),
             property,
-        }))
+        })
     }
-
 }
 
 #[cfg(test)]
@@ -66,7 +81,7 @@ mod tests {
                     expression:
                     Expression::Call(ref call_expr), ..
                 }) => call_expr,
-            _ => panic!("Expected a call expresssion")
+            _ => panic!("Expected a call expression")
         };
 
         let method = match call_expr.function.as_ref() {

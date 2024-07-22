@@ -28,11 +28,14 @@ impl Display for ArrayLiteral {
 
 impl Parser {
 
-    pub(super) fn parse_array_expression(&mut self) -> Result<Expression, Error> {
+    pub(super) fn parse_array_expression(&mut self) -> Result<ArrayLiteral, Error> {
+        debug_assert!(self.is_cur_token(TokenKind::LeftSquare), "Expected current token to be `[`");
         let token = self.cur_token.clone();
         let elements = self.parse_expression_list(TokenKind::RightSquare)?;
+        
+        debug_assert!(self.is_cur_token(TokenKind::RightSquare), "Expected current token to be `]`");
 
-        Ok(Expression::ArrayLiteral(ArrayLiteral { token, elements: elements.into() }))
+        Ok(ArrayLiteral { token, elements: elements.into() })
     }
 }
 

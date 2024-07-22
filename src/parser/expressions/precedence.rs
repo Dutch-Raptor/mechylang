@@ -18,10 +18,10 @@ pub enum Precedence {
     BitShift,    // << or >>
     Sum,         // + or -
     Product,     // * or /
-    Prefix,      // -X or !X
+    Prefix,      // -x or !x
     Index,       // array[index]
     Call,        // myFunction(X)
-    Member,      // object.member
+    Member,      // foo.member
 }
 
 pub trait PrecedenceTrait {
@@ -30,7 +30,7 @@ pub trait PrecedenceTrait {
 
 impl PrecedenceTrait for TokenKind {
     fn precedence(&self) -> Option<Precedence> {
-        let presedence = match self {
+        let precedence = match self {
             // Precedences listed in ascending order, but lowest precedence at the end
             // *** Assign ***
             TokenKind::AssignEqual
@@ -122,7 +122,7 @@ impl PrecedenceTrait for TokenKind {
             }
         };
 
-        Some(presedence)
+        Some(precedence)
     }
 }
 
@@ -133,9 +133,7 @@ impl PrecedenceTrait for Token {
 }
 
 impl Parser {
-
     pub(super) fn peek_precedence(&mut self) -> Precedence {
-
         match self.peek_token.precedence() {
             Some(precedence) => precedence,
             None => {
@@ -148,7 +146,7 @@ impl Parser {
             }
         }
     }
-
+    
     pub(super) fn cur_precedence(&self) -> Precedence {
         self.cur_token.precedence().unwrap_or_else(|| Precedence::Lowest)
     }
@@ -175,6 +173,7 @@ mod tests {
         assert!(Precedence::Product < Precedence::Prefix);
         assert!(Precedence::Prefix < Precedence::Index);
         assert!(Precedence::Index < Precedence::Call);
+        assert!(Precedence::Call < Precedence::Member);
     }
 
 

@@ -47,7 +47,8 @@ impl Parser {
     /// use mechylang::{Lexer, Parser};
     /// let source_code = r#"print("hello, world!")"#;
     /// let lexer = Lexer::new(source_code);
-    /// let parser = Parser::new(lexer);
+    /// let mut parser = Parser::new(lexer);
+    /// let program = parser.parse().unwrap();
     /// ```
     pub fn new(lexer: Lexer) -> Self {
         let mut parser = Self {
@@ -64,6 +65,30 @@ impl Parser {
         parser.next_token();
         parser.next_token();
         parser
+    }
+    
+    /// Creates a new `Parser` instance from the provided source code.
+    ///
+    /// This method initializes a new `Parser` with the given source code by first creating a
+    /// `Lexer` from the source and then using it to create the `Parser`.
+    ///
+    /// # Arguments
+    ///
+    /// * `src` - The source code as a string reference that will be tokenized and parsed.
+    ///
+    /// # Returns
+    ///
+    /// A new `Parser` instance with the initial state set.
+    /// 
+    /// # Example
+    /// ```
+    /// use mechylang::Parser;
+    /// let source_code = r#"print("hello, world!")"#;
+    /// let mut parser = Parser::from_source(source_code);
+    /// let program = parser.parse().unwrap();
+    /// ```
+    pub fn from_source(src: impl AsRef<str>) -> Self {
+        Parser::new(Lexer::new(src))
     }
     
     /// Parses the input source code into a `Program` structure.
@@ -88,11 +113,11 @@ impl Parser {
     /// ```
     /// use mechylang::{Lexer, Parser};
     /// let source_code = r#"print("hello, world!")"#;
-    /// let lexer = Lexer::new(source_code);
-    /// let mut parser = Parser::new(lexer);
+    /// let mut parser = Parser::from_source(source_code);
     /// match parser.parse() {
     ///     Ok(program) => {
     ///         // Process the parsed program
+    ///         println!("{}", program);
     ///     }
     ///     Err(errors) => {
     ///         // Handle parsing errors
@@ -120,13 +145,11 @@ impl Parser {
 mod tests {
     use color_print::cprintln;
     use crate::errors::InterpreterErrors;
-    use crate::Lexer;
     use crate::parser::Parser;
     use crate::parser::statements::Statement;
 
     pub(super) fn parse(input: &str) -> Result<Vec<Statement>, InterpreterErrors> {
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
+        let mut parser = Parser::from_source(input);
 
         let result = parser.parse();
 
@@ -134,7 +157,7 @@ mod tests {
             cprintln!("{}", err)
         }
 
-        result.map(|prgrm| prgrm.statements)
+        result.map(|program| program.statements)
     }
 }
 

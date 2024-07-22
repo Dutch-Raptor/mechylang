@@ -3,7 +3,6 @@ use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
 use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
 use crate::parser::Parser;
 use crate::{Error, Token};
 use crate::errors::ErrorKind;
@@ -21,8 +20,7 @@ impl Display for StringLiteral {
 }
 
 impl Parser {
-
-    pub(super) fn parse_string(&mut self) -> Result<Expression, Error> {
+    pub(super) fn parse_string(&mut self) -> Result<StringLiteral, Error> {
         let token = self.cur_token.clone();
         let value = match self.cur_token.kind {
             TokenKind::String(ref s) => s.clone(),
@@ -34,7 +32,7 @@ impl Parser {
             }
         };
 
-        Ok(Expression::StringLiteral(StringLiteral { token, value: value.into() }))
+        Ok(StringLiteral { token, value: value.into() })
     }
 }
 #[cfg(test)]

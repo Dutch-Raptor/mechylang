@@ -8,7 +8,6 @@ use crate::parser::expressions::identifier::Identifier;
 use crate::parser::expressions::precedence::Precedence;
 use crate::parser::Parser;
 use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
 use crate::parser::expressions::block_expression::BlockExpression;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -45,7 +44,7 @@ impl Parser {
     /// for <iterator> in <iterable> { <body> }
     /// for (<index>, <iterator>) in <iterable> { <body> }
     /// ```
-    pub(super) fn parse_for_expression(&mut self) -> Result<Expression, Error> {
+    pub(super) fn parse_for_expression(&mut self) -> Result<ForExpression, Error> {
         let _trace = trace!("parse_for_expression");
         let token = self.cur_token.clone();
 
@@ -55,31 +54,16 @@ impl Parser {
         let index = match self.cur_token.kind {
             TokenKind::LeftParen => {
                 self.next_token();
-                let index = match self.parse_identifier()? {
-                    Expression::Identifier(ident) => ident,
-                    _ => {
-                        return Err(self.error_current(
-                            ErrorKind::UnexpectedToken,
-                            format!("Expected an identifier, got {:?}", self.cur_token),
-                        ))
-                    }
-                };
+                let index_ident = self.parse_identifier()?;
+                
                 self.expect_peek(TokenKind::Comma)?;
                 self.next_token();
-                Some(index)
+                Some(index_ident)
             }
             _ => None,
         };
 
-        let iterator = match self.parse_identifier()? {
-            Expression::Identifier(ident) => ident,
-            _ => {
-                return Err(self.error_current(
-                    ErrorKind::UnexpectedToken,
-                    format!("Expected an identifier, got {:?}", self.cur_token),
-                ))
-            }
-        };
+        let iterator = self.parse_identifier()?;
 
         if index.is_some() {
             self.expect_peek(TokenKind::RightParen)?;
@@ -95,22 +79,16 @@ impl Parser {
 
         let body = self.parse_block_expression()?;
 
-        let else_block = if self.peek_token.kind == TokenKind::Else {
-            self.next_token();
-            self.expect_peek(TokenKind::LeftSquirly)?;
-            Some(self.parse_block_expression()?)
-        } else {
-            None
-        };
+        let else_block = self.parse_else_block()?;
 
-        Ok(Expression::For(ForExpression {
+        Ok(ForExpression {
             token,
             iterator,
             iterable: Rc::new(iterable),
             body,
             index,
             else_block,
-        }))
+        })
     }
 }
 

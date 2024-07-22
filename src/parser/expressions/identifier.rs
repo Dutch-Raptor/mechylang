@@ -3,7 +3,6 @@ use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
 use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
 use crate::parser::Parser;
 use crate::{Error, Token, trace};
 use crate::errors::ErrorKind;
@@ -27,8 +26,9 @@ impl Into<Rc<str>> for Identifier {
 }
  impl Parser {
 
-     pub(super) fn parse_identifier(&mut self) -> Result<Expression, Error> {
+     pub(super) fn parse_identifier(&mut self) -> Result<Identifier, Error> {
          let _trace = trace!("parse_identifier");
+         debug_assert!(matches!(self.cur_token.kind, TokenKind::Identifier(_)), "Expected current token to be an identifier");
          let token = self.cur_token.clone();
 
          let literal = match token.kind {
@@ -41,10 +41,10 @@ impl Into<Rc<str>> for Identifier {
              }
          };
 
-         Ok(Expression::Identifier(Identifier {
+         Ok(Identifier {
              token,
              value: literal.into(),
-         }))
+         })
      }
  }
 

@@ -14,7 +14,7 @@ use crate::{evaluator::runtime::builtins::BuiltinError, Token};
 pub struct InterpreterErrors(pub Vec<Error>);
 
 impl Display for InterpreterErrors {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0.iter().map(|err| err.to_string()).join("\n"))
     }
 }

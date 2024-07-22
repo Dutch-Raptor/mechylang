@@ -21,8 +21,9 @@ impl Display for IndexExpression {
     }
 }
 impl Parser {
-    pub(super) fn parse_index_expression(&mut self, left: Expression) -> Result<Expression, Error> {
+    pub(super) fn parse_index_expression(&mut self, left: Expression) -> Result<IndexExpression, Error> {
         let token = self.cur_token.clone();
+        debug_assert!(self.is_cur_token(TokenKind::LeftSquare), "Expected current token to be `[`");
 
         self.next_token();
 
@@ -30,11 +31,11 @@ impl Parser {
 
         self.expect_peek(TokenKind::RightSquare)?;
 
-        Ok(Expression::Index(IndexExpression {
+        Ok(IndexExpression {
             token,
             left: Rc::new(left),
             index: Rc::new(index),
-        }))
+        })
     }
 }
 

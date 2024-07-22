@@ -29,6 +29,7 @@ pub enum InfixOperator {
     Asterisk,
     Slash,
     Percent,
+   
     CompareEqual,
     CompareNotEqual,
     CompareLess,
@@ -42,7 +43,6 @@ pub enum InfixOperator {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
-
     BitwiseLeftShift,
     BitwiseRightShift,
 
@@ -95,47 +95,30 @@ impl Display for InfixOperator {
 impl Parser {
     pub(super) fn has_infix(&self, token: &TokenKind) -> bool {
         match token {
-            TokenKind::Plus
-            | TokenKind::Minus
-            | TokenKind::Divide
-            | TokenKind::Multiply
-            | TokenKind::Modulo
-            | TokenKind::CompareEqual
-            | TokenKind::CompareNotEqual
-            | TokenKind::CompareGreater
-            | TokenKind::CompareGreaterEqual
-            | TokenKind::CompareLess
-            | TokenKind::CompareLessEqual
+            TokenKind::Plus | TokenKind::Minus | TokenKind::Divide
+            | TokenKind::Multiply | TokenKind::Modulo | TokenKind::CompareEqual
+            | TokenKind::CompareNotEqual | TokenKind::CompareGreater | TokenKind::CompareGreaterEqual
+            | TokenKind::CompareLess | TokenKind::CompareLessEqual
+
             // Open parenthesis for function calls
             | TokenKind::LeftParen
             // Open square bracket for array indexing
             | TokenKind::LeftSquare
 
             // logical operators
-            | TokenKind::LogicalAnd
-            | TokenKind::LogicalOr
+            | TokenKind::LogicalAnd | TokenKind::LogicalOr
 
             // bitwise operators
-            | TokenKind::Ampersand
-            | TokenKind::BitwiseOr
-            | TokenKind::BitwiseXor
-            | TokenKind::BitwiseLeftShift
-            | TokenKind::BitwiseRightShift
+            | TokenKind::Ampersand | TokenKind::BitwiseOr | TokenKind::BitwiseXor
+            | TokenKind::BitwiseLeftShift | TokenKind::BitwiseRightShift
 
             // Assignment operators
-            | TokenKind::AssignEqual
-            | TokenKind::AssignPlus
-            | TokenKind::AssignMinus
-            | TokenKind::AssignMultiply
-            | TokenKind::AssignDivide
-            | TokenKind::AssignModulo
-            | TokenKind::AssignBitwiseAnd
-            | TokenKind::AssignBitwiseOr
-            | TokenKind::AssignBitwiseXor
+            | TokenKind::AssignEqual | TokenKind::AssignPlus | TokenKind::AssignMinus
+            | TokenKind::AssignMultiply | TokenKind::AssignDivide | TokenKind::AssignModulo
+            | TokenKind::AssignBitwiseAnd | TokenKind::AssignBitwiseOr | TokenKind::AssignBitwiseXor
 
             // Range operator
-            | TokenKind::RangeExclusive
-            | TokenKind::RangeInclusive
+            | TokenKind::RangeExclusive | TokenKind::RangeInclusive
 
             // Method expressions
             | TokenKind::Dot
@@ -145,44 +128,101 @@ impl Parser {
         }
     }
 
-    pub(super) fn parse_infix(&mut self, token: TokenKind, left: Expression) -> Result<Expression, Error> {
+    /// Parses an infix expression in Mechylang.
+    ///
+    /// This function takes the left-hand side of an expression and the current token,
+    /// and parses it into a corresponding infix `Expression`. It handles various infix
+    /// operators such as arithmetic, comparison, logical, bitwise, and assignment operators,
+    /// as well as function calls, indexing, member access, and range expressions.
+    ///
+    /// # Parameters
+    ///
+    /// - `left`: The left-hand side `Expression` of the infix operation.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result<Expression, Error>` where:
+    /// - `Ok(Expression)` is returned if the current token is successfully parsed into an `Expression`.
+    /// - `Err(Error)` is returned if the current token does not correspond to a valid infix operator
+    ///   or if parsing fails.
+    ///
+    /// # Errors
+    ///
+    /// The function will return an error if:
+    /// - The `TokenKind` does not have a registered infix function. This could occur if the
+    ///   token type is unexpected or unsupported, resulting in an `ErrorKind::MissingInfix`
+    ///   error with a descriptive message.
+    pub(super) fn parse_infix(&mut self, left: Expression) -> Result<Expression, Error> {
         let _trace = trace!("parse_infix");
-        match token {
+        match self.cur_token.kind {
+            // **** infix operators ****
+            // Arithmetic operators
             TokenKind::Plus | TokenKind::Minus | TokenKind::Divide
-            | TokenKind::Multiply | TokenKind::Modulo | TokenKind::CompareEqual
-            | TokenKind::CompareNotEqual | TokenKind::CompareGreater | TokenKind::CompareGreaterEqual
-            | TokenKind::CompareLess | TokenKind::CompareLessEqual | TokenKind::LogicalAnd
-            | TokenKind::LogicalOr | TokenKind::Ampersand | TokenKind::BitwiseOr
-            | TokenKind::BitwiseXor | TokenKind::BitwiseLeftShift | TokenKind::BitwiseRightShift
+            | TokenKind::Multiply | TokenKind::Modulo
+
+            // Comparison operators
+            | TokenKind::CompareEqual | TokenKind::CompareNotEqual | TokenKind::CompareGreater
+            | TokenKind::CompareGreaterEqual | TokenKind::CompareLess | TokenKind::CompareLessEqual
+
+            // Logical operators
+            | TokenKind::LogicalAnd | TokenKind::LogicalOr
+
+            // Bitwise operators
+            | TokenKind::Ampersand | TokenKind::BitwiseOr | TokenKind::BitwiseXor
+            | TokenKind::BitwiseLeftShift | TokenKind::BitwiseRightShift
 
             // Assignments
             | TokenKind::AssignEqual | TokenKind::AssignPlus | TokenKind::AssignMinus
             | TokenKind::AssignMultiply | TokenKind::AssignDivide | TokenKind::AssignModulo
             | TokenKind::AssignBitwiseAnd | TokenKind::AssignBitwiseOr | TokenKind::AssignBitwiseXor
 
-            => self.parse_infix_expression(left),
-            TokenKind::LeftParen => self.parse_call_expression(left),
-            TokenKind::LeftSquare => self.parse_index_expression(left),
-            TokenKind::Dot => self.parse_member(left),
-            TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_infix_expression(token, left),
+            => Ok(Expression::Infix(self.parse_infix_expression(left)?)),
+
+            TokenKind::LeftParen => Ok(Expression::Call(self.parse_call_expression(left)?)),
+            TokenKind::LeftSquare => Ok(Expression::Index(self.parse_index_expression(left)?)),
+            TokenKind::Dot => Ok(Expression::Member(self.parse_member(left)?)),
+            TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_infix_expression(left),
+
             _ => Err(self.error_current(
                 ErrorKind::MissingInfix,
-                format!("No registered infix function for {:?}", token),
+                format!("No registered infix function for {:?}", self.cur_token.kind),
             )),
         }
     }
 
 
-    pub(super) fn parse_infix_expression(&mut self, left: Expression) -> Result<Expression, Error> {
+    pub(super) fn parse_infix_expression(&mut self, left: Expression) -> Result<InfixExpression, Error> {
         let _trace = trace!("parse_infix_expression");
         let token = self.cur_token.clone();
 
-        let operator = match token.kind {
+        let operator = Self::parse_infix_operator(&token)
+            .ok_or(self.error_current(
+                ErrorKind::MissingInfix,
+                format!("expected infix operator, got {:?}", token),
+            ))?;
+
+        let precedence = self.cur_precedence();
+        self.next_token();
+        let right = self.parse_expression(precedence)?;
+
+        Ok(InfixExpression {
+            token,
+            operator,
+            left: Rc::new(left),
+            right: Rc::new(right),
+        })
+    }
+
+    fn parse_infix_operator(token: &Token) -> Option<InfixOperator> {
+        Some(match token.kind {
+            // Arithmetic operators
             TokenKind::Plus => InfixOperator::Plus,
             TokenKind::Minus => InfixOperator::Minus,
             TokenKind::Multiply => InfixOperator::Asterisk,
             TokenKind::Divide => InfixOperator::Slash,
             TokenKind::Modulo => InfixOperator::Percent,
+
+            // Comparison operators
             TokenKind::CompareEqual => InfixOperator::CompareEqual,
             TokenKind::CompareNotEqual => InfixOperator::CompareNotEqual,
             TokenKind::CompareLess => InfixOperator::CompareLess,
@@ -190,12 +230,14 @@ impl Parser {
             TokenKind::CompareLessEqual => InfixOperator::CompareLessEqual,
             TokenKind::CompareGreaterEqual => InfixOperator::CompareGreaterEqual,
 
+            // Bitwise operators
             TokenKind::BitwiseXor => InfixOperator::BitwiseXor,
             TokenKind::Ampersand => InfixOperator::BitwiseAnd,
             TokenKind::BitwiseOr => InfixOperator::BitwiseOr,
             TokenKind::BitwiseLeftShift => InfixOperator::BitwiseLeftShift,
             TokenKind::BitwiseRightShift => InfixOperator::BitwiseRightShift,
 
+            // Logical operators
             TokenKind::LogicalAnd => InfixOperator::LogicalAnd,
             TokenKind::LogicalOr => InfixOperator::LogicalOr,
 
@@ -211,23 +253,9 @@ impl Parser {
             TokenKind::AssignBitwiseOr => InfixOperator::AssignBitwiseOr,
 
             _ => {
-                return Err(self.error_current(
-                    ErrorKind::MissingInfix,
-                    format!("expected infix operator, got {:?}", token),
-                ))
+                return None;
             }
-        };
-
-        let precedence = self.cur_precedence();
-        self.next_token();
-        let right = self.parse_expression(precedence)?;
-
-        Ok(Expression::Infix(InfixExpression {
-            token,
-            operator,
-            left: Rc::new(left),
-            right: Rc::new(right),
-        }))
+        })
     }
 }
 

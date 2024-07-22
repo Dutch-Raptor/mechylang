@@ -9,7 +9,7 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use color_print::cformat;
 use serde::Serialize;
-use crate::{Error, trace};
+use crate::{Error, Token, trace};
 use crate::errors::ErrorKind;
 use crate::lexer::tokens::TokenKind;
 use crate::parser::Parser;
@@ -29,8 +29,8 @@ pub enum Statement {
     ///
     /// Syntax:
     /// ```
-    /// # use mechylang::test_utils::test_eval_ok;
-    /// # test_eval_ok(r#"
+    /// # use mechylang::test_utils::test_parse_ok;
+    /// # test_parse_ok(r#"
     /// let x = 5;
     /// # "#)
     /// ```
@@ -39,8 +39,8 @@ pub enum Statement {
     ///
     /// Syntax:
     /// ```
-    /// # use mechylang::test_utils::test_eval_ok;
-    /// # test_eval_ok(r#"
+    /// # use mechylang::test_utils::test_parse_ok;
+    /// # test_parse_ok(r#"
     /// fn add(a, b) {
     ///     return a + b;
     /// }
@@ -51,18 +51,18 @@ pub enum Statement {
     ///
     /// Syntax:
     /// ```
-    /// # use mechylang::test_utils::test_eval_ok;
-    /// # test_eval_ok(r#"
+    /// # use mechylang::test_utils::test_parse_ok;
+    /// # test_parse_ok(r#"
     /// 5 + 10;
     /// # "#)
     /// ```
     Expression(ExpressionStatement),
-   /// A `break` statement for breaking out of loops.
+    /// A `break` statement for breaking out of loops.
     ///
     /// Syntax:
     /// ```
-    /// # use mechylang::test_utils::test_eval_ok;
-    /// # test_eval_ok(r#"
+    /// # use mechylang::test_utils::test_parse_ok;
+    /// # test_parse_ok(r#"
     /// let x = 0;
     /// while (x < 10) {
     ///     if (x == 5) {
@@ -77,8 +77,8 @@ pub enum Statement {
     ///
     /// Syntax:
     /// ```
-    /// # use mechylang::test_utils::test_eval_ok;
-    /// # test_eval_ok(r#"
+    /// # use mechylang::test_utils::test_parse_ok;
+    /// # test_parse_ok(r#"
     /// let x = 0;
     /// let sum = 0;
     /// while (x < 10) {
@@ -95,8 +95,8 @@ pub enum Statement {
     ///
     /// Syntax:
     /// ```
-    /// # use mechylang::test_utils::test_eval_ok;
-    /// # test_eval_ok(r#"
+    /// # use mechylang::test_utils::test_parse_ok;
+    /// # test_parse_ok(r#"
     /// fn add(a, b) {
     ///     return a + b;
     /// }
@@ -118,24 +118,41 @@ impl Display for Statement {
 }
 
 impl Parser {
+    /// Parses a single statement in Mechylang.
+    ///
+    /// This function handles the parsing of various types of statements, including `let`, `return`,
+    /// `break`, `continue`, and function statements. If the current token does not match any of these
+    /// specific types, it treats the statement as an expression statement.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` containing either:
+    /// - `Ok(Statement)` if the statement was successfully parsed.
+    /// - `Err(Error)` if there was an error during parsing, such as an unexpected token.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an error if:
+    /// - An error occurs while parsing an expression or any other statement type.
+    /// - After parsing a statement, the next token is not a statement terminator.
     pub(crate) fn parse_statement(&mut self) -> Result<Statement, Error> {
         let _trace = trace!("parse_statement");
 
         let statement = match self.cur_token.kind {
-            TokenKind::Let => self.parse_let_statement()?,
-            TokenKind::Return => self.parse_return_statement()?,
+            TokenKind::Let => Statement::Let(self.parse_let_statement()?),
+            TokenKind::Return => Statement::Return(self.parse_return_statement()?),
             TokenKind::Semicolon => {
                 self.next_token();
                 self.parse_statement()?
             }
-            TokenKind::Break => self.parse_break_statement()?,
+            TokenKind::Break => Statement::Break(self.parse_break_statement()?),
             TokenKind::Continue => Statement::Continue(ContinueStatement { token: self.cur_token.clone() }),
             TokenKind::Fn => self.parse_function_statement()?,
-            _ => self.parse_expression_statement()?,
+            _ => Statement::Expression(self.parse_expression_statement()?),
         };
 
 
-        if !self.peek_token.is_statement_terminator(&self.cur_token) {
+        if !Parser::is_statement_terminator(&self.peek_token, &self.cur_token) {
             return Err(self.error_peek(
                 ErrorKind::UnexpectedToken,
                 cformat!(
@@ -149,5 +166,56 @@ impl Parser {
             self.next_token();
         }
         Ok(statement)
+    }
+
+
+    /// Determines if the current token is a statement terminator in Mechylang.
+    ///
+    /// This function checks if the current token indicates the end of a statement. The statement
+    /// terminators include semicolons (`;`), closing braces (`}`), end of file (`EOF`), closing
+    /// parentheses (`)`), closing square brackets (`]`), and the `else` keyword. Additionally, if the
+    /// current token is on a different line than the previous token, it is considered a statement
+    /// terminator.
+    ///
+    /// # Arguments
+    ///
+    /// * `current_token` - The current token.
+    /// * `previous_token` - The token that was parsed just before the current token.
+    ///
+    /// # Returns
+    ///
+    /// * `true` if the current token is a statement terminator.
+    /// * `false` otherwise. 
+    fn is_statement_terminator(current_token: &Token, previous_token: &Token) -> bool {
+        if current_token.kind == TokenKind::Semicolon {
+            return true;
+        }
+
+        if current_token.kind == TokenKind::RightSquirly {
+            return true;
+        }
+
+        if current_token.kind == TokenKind::EOF {
+            return true;
+        }
+
+        if current_token.kind == TokenKind::RightParen {
+            return true;
+        }
+
+        if current_token.kind == TokenKind::RightSquare {
+            return true;
+        }
+
+        if current_token.kind == TokenKind::Else {
+            return true;
+        }
+
+        // if previous token was on a different line
+        if current_token.position.line != previous_token.position.line {
+            return true;
+        }
+
+        return false;
     }
 }

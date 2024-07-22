@@ -3,10 +3,69 @@ use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
 use crate::{Error, Token, trace};
+use crate::errors::ErrorKind;
 use crate::lexer::tokens::TokenKind;
 use crate::parser::Parser;
 use crate::parser::statements::Statement;
 
+/// Represents a block of code in Mechylang, which is a sequence of statements enclosed in curly braces.
+///
+/// A `BlockExpression` is used to group multiple statements together and is commonly used to
+/// represent the body of functions, control structures (like `if`, `for`, etc.), and other
+/// constructs that contain a sequence of statements. A block expression can however also be used
+/// to group expressions, which is useful for expressions that return a value.
+///
+/// # Fields
+///
+/// * `token` - The token representing the opening curly brace `{` that starts the block. This token
+///            is used for error reporting and debugging purposes.
+/// * `statements` - A sequence of `Statement` instances contained within the block. The statements
+///                  are stored in an `Rc<[Statement]>`, which is a reference-counted smart pointer
+///                  to a slice, allowing multiple parts of the code to share the same statements
+///                  without unnecessary copying.
+///
+/// # Notes
+///
+/// The `BlockExpression` struct is used internally by the parser to represent blocks of code. 
+/// The `statements` field is a collection of `Statement` enums, which can represent different types
+/// of statements such as variable declarations, expressions, and control flow commands.
+///
+/// It is crucial for understanding how the parser organizes and processes blocks of code in Mechylang.
+/// 
+/// # Example usages
+/// 
+/// ## Block expression as a function body
+/// ```
+/// use mechylang::test_utils::test_parse_ok;
+/// test_parse_ok(r#"
+/// fn add(a, b) {
+///     return a + b;
+/// }
+/// "#);
+/// ```
+/// 
+/// ## Block expression as an expression
+/// ```
+/// use mechylang::test_utils::test_parse_ok;
+/// test_parse_ok(r#"
+/// let result = {
+///     let x = 5;
+///     let y = 10;
+///     x + y;
+/// };
+/// // result is now 15
+/// "#);
+/// ```
+/// 
+/// ## Block expression in a for loop
+/// ```
+/// use mechylang::test_utils::test_parse_ok;
+/// test_parse_ok(r#"
+/// for i in 1..5 {
+///     sum += i;
+/// }
+/// "#);
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BlockExpression {
     pub token: Token,
@@ -25,10 +84,27 @@ impl Display for BlockExpression {
 }
 
 impl Parser {
+    /// Parses a block expression in Mechylang.
+    ///
+    /// This function handles the parsing of a block expression, which is a sequence of statements enclosed
+    /// in curly braces (`{}`). It reads statements from the lexer until it encounters a closing curly brace
+    /// (`}`) or the end of the file (EOF). The block expression is represented by a `BlockExpression` structure.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` which contains:
+    /// - `Ok(BlockExpression)` if the block expression was successfully parsed.
+    /// - `Err(Error)` if there was an error during parsing, such as an unexpected token.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an error if:
+    /// - The current token is not a left curly brace (`{`) at the beginning.
+    /// - An unexpected token is encountered while parsing the statements.
+    /// - The closing curly brace (`}`) is missing or misplaced.
     pub(in crate::parser) fn parse_block_expression(&mut self) -> Result<BlockExpression, Error> {
-
-        let _trace = trace!("parse_block_statement");
-        // parse_block_statement handles opening and closing braces
+        let _trace = trace!("parse_block_expression");
+        debug_assert!(self.is_cur_token(TokenKind::LeftSquirly), "Expected current token to be `{{`");
         self.next_token();
         let token = self.cur_token.clone();
 
@@ -42,6 +118,12 @@ impl Parser {
             self.next_token();
         }
 
+        if self.cur_token.kind != TokenKind::RightSquirly {
+            return Err(self.error_current(
+                ErrorKind::UnexpectedToken,
+                format!("Expected `}}`, got {:?}", self.cur_token.kind),
+            ));
+        }
 
         Ok(BlockExpression { token, statements: statements.into() })
     }
@@ -50,36 +132,92 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::expressions::Expression;
+    use crate::errors::ErrorKind;
+    use crate::Parser;
+    use crate::parser::expressions::block_expression::BlockExpression;
+    use crate::parser::statements::expression_statement::ExpressionStatement;
     use crate::parser::statements::Statement;
-    use crate::parser::tests::parse;
-
+    
+   /// Test parsing a block expression with multiple statements
     #[test]
-    fn test_block_expression() {
-        let input = "{
-            let x = 1;
-            let y = 2;
+    fn test_parse_block_expression_multiple_statements() {
+        let source_code = r#"
+        {
+            let x = 10;
+            let y = 20;
             x + y;
-        }";
+        }
+        "#;
 
-        let statements = parse(input).unwrap();
+        let mut parser = Parser::from_source(source_code);
+        let result = parser.parse_block_expression();
+        assert!(result.is_ok());
 
+        if let Ok(BlockExpression { statements, .. }) = result {
+            assert_eq!(statements.len(), 3);
+            assert!(matches!(statements[0], Statement::Let(_)));
+            assert!(matches!(statements[1], Statement::Let(_)));
+            assert!(matches!(statements[2], Statement::Expression(ExpressionStatement { .. })));
+        } else {
+            panic!("Expected BlockExpression but found {:?}", result);
+        }
+    } 
 
-        assert_eq!(statements.len(), 1);
+    /// Test parsing a block expression with a single statement
+    #[test]
+    fn test_parse_block_expression_single_statement() {
+        let source_code = r#"
+        {
+            let x = 42;
+        }
+        "#;
 
-        let stmt = &statements[0];
+        let mut parser = Parser::from_source(source_code);
+        let result = parser.parse_block_expression();
+        assert!(result.is_ok());
 
-        match stmt {
-            Statement::Expression(ref expr) => match expr.expression {
-                Expression::Block(ref block) => {
-                    assert_eq!(block.statements.len(), 3);
-                    assert_eq!(block.statements[0].to_string(), "let x = 1;");
-                    assert_eq!(block.statements[1].to_string(), "let y = 2;");
-                    assert_eq!(block.statements[2].to_string(), "(x + y);");
-                }
-                _ => panic!("expected block expression"),
-            },
-            _ => panic!("expected expression statement"),
-        };
+        if let Ok(BlockExpression { statements, .. }) = result {
+            assert_eq!(statements.len(), 1);
+            assert!(matches!(statements[0], Statement::Let(_)));
+        } else {
+            panic!("Expected BlockExpression but found {:?}", result);
+        }
+    }
+    
+    /// Test parsing a block expression with no statements
+    #[test]
+    fn test_parse_block_expression_empty() {
+        let source_code = r#"
+        {}
+        "#;
+
+        let mut parser = Parser::from_source(source_code);
+        let result = parser.parse_block_expression();
+        assert!(result.is_ok());
+
+        if let Ok(BlockExpression { statements, .. }) = result {
+            assert_eq!(statements.len(), 0);
+        } else {
+            panic!("Expected BlockExpression but found {:?}", result);
+        }
+    }
+    
+    /// Test parsing a block expression with missing closing brace
+    #[test]
+    fn test_parse_block_expression_missing_closing_brace() {
+        let source_code = r#"
+        {
+            let x = 10;
+        "#; // Missing closing brace
+
+        let mut parser = Parser::from_source(source_code);
+        let result = parser.parse_block_expression();
+        assert!(result.is_err());
+
+        if let Err(error) = result {
+            assert_eq!(error.kind, ErrorKind::UnexpectedToken);
+        } else {
+            panic!("Expected error but found {:?}", result);
+        }
     }
 }

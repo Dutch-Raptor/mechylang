@@ -37,12 +37,13 @@ impl Parser {
     /// ```
     ///
     /// Trailing commas are optional
-    pub(super) fn parse_struct_literal(&mut self) -> Result<Expression, Error> {
-        // Cur token is `struct`
+    pub(super) fn parse_struct_literal(&mut self) -> Result<StructLiteral, Error> {
+        debug_assert!(self.is_cur_token(TokenKind::Struct), "Expected current token to be `struct`");
         let token = self.cur_token.clone();
 
         self.expect_peek(TokenKind::LeftSquirly)?;
 
+        // move past the opening brace
         self.next_token();
 
         let mut entries = HashMap::new();
@@ -53,13 +54,15 @@ impl Parser {
                 _ => return Err(self.error_current(ErrorKind::TypeError, "Struct keys must be identifiers.")),
             };
 
+            // ensure key is followed by a colon
             self.expect_peek(TokenKind::Colon)?;
-
+            // move past the colon
             self.next_token();
 
             let value = self.parse_expression(Precedence::Lowest)?;
             entries.insert(key, value);
 
+            // move past the value
             self.next_token();
 
             if self.cur_token.kind != TokenKind::Comma && self.cur_token.kind != TokenKind::RightSquirly {
@@ -73,10 +76,10 @@ impl Parser {
 
         self.expect_current(TokenKind::RightSquirly)?;
 
-        Ok(Expression::StructLiteral(StructLiteral {
+        Ok(StructLiteral {
             token,
             entries,
-        }))
+        })
     }
 }
 #[cfg(test)]

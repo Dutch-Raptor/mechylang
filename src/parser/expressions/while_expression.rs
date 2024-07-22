@@ -31,7 +31,7 @@ impl Parser {
     ///
     /// ```text
     /// while <condition> { <body> }
-    pub(super) fn parse_while_expression(&mut self) -> Result<Expression, Error> {
+    pub(super) fn parse_while_expression(&mut self) -> Result<WhileExpression, Error> {
         let token = self.cur_token.clone();
 
         self.next_token();
@@ -42,21 +42,16 @@ impl Parser {
 
         let body = self.parse_block_expression()?;
 
-        let else_block = if self.peek_token.kind == TokenKind::Else {
-            self.next_token();
-            self.expect_peek(TokenKind::LeftSquirly)?;
-            Some(self.parse_block_expression()?)
-        } else {
-            None
-        };
+        let else_block = self.parse_else_block()?;
 
-        Ok(Expression::While(WhileExpression {
+        Ok(WhileExpression {
             token,
             condition: Rc::new(condition),
             body,
             else_block,
-        }))
+        })
     }
+
 }
 
 #[cfg(test)]

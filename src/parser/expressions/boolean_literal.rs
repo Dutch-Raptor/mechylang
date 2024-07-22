@@ -2,7 +2,6 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
 use crate::parser::Parser;
 use crate::{Error, Token, trace};
 use crate::errors::ErrorKind;
@@ -21,7 +20,7 @@ impl Display for BooleanLiteral {
 
 impl Parser {
 
-    pub(super) fn parse_boolean(&self) -> Result<Expression, Error> {
+    pub(super) fn parse_boolean(&self) -> Result<BooleanLiteral, Error> {
         let _trace = trace!("parse_boolean");
         let token = self.cur_token.clone();
         let value = match token.kind {
@@ -35,6 +34,6 @@ impl Parser {
             }
         };
 
-        Ok(Expression::Boolean(BooleanLiteral { token, value }))
+        Ok(BooleanLiteral { token, value })
     }
 }

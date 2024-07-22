@@ -80,44 +80,44 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_prefix(&mut self, token: TokenKind) -> Result<Expression, Error> {
+    pub(crate) fn parse_prefix(&mut self) -> Result<Expression, Error> {
         let _trace = trace!("parse_prefix");
-        match token {
-            TokenKind::Identifier(_) => self.parse_identifier(),
+        match self.cur_token.kind {
+            TokenKind::Identifier(_) => Ok(Expression::Identifier(self.parse_identifier()?)),
             TokenKind::Number(_) => self.parse_number(),
-            TokenKind::True | TokenKind::False => self.parse_boolean(),
+            TokenKind::True | TokenKind::False => Ok(Expression::Boolean(self.parse_boolean()?)),
 
-            TokenKind::Fn => self.parse_function_literal(),
+            TokenKind::Fn => Ok(Expression::Function(self.parse_function_literal()?)),
 
-            TokenKind::If => self.parse_if_expression(),
+            TokenKind::If => Ok(Expression::If(self.parse_if_expression()?)),
 
-            TokenKind::Bang => self.parse_prefix_expression(),
-            TokenKind::Minus => self.parse_prefix_expression(),
-            TokenKind::BitwiseNot => self.parse_prefix_expression(),
-            TokenKind::Ampersand => self.parse_prefix_expression(),
+            TokenKind::Bang |
+            TokenKind::Minus |
+            TokenKind::BitwiseNot |
+            TokenKind::Ampersand => Ok(Expression::Prefix(self.parse_prefix_expression()?)),
 
             // Block expression
             TokenKind::LeftSquirly => Ok(Expression::Block(self.parse_block_expression()?)),
 
-            TokenKind::Struct => self.parse_struct_literal(),
-            TokenKind::String(_) => self.parse_string(),
+            TokenKind::Struct => Ok(Expression::StructLiteral(self.parse_struct_literal()?)),
+            TokenKind::String(_) => Ok(Expression::StringLiteral(self.parse_string()?)),
 
             TokenKind::LeftParen => self.parse_grouped_expression(),
 
-            TokenKind::LeftSquare => self.parse_array_expression(),
+            TokenKind::LeftSquare => Ok(Expression::ArrayLiteral(self.parse_array_expression()?)),
 
-            TokenKind::For => self.parse_for_expression(),
-            TokenKind::While => self.parse_while_expression(),
+            TokenKind::For => Ok(Expression::For(self.parse_for_expression()?)),
+            TokenKind::While => Ok(Expression::While(self.parse_while_expression()?)),
 
             TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_prefix_expression(),
             _ => Err(self.error_current(
                 ErrorKind::MissingPrefix,
-                format!("No registered prefix function for {:?}", token),
+                format!("No registered prefix function for {:?}", self.cur_token.kind),
             )),
         }
     }
 
-    pub(super) fn parse_prefix_expression(&mut self) -> Result<Expression, Error> {
+    pub(super) fn parse_prefix_expression(&mut self) -> Result<PrefixExpression, Error> {
         let _trace = trace!("parse_prefix_expression");
         let token = self.cur_token.clone();
 
@@ -138,10 +138,10 @@ impl Parser {
 
         let right = self.parse_expression(Precedence::Prefix)?;
 
-        Ok(Expression::Prefix(PrefixExpression {
+        Ok(PrefixExpression {
             token,
             operator,
             right: Rc::new(right),
-        }))
+        })
     }
 }

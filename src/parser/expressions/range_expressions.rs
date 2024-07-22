@@ -71,22 +71,15 @@ impl Display for RangeFullExpression {
 }
 
 impl Parser {
-
-    pub(super) fn parse_range_infix_expression(&mut self, token_kind: TokenKind, left: Expression) -> Result<Expression, Error> {
+    pub(super) fn parse_range_infix_expression(&mut self, left: Expression) -> Result<Expression, Error> {
         let token = self.cur_token.clone();
 
         let precedence = self.cur_precedence();
-        let inclusive = match token_kind {
-            TokenKind::RangeInclusive => true,
-            TokenKind::RangeExclusive => false,
-            _ => {
-                return Err(self.error_current(
-                    ErrorKind::UnexpectedToken,
-                    format!("Expected a range operator, got {:?}", self.cur_token),
-                ))
-            }
-        };
-
+        let inclusive = Self::range_is_inclusive(&token).ok_or(self.error_current(
+            ErrorKind::UnexpectedToken,
+            format!("Expected a range operator, got {:?}", self.cur_token),
+        ))?;
+        
         // check if we have a RangeFrom expression
         // RangeFrom expressions are bounded by either square brackets or a parenthesis
         //
@@ -103,9 +96,7 @@ impl Parser {
 
         self.next_token();
 
-
         // if the next token is not a closing parenthesis or square bracket, we assume that we have a Range expression
-
         let right = self.parse_expression(precedence)?;
 
         Ok(Expression::Range(RangeExpression {
@@ -115,6 +106,8 @@ impl Parser {
             inclusive,
         }))
     }
+
+
     /// Parses a RangeTo expression
     /// e.g. `..5` or `..=5`
     pub(super) fn parse_range_prefix_expression(&mut self) -> Result<Expression, Error> {
@@ -132,22 +125,24 @@ impl Parser {
 
         let right = self.parse_expression(Precedence::Prefix)?;
 
-        let inclusive = match token.kind {
-            TokenKind::RangeInclusive => true,
-            TokenKind::RangeExclusive => false,
-            _ => {
-                return Err(self.error_current(
-                    ErrorKind::UnexpectedToken,
-                    format!("Expected a range operator, got {:?}", self.cur_token),
-                ))
-            }
-        };
+        let inclusive = Self::range_is_inclusive(&token).ok_or(self.error_current(
+            ErrorKind::UnexpectedToken,
+            format!("Expected a range operator, got {:?}", self.cur_token),
+        ))?;
 
         Ok(Expression::RangeTo(RangeToExpression {
             token,
             right: Rc::new(right),
             inclusive,
         }))
+    }
+    
+    fn range_is_inclusive(token: &Token) -> Option<bool> {
+        match token.kind {
+            TokenKind::RangeInclusive => Some(true),
+            TokenKind::RangeExclusive => Some(false),
+            _ => None,
+        }
     }
 }
 

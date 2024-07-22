@@ -29,35 +29,39 @@ impl Display for IfExpression {
 
 impl Parser {
 
-    pub(super) fn parse_if_expression(&mut self) -> Result<Expression, Error> {
+    pub(super) fn parse_if_expression(&mut self) -> Result<IfExpression, Error> {
         let _trace = trace!("parse_if_expression");
+        debug_assert!(self.is_cur_token(TokenKind::If), "Expected current token to be `if`");
         let token = self.cur_token.clone();
-
 
         self.next_token();
         let condition = self.parse_expression(Precedence::Lowest)?;
 
         self.expect_peek(TokenKind::LeftSquirly)?;
 
-        // parse_block_statement handles opening and closing braces
         let consequence = self.parse_block_expression()?;
+        debug_assert!(self.is_cur_token(TokenKind::RightSquirly), "Expected current token to be `}}` after parse_block_expression call");
 
-        let mut alternative = None;
+        let alternative = self.parse_else_block()?;
 
-        if self.peek_token.kind == TokenKind::Else {
-            self.next_token();
-
-            self.expect_peek(TokenKind::LeftSquirly)?;
-
-            alternative = Some(self.parse_block_expression()?);
-        }
-
-        Ok(Expression::If(IfExpression {
+        Ok(IfExpression {
             token,
             condition: Rc::new(condition),
             consequence,
             alternative,
-        }))
+        })
+    }
+
+
+    pub(super) fn parse_else_block(&mut self) -> Result<Option<BlockExpression>, Error> {
+        let else_block = if self.peek_token.kind == TokenKind::Else {
+            self.next_token();
+            self.expect_peek(TokenKind::LeftSquirly)?;
+            Some(self.parse_block_expression()?)
+        } else {
+            None
+        };
+        Ok(else_block)
     }
 }
 

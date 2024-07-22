@@ -4,8 +4,7 @@ use serde::Serialize;
 use crate::parser::expressions::Expression;
 use crate::parser::expressions::precedence::Precedence;
 use crate::parser::Parser;
-use crate::parser::statements::Statement;
-use crate::{Error, Token, trace};
+use crate::{Error, Token, TokenKind, trace};
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct BreakStatement {
@@ -23,13 +22,14 @@ impl Display for BreakStatement {
 }
 
 impl Parser {
-    pub(crate) fn parse_break_statement(&mut self) -> Result<Statement, Error> {
+    pub(super) fn parse_break_statement(&mut self) -> Result<BreakStatement, Error> {
         let _trace = trace!("parse_break_statement");
+        debug_assert!(self.is_cur_token(TokenKind::Break), "Expected current token to be `Break`");
         let token = self.cur_token.clone();
 
 
         // check if we have a value to return
-        let value = if !self.peek_token.is_statement_terminator(&self.cur_token) {
+        let value = if !Parser::is_statement_terminator(&self.peek_token, &self.cur_token) {
             self.next_token();
             let value = self.parse_expression(Precedence::Lowest)?;
             Some(value)
@@ -37,7 +37,7 @@ impl Parser {
             None
         };
 
-        Ok(Statement::Break(BreakStatement { token, value }))
+        Ok(BreakStatement { token, value })
     }
 }
 

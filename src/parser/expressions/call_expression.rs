@@ -27,14 +27,14 @@ impl Display for CallExpression {
     }
 }
 impl Parser {
-    pub(super) fn parse_call_expression(&mut self, left: Expression) -> Result<Expression, Error> {
+    pub(super) fn parse_call_expression(&mut self, left: Expression) -> Result<CallExpression, Error> {
         let arguments = self.parse_expression_list(TokenKind::RightParen)?;
 
-        Ok(Expression::Call(CallExpression {
+        Ok(CallExpression {
             token: self.cur_token.clone(),
             function: Rc::new(left),
             arguments: arguments.into(),
-        }))
+        })
     }
 }
 
