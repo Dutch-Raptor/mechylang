@@ -1,5 +1,3 @@
-use crate::evaluator::objects::iterators::IteratorObject;
-use crate::evaluator::Environment;
 use std::{
     fmt::{Display, Formatter},
     ops::RangeInclusive,
@@ -27,10 +25,8 @@ pub(crate) use self::{
     string_methods::STRING_METHODS,
 };
 
-use super::{
-    eval::{EvalConfig, Evaluator},
-    objects::Object,
-};
+use crate::{Environment, EvalConfig, Evaluator, Object};
+use crate::evaluator::objects::iterators::IteratorObject;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Method {
@@ -198,7 +194,7 @@ pub struct MethodInner {
 /// assert(iterator.next() == ());
 /// # "#);
 /// ```
-pub const ITERATOR_METHODS: [MethodInner; 10] =
+pub const ITERATOR_METHODS: [MethodInner; 11] =
     [
         MethodInner {
             name: "next",
@@ -343,13 +339,10 @@ pub const ITERATOR_METHODS: [MethodInner; 10] =
 
                 Ok(Object::Iterator(IteratorObject {
                     iterator: Box::new(iterator.map(move |item| {
-                        match function.call(vec![item], None, config.clone()) {
-                            Ok(obj) => obj,
-                            Err(e) => {
-                                eprintln!("Error evaluating closure in map {}", e);
-                                Object::Unit
-                            }
-                        }
+                        function.call(vec![item], None, config.clone()).unwrap_or_else(|e| {
+                            eprintln!("Error evaluating closure in map {}", e);
+                            Object::Unit
+                        })
                     })),
                 }))
             },
@@ -371,6 +364,28 @@ pub const ITERATOR_METHODS: [MethodInner; 10] =
             function: |obj, _, _, _, _| {
                 if let Object::Iterator(ref iterator) = obj {
                     Ok(iterator.clone().sum())
+                } else {
+                    Err(format!("Expected Iterator, got {}", obj))
+                }
+            },
+        },
+        MethodInner {
+            name: "for_each",
+            args_len: 1..=1,
+            function: |obj, _, args, _, _| {
+                if let Object::Iterator(iterator) = obj {
+                    let function = match &args[0] {
+                        Object::Function(f) => f.clone(),
+                        _ => return Err("Expected function for for_each".to_string()),
+                    };
+
+                    iterator.for_each(|item| {
+                        function.call(vec![item], None, Rc::new(EvalConfig::default())).unwrap_or_else(|e| {
+                            eprintln!("Error evaluating closure in for_each {}", e);
+                            Object::Unit
+                        });
+                    });
+                    Ok(Object::Unit)
                 } else {
                     Err(format!("Expected Iterator, got {}", obj))
                 }
@@ -401,13 +416,10 @@ pub const ITERATOR_METHODS: [MethodInner; 10] =
 
                 Ok(iterator.clone().fold(initial, move |acc, obj| {
                     let res =
-                        match function.call(vec![acc.clone(), obj.clone()], None, config.clone()) {
-                            Ok(obj) => obj,
-                            Err(e) => {
-                                eprintln!("Error evaluating closure in fold {}", e);
-                                Object::Unit
-                            }
-                        };
+                        function.call(vec![acc.clone(), obj.clone()], None, config.clone()).unwrap_or_else(|e| {
+                            eprintln!("Error evaluating closure in fold {}", e);
+                            Object::Unit
+                        });
 
                     res
                 }))
