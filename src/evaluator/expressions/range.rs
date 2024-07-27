@@ -37,7 +37,7 @@ impl Evaluator {
             Expression::RangeFull(_) => Object::RangeFull,
             _ => {
                 return Err(self.error(
-                    Some(&expression.token()),
+                    Some(expression.token()),
                     &format!("Invalid range expression: {:?}", expression).to_string(),
                     ErrorKind::UnexpectedToken,
                 ));

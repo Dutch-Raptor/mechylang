@@ -74,9 +74,9 @@ pub struct BlockExpression {
 
 impl Display for BlockExpression {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{{\n")?;
+        writeln!(f, "{{")?;
         for statement in self.statements.iter() {
-            write!(f, "\t{}\n", statement)?;
+            writeln!(f, "\t{}", statement)?;
         }
         write!(f, "}}")?;
         Ok(())

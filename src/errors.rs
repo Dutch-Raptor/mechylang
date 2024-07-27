@@ -39,7 +39,7 @@ impl IntoIterator for InterpreterErrors {
 #[derive(Debug, PartialEq)]
 pub struct Error {
     pub kind: ErrorKind,
-    pub token: Option<Token>,
+    pub token: Option<Box<Token>>,
     pub message: String,
     pub line: Option<String>,
     pub context: Option<String>,
@@ -57,13 +57,12 @@ impl Error {
         let message = message.to_string();
 
         let line = token
-            .map(|token| lines.get(token.position.line - 1))
-            .flatten()
+            .and_then(|token| lines.get(token.position.line - 1))
             .map(|line| line.to_string());
 
         Self {
             kind,
-            token: token.cloned(),
+            token: token.map(|token| Box::new(token.clone())),
             message,
             line,
             context,
@@ -119,20 +118,20 @@ impl Error {
             1 => &[],
             _ => &message[1..],
         };
-        
+
         writeln!(f, "{}", cformat!("{:?}", self.kind))?;
-        
+
         self.line
             .as_ref()
             .map(|line| writeln!(f, "{}", cformat!("{}", line)))
             .unwrap_or(Ok(()))?;
-        
+
         writeln!(f, "{}", cformat!("{}", first_line))?;
-        
+
         for line in rest {
             write!(f, "\n{}", cformat!("{}", line))?;
         }
-        
+
         Ok(())
     }
 
@@ -207,7 +206,7 @@ impl Error {
         )?;
 
         for line in rest {
-            write!(f, "\n{:pos_len$} | {:caret_offset$}  {}", "", "", line,)?;
+            write!(f, "\n{:pos_len$} | {:caret_offset$}  {}", "", "", line, )?;
         }
 
         // Print context after line with error

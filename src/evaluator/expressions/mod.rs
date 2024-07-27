@@ -25,7 +25,7 @@ impl Evaluator {
             Expression::IntegerLiteral(lit) => Ok(Object::Integer(lit.value)),
             Expression::FloatLiteral(lit) => Ok(Object::Float(lit.value)),
             Expression::Boolean(boolean) => Ok(boolean.value.into()),
-            Expression::Prefix(prefix) => self.eval_prefix_expression(env, &prefix),
+            Expression::Prefix(prefix) => self.eval_prefix_expression(env, prefix),
             Expression::Infix(infix) => self.eval_infix_expression(infix, env),
             Expression::If(if_expr) => self.eval_if_expression(if_expr, env),
             Expression::Block(block) => self.eval_scoped_block_expression(block, env),

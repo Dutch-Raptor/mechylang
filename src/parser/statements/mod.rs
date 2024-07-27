@@ -187,35 +187,21 @@ impl Parser {
     /// * `true` if the current token is a statement terminator.
     /// * `false` otherwise. 
     fn is_statement_terminator(current_token: &Token, previous_token: &Token) -> bool {
-        if current_token.kind == TokenKind::Semicolon {
+        if current_token.kind == TokenKind::Semicolon
+            || current_token.kind == TokenKind::RightSquirly
+            || current_token.kind == TokenKind::EOF
+            || current_token.kind == TokenKind::RightParen
+            || current_token.kind == TokenKind::RightSquare
+            || current_token.kind == TokenKind::Else
+        {
             return true;
         }
-
-        if current_token.kind == TokenKind::RightSquirly {
-            return true;
-        }
-
-        if current_token.kind == TokenKind::EOF {
-            return true;
-        }
-
-        if current_token.kind == TokenKind::RightParen {
-            return true;
-        }
-
-        if current_token.kind == TokenKind::RightSquare {
-            return true;
-        }
-
-        if current_token.kind == TokenKind::Else {
-            return true;
-        }
-
+       
         // if previous token was on a different line
         if current_token.position.line != previous_token.position.line {
             return true;
         }
 
-        return false;
+        false
     }
 }

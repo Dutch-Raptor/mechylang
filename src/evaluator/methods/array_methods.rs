@@ -56,7 +56,7 @@ pub const ARRAY_POP: MethodInner = MethodInner {
             .mutate(ident.to_string(), move |arr| {
                 if let Object::Array(ref mut arr) = arr {
                     arr.pop()
-                        .map(|v| Ok(v))
+                        .map(Ok)
                         .unwrap_or(Err("Array is empty".to_string()))
                 } else {
                     Err(format!("Expected array, got {}", arr))

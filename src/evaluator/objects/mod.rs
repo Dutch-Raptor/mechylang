@@ -295,7 +295,7 @@ impl Display for Object {
             Object::Struct(map) => {
                 let items = map
                     .iter()
-                    .map(|(key, value)| format!("{}: {}", key, value.to_string()))
+                    .map(|(key, value)| format!("{}: {}", key, value))
                     .join(", ");
                 write!(f, "{{{}}}", items)
             }

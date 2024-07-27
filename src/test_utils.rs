@@ -90,7 +90,7 @@ pub fn test_parse_ok(code :&str) {
 pub fn test_eval_err(code: &str, error_kinds: &[ErrorKind]) {
     let result = crate::Evaluator::eval(code, &mut Default::default(), Default::default());
 
-    if let Ok(_) = result {
+    if result.is_ok() {
         panic!("Expected error, got Ok");
     }
 
@@ -99,6 +99,6 @@ pub fn test_eval_err(code: &str, error_kinds: &[ErrorKind]) {
             println!("{}", e);
         }
         assert_eq!(errors.len(), error_kinds.len());
-        assert_eq!(errors.iter().all(|e| error_kinds.contains(&e.kind)), true);
+        assert!(errors.iter().all(|e| error_kinds.contains(&e.kind)));
     }
 }

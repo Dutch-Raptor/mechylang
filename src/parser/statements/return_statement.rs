@@ -74,10 +74,10 @@ impl Parser {
             Err(err) => return Err(err),
         };
 
-        return Ok(ReturnStatement {
+        Ok(ReturnStatement {
             token,
             return_value: Some(expression),
-        });
+        })
     }
 }
 

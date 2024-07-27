@@ -19,9 +19,9 @@ impl Display for Identifier {
     }
 }
 
-impl Into<Rc<str>> for Identifier {
-    fn into(self) -> Rc<str> {
-        self.value
+impl From<Identifier> for Rc<str> {
+    fn from(ident: Identifier) -> Self {
+        ident.value
     }
 }
  impl Parser {

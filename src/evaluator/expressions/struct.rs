@@ -12,7 +12,7 @@ impl Evaluator {
         let mut map = HashMap::new();
 
         for (key, expression) in &lit.entries {
-            let object = self.eval_expression(&expression, env)?;
+            let object = self.eval_expression(expression, env)?;
             map.insert(key.to_string(), object);
         }
 

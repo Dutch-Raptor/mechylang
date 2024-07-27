@@ -40,21 +40,18 @@ impl Evaluator {
             )
         })?;
 
-        let mut index = 0;
-
-        for item in iterator {
+        for (index, item) in iterator.enumerate() {
             let mut new_env = Environment::new_enclosed(env);
 
             new_env.set(for_expr.iterator.value.clone(), item.clone());
 
             if let Some(ref index_ident) = for_expr.index {
-                new_env.set(index_ident.value.clone(), Object::Integer(index));
+                new_env.set(index_ident.value.clone(), Object::Integer(index as i64));
             }
 
             result = self.eval_block_expression(&for_expr.body, &mut new_env)?;
 
-            index += 1;
-
+            // Return early if the result is a return or break
             match result {
                 Object::ReturnValue(_) => return Ok(result),
                 Object::Break(Some(value)) => return Ok(*value),
@@ -86,6 +83,7 @@ impl Evaluator {
 
             result = self.eval_block_expression(&while_expr.body, &mut new_env)?;
 
+            // Return early if the result is a return or break
             match result {
                 Object::ReturnValue(_) => return Ok(result),
                 Object::Break(Some(value)) => return Ok(*value),

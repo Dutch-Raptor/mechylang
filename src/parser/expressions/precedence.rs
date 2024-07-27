@@ -148,7 +148,7 @@ impl Parser {
     }
     
     pub(super) fn cur_precedence(&self) -> Precedence {
-        self.cur_token.precedence().unwrap_or_else(|| Precedence::Lowest)
+        self.cur_token.precedence().unwrap_or(Precedence::Lowest)
     }
 }
 

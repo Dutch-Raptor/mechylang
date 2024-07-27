@@ -34,7 +34,7 @@ impl Evaluator {
             Expression::Identifier(ident) => {
                 env.update(ident.value.clone(), new_value).map_err(|_| {
                     self.error(
-                        Some(&infix.left.token()),
+                        Some(infix.left.token()),
                         &format!("Identifier {} not found", ident.value).to_string(),
                         ErrorKind::IdentifierNotFound,
                     )

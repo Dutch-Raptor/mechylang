@@ -403,7 +403,7 @@ impl Parser {
             left_exp = self.parse_infix(left_exp)?;
         }
 
-        return Ok(left_exp);
+        Ok(left_exp)
     }
 
 

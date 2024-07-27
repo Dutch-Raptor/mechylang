@@ -39,13 +39,7 @@ pub struct Method {
     /// * `ident` - an identifier for the object in case it needs to be mutated
     /// * `args` - The arguments passed to the method
     /// * `env` - The environment the method is being called in
-    pub function: fn(
-        obj: Object,
-        ident: Option<&str>,
-        args: Vec<Object>,
-        env: &mut Environment,
-        config: Rc<EvalConfig>,
-    ) -> Result<Object, String>,
+    pub function: MethodFunction,
 }
 
 impl Display for Method {
@@ -144,32 +138,31 @@ impl ObjectMethods for Object {
             });
         // If no method matches, check if the object is iterable and if the method would match on the iterator
         // If so, warn the user that they should call the method on the iterator instead
-        if method.is_none() {
-            if let Ok(_) = IteratorObject::try_from(self.clone()) {
-                if ITERATOR_METHODS
-                    .iter()
-                    .find(|m| m.name == method_name)
-                    .is_some()
-                {
-                    return Err(MethodError::IterMethodOnIterable(method_name.to_string()));
-                }
-            }
+        if method.is_none()
+            && IteratorObject::try_from(self.clone()).is_ok()
+            && ITERATOR_METHODS
+            .iter()
+            .any(|m| m.name == method_name)
+        {
+            return Err(MethodError::IterMethodOnIterable(method_name.to_string()));
         }
 
         method.ok_or(MethodError::NotFound)
     }
 }
 
+type MethodFunction = fn(
+    obj: Object,
+    ident: Option<&str>,
+    args: Vec<Object>,
+    env: &mut Environment,
+    config: Rc<EvalConfig>,
+) -> Result<Object, String>;
+
 pub struct MethodInner {
     pub name: &'static str,
     pub args_len: RangeInclusive<usize>,
-    function: fn(
-        obj: Object,
-        ident: Option<&str>,
-        args: Vec<Object>,
-        env: &mut Environment,
-        config: Rc<EvalConfig>,
-    ) -> Result<Object, String>,
+    function: MethodFunction,
 }
 
 /// Methods for the Iterator type
@@ -405,13 +398,10 @@ pub const ITERATOR_METHODS: [MethodInner; 11] =
                     ))?;
 
                 Ok(iterator.clone().fold(initial, move |acc, obj| {
-                    let res =
-                        function.call(vec![acc.clone(), obj.clone()], None, config.clone()).unwrap_or_else(|e| {
-                            eprintln!("Error evaluating closure in fold {}", e);
-                            Object::Unit
-                        });
-
-                    res
+                    function.call(vec![acc.clone(), obj.clone()], None, config.clone()).unwrap_or_else(|e| {
+                        eprintln!("Error evaluating closure in fold {}", e);
+                        Object::Unit
+                    })
                 }))
             },
         },

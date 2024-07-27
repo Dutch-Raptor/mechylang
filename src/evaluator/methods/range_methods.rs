@@ -29,7 +29,7 @@ pub const RANGE_METHODS: [MethodInner; 1] = [MethodInner {
     function: |obj, _, args, _, _| {
         if let Object::Range(start, end) = obj {
             let value = &args[0];
-            return contains(value, Some(&start), Some(&end), false);
+            contains(value, Some(&start), Some(&end), false)
         } else {
             Err(format!("Range method called on non-range object: {}", obj))
         }
@@ -59,7 +59,7 @@ pub const RANGE_INCLUSIVE_METHODS: [MethodInner; 1] = [MethodInner {
     function: |obj, _, args, _, _| {
         if let Object::RangeInclusive(start, end) = obj {
             let value = &args[0];
-            return contains(value, Some(&start), Some(&end), true);
+            contains(value, Some(&start), Some(&end), true)
         } else {
             Err(format!(
                 "RangeInclusive method called on non-range-inclusive object: {}",
@@ -81,7 +81,7 @@ pub const RANGE_TO_METHODS: [MethodInner; 1] = [MethodInner {
     function: |obj, _, args, _, _| {
         if let Object::RangeTo(end) = obj {
             let value = &args[0];
-            return contains(value, None, Some(&end), false);
+            contains(value, None, Some(&end), false)
         } else {
             Err(format!(
                 "RangeTo method called on non-range-to object: {}",
@@ -102,7 +102,7 @@ pub const RANGE_TO_INCLUSIVE_METHODS: [MethodInner; 1] = [MethodInner {
     function: |obj, _, args, _, _| {
         if let Object::RangeToInclusive(end) = obj {
             let value = &args[0];
-            return contains(value, None, Some(&end), true);
+            contains(value, None, Some(&end), true)
         } else {
             Err(format!(
                 "RangeToInclusive method called on non-range-to-inclusive object: {}",
@@ -120,7 +120,7 @@ pub const RANGE_FROM_METHODS: [MethodInner; 1] = [MethodInner {
     function: |obj, _, args, _, _| {
         if let Object::RangeFrom(start) = obj {
             let value = &args[0];
-            return contains(value, Some(&start), None, false);
+            contains(value, Some(&start), None, false)
         } else {
             Err(format!(
                 "RangeFrom method called on non-range-from object: {}",
@@ -136,7 +136,7 @@ pub const RANGE_FULL_METHODS: [MethodInner; 1] = [MethodInner {
     function: |obj, _, _, _, _| {
         if let Object::RangeFull = obj {
             // A RangeFull contains all values
-            return Ok(true.into());
+            Ok(true.into())
         } else {
             Err(format!(
                 "RangeFull method called on non-range-full object: {}",
@@ -182,7 +182,7 @@ fn contains(
         }
     }
 
-    return Ok(Object::Boolean(true));
+    Ok(Object::Boolean(true))
 }
 #[cfg(test)]
 

@@ -17,11 +17,11 @@ pub struct StructLiteral {
 
 impl Display for StructLiteral {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "struct {{\n")?;
+        writeln!(f, "struct {{")?;
         for (key, value) in &self.entries {
-            write!(f, "{}: {}\n", key, value)?;
+            writeln!(f, "{}: {}", key, value)?;
         }
-        write!(f, "}}\n")
+        writeln!(f, "}}")
     }
 }
 
@@ -66,7 +66,7 @@ impl Parser {
             self.next_token();
 
             if self.cur_token.kind != TokenKind::Comma && self.cur_token.kind != TokenKind::RightSquirly {
-                return Err(self.error_current(ErrorKind::UnexpectedToken, format!("Expected a `,` or `}}`")));
+                return Err(self.error_current(ErrorKind::UnexpectedToken, "Expected a `,` or `}`".to_string()));
             }
 
             if self.cur_token.kind == TokenKind::Comma {
