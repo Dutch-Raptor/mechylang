@@ -95,7 +95,6 @@ pub fn test_eval_err(code: &str, error_kinds: &[ErrorKind]) {
     }
 
     if let Err(ref errors) = result {
-        println!("Errors: {:?}", errors);
         for e in errors.iter() {
             println!("{}", e);
         }

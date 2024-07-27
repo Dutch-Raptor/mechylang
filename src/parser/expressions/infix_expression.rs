@@ -57,6 +57,34 @@ pub enum InfixOperator {
     AssignBitwiseXor,
 }
 
+impl InfixOperator {
+    pub fn is_assignment(&self) -> bool {
+        matches!(self, InfixOperator::AssignEqual
+        | InfixOperator::AssignPlus | InfixOperator::AssignMinus
+        | InfixOperator::AssignAsterisk | InfixOperator::AssignSlash
+        | InfixOperator::AssignPercent | InfixOperator::AssignBitwiseAnd
+        | InfixOperator::AssignBitwiseOr | InfixOperator::AssignBitwiseXor)
+    }
+    
+    /// Returns the related operator to an assignment operator.
+    /// For example, the `AssignPlus` operator is related to the `Plus` operator.
+    /// 
+    /// For non-assignment operators, returns `None`.
+    pub fn assignment_related_operator(&self) -> Option<InfixOperator> {
+        match self {
+            InfixOperator::AssignPlus => Some(InfixOperator::Plus),
+            InfixOperator::AssignMinus => Some(InfixOperator::Minus),
+            InfixOperator::AssignAsterisk => Some(InfixOperator::Asterisk),
+            InfixOperator::AssignSlash => Some(InfixOperator::Slash),
+            InfixOperator::AssignPercent => Some(InfixOperator::Percent),
+            InfixOperator::AssignBitwiseAnd => Some(InfixOperator::BitwiseAnd),
+            InfixOperator::AssignBitwiseOr => Some(InfixOperator::BitwiseOr),
+            InfixOperator::AssignBitwiseXor => Some(InfixOperator::BitwiseXor),
+            _ => None,
+        }
+    }
+}
+
 impl Display for InfixOperator {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {

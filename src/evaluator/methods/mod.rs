@@ -11,8 +11,6 @@ pub mod range_methods;
 pub mod string_methods;
 pub mod struct_methods;
 
-use color_print::cformat;
-
 use self::struct_methods::STRUCT_METHODS;
 pub(crate) use self::{
     array_methods::ARRAY_METHODS,
@@ -30,7 +28,6 @@ use crate::evaluator::objects::iterators::IteratorObject;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Method {
-    #[cfg(not(debug))]
     pub method_name: &'static str,
     pub ident: Option<Rc<str>>,
     pub args_len: RangeInclusive<usize>,
@@ -125,26 +122,26 @@ impl ObjectMethods for Object {
             Object::Method(_) => None,
             Object::Reference(_) => None,
         }
-        // Generic methods
-        .or_else(|| match method_name {
-            "iter" => Some(Method {
-                method_name: "iter",
-                ident: obj_identifier,
-                args_len: 0..=0,
-                function: |obj, _, _, _, _| {
-                    Ok(Object::Iterator(IteratorObject::try_from(obj.clone())?))
-                },
-                obj: Box::new(self.clone()),
-            }),
-            "to_string" => Some(Method {
-                method_name: "to_string",
-                ident: obj_identifier,
-                args_len: 0..=0,
-                function: |obj, _, _, _, _| Ok(Object::String(obj.to_string().into())),
-                obj: Box::new(self.clone()),
-            }),
-            _ => None,
-        });
+            // Generic methods
+            .or_else(|| match method_name {
+                "iter" => Some(Method {
+                    method_name: "iter",
+                    ident: obj_identifier,
+                    args_len: 0..=0,
+                    function: |obj, _, _, _, _| {
+                        Ok(Object::Iterator(IteratorObject::try_from(obj.clone())?))
+                    },
+                    obj: Box::new(self.clone()),
+                }),
+                "to_string" => Some(Method {
+                    method_name: "to_string",
+                    ident: obj_identifier,
+                    args_len: 0..=0,
+                    function: |obj, _, _, _, _| Ok(Object::String(obj.to_string().into())),
+                    obj: Box::new(self.clone()),
+                }),
+                _ => None,
+            });
         // If no method matches, check if the object is iterable and if the method would match on the iterator
         // If so, warn the user that they should call the method on the iterator instead
         if method.is_none() {
@@ -181,7 +178,7 @@ pub struct MethodInner {
 ///
 /// ## Creating an iterator
 ///
-/// To create an iteratos, use the `iter` method on an `array`, `range`, or `string`.
+/// To create an iterators, use the `iter` method on an `array`, `range`, or `string`.
 /// This will return an iterator that can be used to iterate over the object.
 ///
 /// ```
@@ -289,21 +286,23 @@ pub const ITERATOR_METHODS: [MethodInner; 11] =
         MethodInner {
             name: "filter",
             args_len: 1..=1,
-            function: |obj, _, args, _, config| {
+            function: |obj, _, mut args, _, config| {
                 let iterator = match obj {
                     Object::Iterator(iterator) => iterator,
                     _ => return Err(format!("Expected Iterator, got {}", obj)),
                 };
 
-                let predicate = match &args[0] {
-                    Object::Function(f) => f.clone(),
-                    _ => return Err("Expected function for filter".to_string()),
-                };
+                let predicate = args.remove(0);
+                let predicate = predicate.to_callable().map_err(|e| format!(
+                    "Expected a function fn(Object) -> bool, got {}",
+                    e
+                ))?;
 
-                match predicate.params.len() {
-                    1 => {}
-                    _ => return Err("Expected function with 1 parameter".to_string()),
+                let args_len = predicate.args_len();
+                if *args_len.start() != 1 && *args_len.end() != 1 {
+                    return Err("Expected a function with exactly 1 parameter".to_string());
                 }
+
 
                 Ok(Object::Iterator(IteratorObject {
                     iterator: Box::new(iterator.filter(move |item| {
@@ -321,26 +320,23 @@ pub const ITERATOR_METHODS: [MethodInner; 11] =
         MethodInner {
             name: "map",
             args_len: 1..=1,
-            function: |obj, _, args, _, config| {
-                let iterator = match obj {
-                    Object::Iterator(iterator) => iterator,
-                    _ => return Err(format!("Expected Iterator, got {}", obj)),
-                };
+            function: |obj, _, mut args, _, config| {
+                let iterator = obj.to_iterator().map_err(|e| format!("Expected Iterator, got {}", e))?;
 
-                let function = match &args[0] {
-                    Object::Function(f) => f.clone(),
-                    _ => {
-                        return Err(cformat!(
-                            "map expects <i>`fn(Object) -> Object`</> as it's argument, got {:?}",
-                            args[0]
-                        ))
-                    }
-                };
+                let function = args.remove(0);
+                let function = function.to_callable().map_err(|e| format!(
+                    "Expected a function fn(Object) -> Object, got {}",
+                    e
+                ))?;
+
+                if *function.args_len().start() != 1 && *function.args_len().end() != 1 {
+                    return Err("Expected a function fn(Object) -> Object".to_string());
+                }
 
                 Ok(Object::Iterator(IteratorObject {
                     iterator: Box::new(iterator.map(move |item| {
                         function.call(vec![item], None, config.clone()).unwrap_or_else(|e| {
-                            eprintln!("Error evaluating closure in map {}", e);
+                            eprintln!("Error evaluating closure in map: {}", e);
                             Object::Unit
                         })
                     })),
@@ -362,8 +358,8 @@ pub const ITERATOR_METHODS: [MethodInner; 11] =
             name: "sum",
             args_len: 0..=0,
             function: |obj, _, _, _, _| {
-                if let Object::Iterator(ref iterator) = obj {
-                    Ok(iterator.clone().sum())
+                if let Object::Iterator(iterator) = obj {
+                    Ok(iterator.sum())
                 } else {
                     Err(format!("Expected Iterator, got {}", obj))
                 }
@@ -372,12 +368,11 @@ pub const ITERATOR_METHODS: [MethodInner; 11] =
         MethodInner {
             name: "for_each",
             args_len: 1..=1,
-            function: |obj, _, args, _, _| {
+            function: |obj, _, mut args, _, _| {
                 if let Object::Iterator(iterator) = obj {
-                    let function = match &args[0] {
-                        Object::Function(f) => f.clone(),
-                        _ => return Err("Expected function for for_each".to_string()),
-                    };
+                    let function = args.remove(0)
+                        .to_callable()
+                        .map_err(|e| format!("Expected function for for_each, got {}", e))?;
 
                     iterator.for_each(|item| {
                         function.call(vec![item], None, Rc::new(EvalConfig::default())).unwrap_or_else(|e| {
@@ -394,25 +389,20 @@ pub const ITERATOR_METHODS: [MethodInner; 11] =
         MethodInner {
             name: "fold",
             args_len: 2..=2,
-            function: |obj, _, args, _, config| {
+            function: |obj, _, mut args, _, config| {
                 let iterator = match obj {
                     Object::Iterator(iterator) => iterator,
                     _ => return Err(format!("Expected Iterator, got {}", obj)),
                 };
 
-                let initial = args[0].clone();
-                let function = match &args[1] {
-                    Object::Function(f) => f.clone(),
-                    _ => return Err("Expected function for fold".to_string()),
-                };
 
-                match function.params.len() {
-                    2 => {}
-                    _ => return Err(
-                        "Expected function with 2 parameters: initial, fn(acc, v) -> updated acc"
-                            .to_string(),
-                    ),
-                }
+                let initial = args.remove(0);
+                let function = args.remove(0)
+                    .to_callable()
+                    .map_err(|e| format!(
+                        "Expected function for fold, got {}",
+                        e
+                    ))?;
 
                 Ok(iterator.clone().fold(initial, move |acc, obj| {
                     let res =
@@ -445,15 +435,10 @@ pub const INTEGER_METHODS: [MethodInner; 1] = [MethodInner {
     name: "pow",
     args_len: 1..=1,
     function: |obj, _, args, _, _| {
-        let exponent = match args[0] {
-            Object::Integer(i) => i,
-            _ => return Err("Expected integer for base".to_string()),
-        };
+        debug_assert!(matches!(obj, Object::Integer(_)), "Expected obj to be an integer");
 
-        let base = match obj {
-            Object::Integer(i) => i,
-            _ => return Err("Expected integer".to_string()),
-        };
+        let base = obj.as_integer().ok_or("Expected obj to be an integer".to_string())?;
+        let exponent = args[0].as_integer().ok_or("Expected exponent to be an integer".to_string())?;
 
         Ok(Object::Integer(base.pow(exponent as u32)))
     },

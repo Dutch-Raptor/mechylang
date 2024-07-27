@@ -10,7 +10,7 @@ use std::{
 };
 
 use itertools::Itertools;
-
+use crate::evaluator::objects::function::Callable;
 use self::{function::Function, iterators::IteratorObject, reference::Reference};
 
 use super::{methods::Method, runtime::builtins::BuiltinFunction};
@@ -105,6 +105,151 @@ pub enum Object {
     Reference(Reference),
 
     Struct(HashMap<String, Object>),
+}
+
+impl Object {
+    pub fn as_integer(&self) -> Option<i64> {
+        match self {
+            Object::Integer(i) => Some(*i),
+            _ => None,
+        }
+    }
+    
+    pub fn as_float(&self) -> Option<f64> {
+        match self {
+            Object::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
+    
+    pub fn as_boolean(&self) -> Option<bool> {
+        match self {
+            Object::Boolean(b) => Some(*b),
+            _ => None,
+        }
+    }
+    
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            Object::String(s) => Some(s.as_ref()),
+            _ => None,
+        }
+    }
+    
+    pub fn as_array(&self) -> Option<&Vec<Object>> {
+        match self {
+            Object::Array(a) => Some(a),
+            _ => None,
+        }
+    }
+    
+    pub fn as_struct(&self) -> Option<&HashMap<String, Object>> {
+        match self {
+            Object::Struct(s) => Some(s),
+            _ => None,
+        }
+    }
+    
+    pub fn as_range(&self) -> Option<(&Object, &Object)> {
+        match self {
+            Object::Range(from, to) => Some((from, to)),
+            _ => None,
+        }
+    }
+    
+    pub fn as_range_inclusive(&self) -> Option<(&Object, &Object)> {
+        match self {
+            Object::RangeInclusive(from, to) => Some((from, to)),
+            _ => None,
+        }
+    }
+    
+    pub fn as_range_from(&self) -> Option<&Object> {
+        match self {
+            Object::RangeFrom(from) => Some(from),
+            _ => None,
+        }
+    }
+    
+    pub fn as_range_to(&self) -> Option<&Object> {
+        match self {
+            Object::RangeTo(to) => Some(to),
+            _ => None,
+        }
+    }
+    
+    pub fn as_iterator(&self) -> Option<&IteratorObject> {
+        match self {
+            Object::Iterator(iterator) => Some(iterator),
+            _ => None,
+        }
+    }
+    
+    /// Converts the object to an iterator if it is one
+    /// 
+    /// # Errors
+    /// Returns an error containing the original object if it is not an iterator
+    pub fn to_iterator(self) -> Result<IteratorObject, Object> {
+        match self {
+            Object::Iterator(iterator) => Ok(iterator),
+            _ => Err(self),
+        }
+    }
+    
+    pub fn as_method(&self) -> Option<&Method> {
+        match self {
+            Object::Method(method) => Some(method),
+            _ => None,
+        }
+    }
+    
+    pub fn as_reference(&self) -> Option<&Reference> {
+        match self {
+            Object::Reference(reference) => Some(reference),
+            _ => None,
+        }
+    }
+    
+    pub fn as_function(&self) -> Option<&Function> {
+        match self {
+            Object::Function(function) => Some(function),
+            _ => None,
+        }
+    }
+    
+    /// Converts the object to a function if it is one
+    /// 
+    /// # Errors
+    /// Returns an error containing the original object if it is not a function
+    pub fn to_function(self) -> Result<Function, Object> {
+        match self {
+            Object::Function(function) => Ok(function),
+            _ => Err(self),
+        }
+    }
+    
+    pub fn as_builtin_function(&self) -> Option<&BuiltinFunction> {
+        match self {
+            Object::BuiltinFunction(builtin) => Some(builtin),
+            _ => None,
+        }
+    }
+    
+    pub fn as_callable(&self) -> Option<&dyn Callable> {
+        match self {
+            Object::Function(function) => Some(function),
+            Object::BuiltinFunction(builtin) => Some(builtin),
+            _ => None,
+        }
+    }
+    
+    pub fn to_callable(self) -> Result<Rc<dyn Callable>, Object> {
+        match self {
+            Object::Function(function) => Ok(Rc::new(function)),
+            Object::BuiltinFunction(builtin) => Ok(Rc::new(builtin)),
+            _ => Err(self),
+        }
+    }
 }
 
 impl PartialOrd for Object {
