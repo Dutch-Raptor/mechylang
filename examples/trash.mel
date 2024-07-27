@@ -8,7 +8,7 @@ fn memory_hog(n) {
       big_array.push("Some string that is large")
       big_array.push("Another string but as an array".iter().collect())
     }
-    / Do nothing with this
+    // Do nothing with this
   }
 }
 
