@@ -2,28 +2,39 @@ use std::{
     fmt::{Debug, Display},
     rc::Rc,
 };
-
+use std::ops::RangeInclusive;
 use crate::{
-    parser::{expressions::Identifier, parser::BlockStatement},
+    parser::{expressions::Identifier},
     Environment, EvalConfig, Evaluator, Object,
 };
+use crate::parser::expressions::block_expression::BlockExpression;
 
 #[derive(Clone)]
 pub struct Function {
     pub params: Rc<[Identifier]>,
-    pub body: BlockStatement,
+    pub body: BlockExpression,
     pub env: Environment,
 }
 
-impl Function {
-    pub fn call(
+impl Callable for Function {
+    fn call(
         &self,
         args: Vec<Object>,
         env: Option<Environment>,
         config: Rc<EvalConfig>,
     ) -> Result<Object, String> {
-        Evaluator::eval_function(Object::Function(self.clone()), args, env, config)
+        Evaluator::eval_function(self.clone(), args, env, config)
     }
+
+    fn args_len(&self) -> RangeInclusive<usize> {
+        self.params.len()..=self.params.len()
+    }
+}
+
+pub trait Callable {
+    fn call(&self, args: Vec<Object>, env: Option<Environment>, config: Rc<EvalConfig>) -> Result<Object, String>;
+    
+    fn args_len(&self) -> RangeInclusive<usize>;
 }
 
 impl PartialEq for Function {

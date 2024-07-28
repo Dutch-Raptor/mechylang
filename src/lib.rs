@@ -602,11 +602,11 @@ pub mod test_utils;
 mod tracer;
 
 pub use errors::Error;
-pub use evaluator::eval::EvalConfig;
-pub use evaluator::eval::Evaluator;
+pub use evaluator::EvalConfig;
+pub use evaluator::Evaluator;
 pub use evaluator::eval_file;
 pub use evaluator::objects::Object;
 pub use evaluator::runtime::environment::Environment;
-pub use lexer::lexer::Lexer;
-pub use lexer::tokens::Token;
-pub use parser::parser::Parser;
+pub use lexer::Lexer;
+pub use lexer::tokens::{Token, TokenKind};
+pub use parser::Parser;

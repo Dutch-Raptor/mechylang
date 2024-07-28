@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 mod repl;
-use repl::repl::Repl;
+use repl::Repl;
 
 use clap::{Parser, Subcommand};
 use mechylang::eval_file;

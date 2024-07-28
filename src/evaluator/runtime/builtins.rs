@@ -108,15 +108,15 @@
 //! # "#);
 //! ```
 
-use crate::Evaluator;
+use crate::EvalConfig;
 use crate::Object;
 use std::{
     io::{stdin, BufRead, Error},
     ops::RangeInclusive,
 };
-
+use std::rc::Rc;
 use itertools::Itertools;
-
+use crate::evaluator::objects::function::Callable;
 use crate::parser::expressions::Identifier;
 
 use super::environment::Environment;
@@ -136,7 +136,18 @@ pub struct BuiltinFunction {
     /// - `args`: The arguments passed to the function
     /// - `env`: The environment the function is being called in
     /// - `eval`: The evaluator, used for configuration (e.g. printing)
-    pub function: fn(&Vec<Object>, &mut Environment, &Evaluator) -> BuiltinResult,
+    pub function: fn(&Vec<Object>, &mut Environment, &EvalConfig) -> BuiltinResult,
+}
+
+impl Callable for BuiltinFunction {
+    fn call(&self, args: Vec<Object>, env: Option<Environment>, config: Rc<EvalConfig>) -> Result<Object, String> {
+        let mut env = env.unwrap_or_default();
+        (self.function)(&args, &mut env, &config).map_err(|(e, b)| format!("{:?}: {}", b, e))
+    }
+
+    fn args_len(&self) -> RangeInclusive<usize> {
+        self.args_len.clone()
+    }
 }
 
 type BuiltinResult = Result<Object, (String, BuiltinError)>;
@@ -150,7 +161,7 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     //     - Type: `String` or `Array`
     BuiltinFunction {
         name: "len",
-        args_len: (1..=1),
+        args_len: 1..=1,
         function: |args, _, _| match args[0] {
             Object::String(ref s) => Ok(Object::Integer(s.len() as i64)),
             Object::Array(ref a) => Ok(Object::Integer(a.len() as i64)),
@@ -167,9 +178,9 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     //    - Type: `Any`
     BuiltinFunction {
         name: "print",
-        args_len: (1..=usize::MAX),
-        function: |args, _, eval| {
-            eval.print(
+        args_len: 1..=usize::MAX,
+        function: |args, _, eval_config| {
+            (eval_config.output_fn)(
                 args.iter()
                     .map(|a| a.to_string())
                     .collect::<Vec<String>>()
@@ -180,9 +191,9 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     },
     BuiltinFunction {
         name: "println",
-        args_len: (1..=usize::MAX),
-        function: |args, _, eval| {
-            eval.print(format!(
+        args_len: 1..=usize::MAX,
+        function: |args, _, eval_config| {
+            (eval_config.output_fn)(format!(
                 "{}\n",
                 args.iter()
                     .map(|a| a.to_string())
@@ -195,12 +206,12 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     // Assert
     BuiltinFunction {
         name: "assert",
-        args_len: (1..=1),
-        function: |args, _, eval| {
+        args_len: 1..=1,
+        function: |args, _, eval_config| {
             if args[0] == Object::Boolean(true) {
                 Ok(Object::Unit)
             } else {
-                eval.print(format!("Assertion failed: {} is not true", args[0]));
+                (eval_config.output_fn)(format!("Assertion failed: {} is not true", args[0]));
                 Err((
                     format!("Assertion failed: {} is not true", args[0]),
                     BuiltinError::AssertionFailed,
@@ -211,7 +222,7 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     // AssertEq
     BuiltinFunction {
         name: "assert_eq",
-        args_len: (2..=usize::MAX),
+        args_len: 2..=usize::MAX,
         function: |args, _, _| {
             let first = args[0].clone();
             for arg in args.iter().skip(1) {
@@ -228,18 +239,8 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     // input_read_all
     BuiltinFunction {
         name: "input_read_all",
-        args_len: (0..=usize::MAX),
-        function: |args, _, eval| {
-            if args.len() > 0 {
-                eval.print(format!(
-                    "{}",
-                    args.iter()
-                        .map(|a| a.to_string())
-                        .collect::<Vec<String>>()
-                        .join(" ")
-                ));
-            }
-
+        args_len: 0..=0,
+        function: |_, _, _| {
             stdin()
                 .lock()
                 .lines()
@@ -251,18 +252,8 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     // input_read_line
     BuiltinFunction {
         name: "input_read_line",
-        args_len: (0..=usize::MAX),
-        function: |args, _, eval| {
-            if args.len() > 0 {
-                eval.print(format!(
-                    "{}",
-                    args.iter()
-                        .map(|a| a.to_string())
-                        .collect::<Vec<String>>()
-                        .join(" ")
-                ));
-            }
-
+        args_len: 0..=0,
+        function: |_, _, _| {
             stdin()
                 .lock()
                 .lines()
@@ -274,7 +265,7 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     // parse_int
     BuiltinFunction {
         name: "parse_int",
-        args_len: (1..=1),
+        args_len: 1..=1,
         function: |args, _, _| match &args[0] {
             Object::String(s) => s.parse::<i64>().map(Object::Integer).map_err(|e| {
                 (
@@ -291,7 +282,7 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     // parse_float
     BuiltinFunction {
         name: "parse_float",
-        args_len: (1..=1),
+        args_len: 1..=1,
         function: |args, _, _| match &args[0] {
             Object::String(s) => s.parse::<f64>().map(Object::Float).map_err(|e| {
                 (

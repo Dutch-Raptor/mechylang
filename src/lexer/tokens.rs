@@ -17,39 +17,6 @@ pub struct Token {
 }
 
 impl Token {
-    pub(crate) fn is_statement_terminator(&self, previous_token: &Token) -> bool {
-        if self.kind == TokenKind::Semicolon {
-            return true;
-        }
-
-        if self.kind == TokenKind::RightSquirly {
-            return true;
-        }
-
-        if self.kind == TokenKind::EOF {
-            return true;
-        }
-
-        if self.kind == TokenKind::RightParen {
-            return true;
-        }
-
-        if self.kind == TokenKind::RightSquare {
-            return true;
-        }
-
-        if self.kind == TokenKind::Else {
-            return true;
-        }
-
-        // if previous token was on a different line
-
-        if self.position.line != previous_token.position.line {
-            return true;
-        }
-
-        return false;
-    }
 }
 
 impl Default for Token {
@@ -97,7 +64,6 @@ pub enum TokenKind {
     Multiply,
     Divide,
     Modulo,
-    Tilde,
     Bang,
     Question,
     Dot,
@@ -114,6 +80,8 @@ pub enum TokenKind {
     BitwiseOr,
     BitwiseXor,
     BitwiseNot,
+    BitwiseRightShift,
+    BitwiseLeftShift,
 
     // Assignment
     AssignEqual,
@@ -149,8 +117,6 @@ pub enum TokenKind {
     Identifier(String),
     EOF,
     Illegal(String),
-    BitwiseRightShift,
-    BitwiseLeftShift,
     Ellipsis,
 }
 
@@ -179,14 +145,95 @@ impl TokenKind {
 }
 
 impl Display for TokenKind {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use TokenKind::*;
+
         match self {
-            TokenKind::Identifier(string) => write!(f, "Ident({})", string),
-            TokenKind::Illegal(string) => write!(f, "Illegal({})", string),
-            TokenKind::Number(number) => write!(f, "Number({})", number),
-            TokenKind::String(string) => write!(f, "String({})", string),
-            TokenKind::Char(char) => write!(f, "Char({})", char),
-            _ => write!(f, "{}", format!("{:?}", self).to_lowercase()),
+            // Keywords
+            Let => write!(f, "let"),
+            If => write!(f, "if"),
+            Else => write!(f, "else"),
+            While => write!(f, "while"),
+            For => write!(f, "for"),
+            In => write!(f, "in"),
+            Return => write!(f, "return"),
+            Break => write!(f, "break"),
+            Continue => write!(f, "continue"),
+            Fn => write!(f, "fn"),
+            Struct => write!(f, "struct"),
+            Enum => write!(f, "enum"),
+            Match => write!(f, "match"),
+            As => write!(f, "as"),
+            Use => write!(f, "use"),
+            True => write!(f, "true"),
+            False => write!(f, "false"),
+
+            // Literals
+            Number(value) => write!(f, "{}", value),
+            String(value) => write!(f, "\"{}\"", value),
+            Char(value) => write!(f, "'{}'", value),
+            Unit => write!(f, "()"),
+
+            // Operators
+            Plus => write!(f, "+"),
+            Minus => write!(f, "-"),
+            Multiply => write!(f, "*"),
+            Divide => write!(f, "/"),
+            Modulo => write!(f, "%"),
+            Bang => write!(f, "!"),
+            Question => write!(f, "?"),
+            Dot => write!(f, "."),
+            Colon => write!(f, ":"),
+            Semicolon => write!(f, ";"),
+            Comma => write!(f, ","),
+
+            // Logical
+            LogicalAnd => write!(f, "&&"),
+            LogicalOr => write!(f, "||"),
+
+            // Bitwise
+            Ampersand => write!(f, "&"),
+            BitwiseOr => write!(f, "|"),
+            BitwiseXor => write!(f, "^"),
+            BitwiseNot => write!(f, "~"),
+            BitwiseRightShift => write!(f, ">>"),
+            BitwiseLeftShift => write!(f, "<<"),
+
+            // Assignment
+            AssignEqual => write!(f, "="),
+            AssignPlus => write!(f, "+="),
+            AssignMinus => write!(f, "-+"),
+            AssignMultiply => write!(f, "*="),
+            AssignDivide => write!(f, "/="),
+            AssignModulo => write!(f, "%="),
+            AssignBitwiseXor => write!(f, "^="),
+            AssignBitwiseAnd => write!(f, "&="),
+            AssignBitwiseOr => write!(f, "|="),
+
+            // Comparison
+            CompareEqual => write!(f, "=="),
+            CompareNotEqual => write!(f, "=="),
+            CompareLess => write!(f, "<"),
+            CompareLessEqual => write!(f, "<="),
+            CompareGreater => write!(f, ">"),
+            CompareGreaterEqual => write!(f, ">="),
+
+            // Brackets
+            LeftParen => write!(f, "("),
+            RightParen => write!(f, ")"),
+            LeftSquirly => write!(f, "{{"),
+            RightSquirly => write!(f, "}}"),
+            LeftSquare => write!(f, "["),
+            RightSquare => write!(f, "]"),
+
+            RangeExclusive => write!(f, ".."),
+            RangeInclusive => write!(f, "..="),
+
+            // Other
+            Identifier(name) => write!(f, "Identifier({})", name),
+            EOF => write!(f, "EOF"),
+            Illegal(msg) => write!(f, "Illegal({})", msg),
+            Ellipsis => write!(f, "Ellipsis"),
         }
     }
 }
@@ -196,3 +243,4 @@ impl Display for Token {
         write!(f, "{}", self.kind)
     }
 }
+

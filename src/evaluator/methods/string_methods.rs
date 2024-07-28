@@ -213,7 +213,7 @@ pub const STRING_METHODS: [MethodInner; 9] = [
             Ok(Object::Iterator(IteratorObject {
                 iterator: Box::new(
                     s.lines()
-                        .map(|str| Object::from(str))
+                        .map(Object::from)
                         .collect_vec()
                         .into_iter(),
                 ),

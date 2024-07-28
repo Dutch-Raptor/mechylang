@@ -4,7 +4,7 @@ use std::{
     ops::Deref,
     rc::Rc,
 };
-
+use std::vec::IntoIter;
 use color_print::cformat;
 use itertools::Itertools;
 
@@ -14,7 +14,7 @@ use crate::{evaluator::runtime::builtins::BuiltinError, Token};
 pub struct InterpreterErrors(pub Vec<Error>);
 
 impl Display for InterpreterErrors {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0.iter().map(|err| err.to_string()).join("\n"))
     }
 }
@@ -27,10 +27,19 @@ impl Deref for InterpreterErrors {
     }
 }
 
+impl IntoIterator for InterpreterErrors {
+    type Item = Error;
+    type IntoIter = IntoIter<Error>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Error {
     pub kind: ErrorKind,
-    pub token: Option<Token>,
+    pub token: Option<Box<Token>>,
     pub message: String,
     pub line: Option<String>,
     pub context: Option<String>,
@@ -48,13 +57,12 @@ impl Error {
         let message = message.to_string();
 
         let line = token
-            .map(|token| lines.get(token.position.line - 1))
-            .flatten()
+            .and_then(|token| lines.get(token.position.line - 1))
             .map(|line| line.to_string());
 
         Self {
             kind,
-            token: token.cloned(),
+            token: token.map(|token| Box::new(token.clone())),
             message,
             line,
             context,
@@ -103,8 +111,28 @@ impl Display for Error {
 }
 
 impl Error {
-    fn fmt_without_token(&self, _f: &mut Formatter<'_>) -> fmt::Result {
-        todo!()
+    fn fmt_without_token(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let message = self.message.split('\n').collect::<Vec<&str>>();
+        let first_line = message[0];
+        let rest = match message.len() {
+            1 => &[],
+            _ => &message[1..],
+        };
+
+        writeln!(f, "{}", cformat!("{:?}", self.kind))?;
+
+        self.line
+            .as_ref()
+            .map(|line| writeln!(f, "{}", cformat!("{}", line)))
+            .unwrap_or(Ok(()))?;
+
+        writeln!(f, "{}", cformat!("{}", first_line))?;
+
+        for line in rest {
+            write!(f, "\n{}", cformat!("{}", line))?;
+        }
+
+        Ok(())
     }
 
     fn fmt_with_token(&self, f: &mut Formatter<'_>, token: &Token) -> fmt::Result {
@@ -178,7 +206,7 @@ impl Error {
         )?;
 
         for line in rest {
-            write!(f, "\n{:pos_len$} | {:caret_offset$}  {}", "", "", line,)?;
+            write!(f, "\n{:pos_len$} | {:caret_offset$}  {}", "", "", line, )?;
         }
 
         // Print context after line with error

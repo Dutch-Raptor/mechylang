@@ -132,7 +132,7 @@
 //! assert_eq!(enclosed_env.get("y"), Some(Object::Integer(1)));
 //!
 //! // Update the value of `y` in the enclosed environment
-//! enclosed_env.update("y", Object::Integer(2));
+//! enclosed_env.update("y", Object::Integer(2)).unwrap();
 //! // Now the value of `y` is updated in the outer environment
 //! // which the enclosed environment has access to
 //! assert_eq!(env.get("y"), Some(Object::Integer(2)));
@@ -146,7 +146,7 @@ use crate::Object;
 use std::{
     collections::HashMap,
     fmt::Debug,
-    rc::{Rc, Weak},
+    rc::Rc,
     sync::RwLock,
 };
 
@@ -210,7 +210,7 @@ impl Environment {
     /// assert_eq!(enclosed_env.get("y"), Some(Object::Integer(1)));
     ///
     /// // Update the value of `y` in the enclosed environment
-    /// enclosed_env.update("y", Object::Integer(2));
+    /// enclosed_env.update("y", Object::Integer(2)).unwrap();
     /// // Now the value of `y` is updated in the outer environment
     /// // which the enclosed environment has access to
     /// assert_eq!(env.get("y"), Some(Object::Integer(2)));
@@ -224,14 +224,14 @@ impl Environment {
             inner: Rc::new(RwLock::new(InnerEnvironment {
                 variables: HashMap::new(),
                 heap: outer.inner.read().unwrap().heap.clone(),
-                outer: Some(Rc::downgrade(&outer.inner)),
+                outer: Some(outer.inner.clone()),
             })),
         }
     }
 
     pub fn set_outer(&mut self, outer: &Environment) {
         let mut env = self.inner.write().unwrap();
-        env.outer = Some(Rc::downgrade(&outer.inner));
+        env.outer = Some(outer.inner.clone());
     }
 
     pub fn get_all_keys(&self) -> Vec<Rc<str>> {
@@ -244,9 +244,8 @@ impl Environment {
         keys
     }
 
-    fn get_all_keys_from_outer(outer: &Weak<RwLock<InnerEnvironment>>) -> Vec<Rc<str>> {
-        let outer_ref = outer.upgrade().unwrap();
-        let outer_env = outer_ref.read().unwrap();
+    fn get_all_keys_from_outer(outer: &RwLock<InnerEnvironment>) -> Vec<Rc<str>> {
+        let outer_env = outer.read().unwrap();
         let mut keys = outer_env.variables.keys().cloned().collect::<Vec<_>>();
         if let Some(outer) = &outer_env.outer {
             keys.extend(Self::get_all_keys_from_outer(outer));
@@ -291,7 +290,7 @@ impl Environment {
     /// For more info on [Environment::set](Environment::set), [Environment::new_enclosed](Environment::new_enclosed)
     /// see their respective documentation
     pub fn get(&self, name: impl Into<Rc<str>>) -> Option<Object> {
-        let env = self.inner.read().unwrap();
+        let env = self.inner.read().expect("environment to be able to get");
         env.get(name)
     }
 
@@ -317,7 +316,7 @@ impl Environment {
     /// ```
     /// For more info on [Environment::get](Environment::get) see its documentation
     pub fn set(&mut self, name: impl Into<Rc<str>>, val: Object) {
-        let mut env = self.inner.write().unwrap();
+        let mut env = self.inner.write().expect("environment to be able to set");
         env.set(name, val);
     }
 
@@ -336,14 +335,14 @@ impl Environment {
     /// let mut env = Environment::new();
     /// env.set("x", Object::Integer(1));
     /// assert_eq!(env.get("x"), Some(Object::Integer(1)));
-    /// env.update("x", Object::Integer(2));
+    /// env.update("x", Object::Integer(2)).unwrap();
     /// assert_eq!(env.get("x"), Some(Object::Integer(2)));
     ///
     /// let mut enclosed_env = Environment::new_enclosed(&env);
     /// // The enclosed env also has access to the value
     /// assert_eq!(enclosed_env.get("x"), Some(Object::Integer(2)));
     ///
-    /// enclosed_env.update("x", Object::Integer(5));
+    /// enclosed_env.update("x", Object::Integer(5)).unwrap();
     /// // The value is only updated in the outer environment, but
     /// // Environment::get will search for the value in the outer environment
     /// // so the new value is returned
@@ -355,7 +354,7 @@ impl Environment {
     /// For more info on [Environment::set](Environment::set) and [Environment::get](Environment::get)
     /// see their respective documentation
     pub fn update(&mut self, name: impl Into<Rc<str>>, val: Object) -> Result<(), String> {
-        let mut env = self.inner.write().unwrap();
+        let mut env = self.inner.write().expect("environment to be able to update");
         env.update(name, val)
     }
 
@@ -364,12 +363,12 @@ impl Environment {
         name: impl Into<Rc<str>>,
         func: impl FnOnce(&mut Object) -> Result<Object, String>,
     ) -> Result<Object, String> {
-        let mut env = self.inner.write().unwrap();
+        let mut env = self.inner.write().expect("environment to be able to mutate");
         env.mutate(name, func)
     }
 
     pub fn delete(&mut self, name: impl Into<Rc<str>>) -> Option<Object> {
-        let mut env = self.inner.write().unwrap();
+        let mut env = self.inner.write().expect("environment to be able to delete");
         env.delete(name)
     }
 }
@@ -378,7 +377,7 @@ impl Environment {
 pub struct InnerEnvironment {
     pub variables: HashMap<Rc<str>, Uuid>,
     pub heap: Rc<RwLock<HashMap<Uuid, HeapObject>>>,
-    pub outer: Option<Weak<RwLock<InnerEnvironment>>>,
+    pub outer: Option<Rc<RwLock<InnerEnvironment>>>,
 }
 
 impl InnerEnvironment {
@@ -424,8 +423,7 @@ impl InnerEnvironment {
             }
             None => match &self.outer {
                 Some(outer) => {
-                    let outer_ref = outer.upgrade()?;
-                    let outer_env = outer_ref.read().unwrap();
+                    let outer_env = outer.read().unwrap();
                     outer_env.get(name)
                 }
                 None => None,
@@ -459,13 +457,7 @@ impl InnerEnvironment {
             None => {
                 return match &self.outer {
                     Some(outer) => {
-                        let outer_ref = match outer.upgrade() {
-                            Some(outer) => outer,
-                            None => {
-                                return Err("Cannot mutate variable that does not exist".to_string())
-                            }
-                        };
-                        let mut outer_env = outer_ref.write().unwrap();
+                        let mut outer_env = outer.write().unwrap();
                         outer_env.update(name, val)
                     }
                     None => Err("Cannot mutate variable that does not exist".to_string()),
@@ -495,10 +487,7 @@ impl InnerEnvironment {
                 Err("Cannot mutate variable that does not exist".to_string())
             }
         } else if let Some(outer) = &self.outer {
-            match outer.upgrade() {
-                Some(outer) => outer.write().unwrap().mutate(name, func),
-                None => Err("Cannot mutate variable that does not exist".to_string()),
-            }
+                outer.write().unwrap().mutate(name, func)
         } else {
             Err("Cannot mutate variable that does not exist".to_string())
         }
@@ -515,8 +504,7 @@ impl InnerEnvironment {
             let heap_obj = heap.remove(&id)?;
             Some(heap_obj.obj)
         } else if let Some(outer) = &self.outer {
-            let outer_ref = outer.upgrade()?;
-            let mut outer_env = outer_ref.write().unwrap();
+            let mut outer_env = outer.write().unwrap();
             outer_env.delete(name)
         } else {
             None
@@ -540,7 +528,7 @@ pub struct HeapObject {
 impl Debug for InnerEnvironment {
     /// Debug implementation for InnerEnvironment
     ///
-    /// Prints the store and whether or not there is an outer environment
+    /// Prints the store and whether there is an outer environment
     /// does not print the outer environment, as that would cause an infinite loop
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let has_outer = self.outer.is_some();

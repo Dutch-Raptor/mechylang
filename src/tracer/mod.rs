@@ -31,7 +31,7 @@ pub fn start_trace(name: &str) -> &str {
         eprintln!("{}Begin {}", " ".repeat(INDENT * 2), name);
         INDENT += 1;
     }
-    return name;
+    name
 }
 
 pub fn stop_trace(name: &str) {
