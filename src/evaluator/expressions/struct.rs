@@ -13,7 +13,8 @@ impl Evaluator {
 
         for (key, expression) in &lit.entries {
             let object = self.eval_expression(expression, env)?;
-            map.insert(key.to_string(), object);
+            let object_id = env.store_object(object.clone());
+            map.insert(key.to_string(), object_id);
         }
 
         Ok(Object::Struct(map))

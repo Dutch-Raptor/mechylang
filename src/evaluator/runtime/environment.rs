@@ -147,12 +147,28 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     rc::Rc,
-    sync::RwLock,
 };
+use std::fmt::{Display, Formatter};
+use std::sync::Mutex;
+use crate::evaluator::runtime::inner_environment::InnerEnvironment;
 
-use uuid::Uuid;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct ObjectId(u32);
 
-#[derive(Debug, Default)]
+impl Display for ObjectId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl ObjectId {
+    pub fn random() -> Self {
+        Self(rand::random::<u32>())
+    }
+}
+
+
 /// An environment is a representation of a scope, which also has access to any outer scopes.
 ///
 /// # Usage
@@ -165,17 +181,17 @@ use uuid::Uuid;
 /// env.set("x", Object::Integer(1));
 /// assert_eq!(env.get("x"), Some(Object::Integer(1)));
 /// ```
-
+#[derive(Debug, Default)]
 pub struct Environment {
-    pub inner: Rc<RwLock<InnerEnvironment>>,
+    pub inner: Rc<Mutex<InnerEnvironment>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
         Self {
-            inner: Rc::new(RwLock::new(InnerEnvironment {
+            inner: Rc::new(Mutex::new(InnerEnvironment {
                 variables: HashMap::new(),
-                heap: Rc::new(RwLock::new(HashMap::new())),
+                heap: Rc::new(Mutex::new(HashMap::new())),
                 outer: None,
             })),
         }
@@ -219,23 +235,20 @@ impl Environment {
     ///
     /// For more info on [Environment::set](Environment::set), [Environment::update](Environment::update)
     /// and [Environment::get](Environment::get) see their respective documentation
-    pub fn new_enclosed(outer: &Environment) -> Self {
+    pub fn new_enclosed(outer_env: &Environment) -> Self {
+        let outer_inner = Rc::clone(&outer_env.inner);
+        let heap = outer_inner.lock().unwrap().heap.clone();
         Self {
-            inner: Rc::new(RwLock::new(InnerEnvironment {
+            inner: Rc::new(Mutex::new(InnerEnvironment {
                 variables: HashMap::new(),
-                heap: outer.inner.read().unwrap().heap.clone(),
-                outer: Some(outer.inner.clone()),
+                heap,
+                outer: Some(outer_inner),
             })),
         }
     }
 
-    pub fn set_outer(&mut self, outer: &Environment) {
-        let mut env = self.inner.write().unwrap();
-        env.outer = Some(outer.inner.clone());
-    }
-
     pub fn get_all_keys(&self) -> Vec<Rc<str>> {
-        let env = self.inner.read().unwrap();
+        let env = self.inner.lock().unwrap();
         let mut keys = env.variables.keys().cloned().collect::<Vec<_>>();
         dbg!(&env.outer);
         if let Some(outer) = &env.outer {
@@ -244,8 +257,8 @@ impl Environment {
         keys
     }
 
-    fn get_all_keys_from_outer(outer: &RwLock<InnerEnvironment>) -> Vec<Rc<str>> {
-        let outer_env = outer.read().unwrap();
+    fn get_all_keys_from_outer(outer: &Mutex<InnerEnvironment>) -> Vec<Rc<str>> {
+        let outer_env = outer.lock().unwrap();
         let mut keys = outer_env.variables.keys().cloned().collect::<Vec<_>>();
         if let Some(outer) = &outer_env.outer {
             keys.extend(Self::get_all_keys_from_outer(outer));
@@ -290,8 +303,18 @@ impl Environment {
     /// For more info on [Environment::set](Environment::set), [Environment::new_enclosed](Environment::new_enclosed)
     /// see their respective documentation
     pub fn get(&self, name: impl Into<Rc<str>>) -> Option<Object> {
-        let env = self.inner.read().expect("environment to be able to get");
+        let env = self.inner.lock().expect("environment to be able to get");
         env.get(name)
+    }
+    
+    pub fn get_by_id(&self, id: ObjectId) -> Option<Object> {
+        let env = self.inner.lock().expect("environment to be able to get");
+        env.get_by_id(id)
+    }
+
+    pub fn get_id(&self, name: impl Into<Rc<str>>) -> Option<ObjectId> {
+        let env = self.inner.lock().expect("environment to be able to get");
+        env.get_id(name)
     }
 
     /// Sets a value in the current scope
@@ -316,8 +339,13 @@ impl Environment {
     /// ```
     /// For more info on [Environment::get](Environment::get) see its documentation
     pub fn set(&mut self, name: impl Into<Rc<str>>, val: Object) {
-        let mut env = self.inner.write().expect("environment to be able to set");
+        let mut env = self.inner.lock().expect("environment to be able to set");
         env.set(name, val);
+    }
+    
+    pub fn set_by_id(&mut self, id: ObjectId, val: Object) {
+        let mut env = self.inner.lock().expect("environment to be able to set");
+        env.set_by_id(id, val);
     }
 
     /// Update a value in the environment recursively
@@ -354,7 +382,7 @@ impl Environment {
     /// For more info on [Environment::set](Environment::set) and [Environment::get](Environment::get)
     /// see their respective documentation
     pub fn update(&mut self, name: impl Into<Rc<str>>, val: Object) -> Result<(), String> {
-        let mut env = self.inner.write().expect("environment to be able to update");
+        let mut env = self.inner.lock().expect("environment to be able to update");
         env.update(name, val)
     }
 
@@ -363,182 +391,20 @@ impl Environment {
         name: impl Into<Rc<str>>,
         func: impl FnOnce(&mut Object) -> Result<Object, String>,
     ) -> Result<Object, String> {
-        let mut env = self.inner.write().expect("environment to be able to mutate");
+        let mut env = self.inner.lock().expect("environment to be able to mutate");
         env.mutate(name, func)
     }
 
     pub fn delete(&mut self, name: impl Into<Rc<str>>) -> Option<Object> {
-        let mut env = self.inner.write().expect("environment to be able to delete");
+        let mut env = self.inner.lock().expect("environment to be able to delete");
         env.delete(name)
     }
-}
 
-#[derive(Default)]
-pub struct InnerEnvironment {
-    pub variables: HashMap<Rc<str>, Uuid>,
-    pub heap: Rc<RwLock<HashMap<Uuid, HeapObject>>>,
-    pub outer: Option<Rc<RwLock<InnerEnvironment>>>,
-}
-
-impl InnerEnvironment {
-    fn set_object(&mut self, name: Rc<str>, obj: Object) -> Uuid {
-        let id = self.generate_id();
-        let mut heap = self.heap.write().unwrap();
-        heap.insert(id, HeapObject { ref_count: 1, obj });
-        self.variables.insert(name, id);
-        id
-    }
-
-    /// Generates a unique id for a new object
-    fn generate_id(&mut self) -> Uuid {
-        let mut id = Uuid::new_v4();
-        let heap = self.heap.read().unwrap();
-        while heap.contains_key(&id) {
-            id = Uuid::new_v4();
-        }
-        id
-    }
-
-    /// Handles dropping an object by id, decreases the ref count for any objects that are referenced by the object being dropped
-    fn handle_drop_for_id(&mut self, id: Uuid) {
-        let mut heap = self.heap.write().unwrap();
-        if let Some(HeapObject { ref_count, .. }) = heap.get_mut(&id) {
-            *ref_count -= 1;
-            if *ref_count == 0 {
-                heap.remove(&id);
-            }
-        }
-    }
-
-    /// Recursively get a value from the environment
-    ///
-    /// Keeps trying to get the value from the outer environment until it succeeds or there are no more outer
-    pub fn get(&self, name: impl Into<Rc<str>>) -> Option<Object> {
-        let name = name.into();
-        match self.variables.get(&name) {
-            Some(id) => {
-                let heap = self.heap.read().unwrap();
-                let heap_obj = heap.get(id)?;
-                Some(heap_obj.obj.clone())
-            }
-            None => match &self.outer {
-                Some(outer) => {
-                    let outer_env = outer.read().unwrap();
-                    outer_env.get(name)
-                }
-                None => None,
-            },
-        }
-    }
-
-    /// Set a value in the current scope
-    ///
-    /// If a value with the same name already exists, in the current scope
-    /// it will be overwritten, if no other reference to the old value exist
-    /// it will be dropped
-    pub fn set(&mut self, name: impl Into<Rc<str>>, val: Object) {
-        let name = name.into();
-
-        if let Some(old_id) = self.variables.get(&name) {
-            self.handle_drop_for_id(*old_id);
-        }
-
-        self.set_object(name, val);
-    }
-
-    pub fn update(&mut self, name: impl Into<Rc<str>>, val: Object) -> Result<(), String> {
-        let name = name.into();
-        match self.variables.get_mut(&name) {
-            Some(id) => {
-                let mut heap = self.heap.write().unwrap();
-                let heap_obj = heap.get_mut(id).unwrap();
-                heap_obj.obj = val;
-            }
-            None => {
-                return match &self.outer {
-                    Some(outer) => {
-                        let mut outer_env = outer.write().unwrap();
-                        outer_env.update(name, val)
-                    }
-                    None => Err("Cannot mutate variable that does not exist".to_string()),
-                }
-            }
-        };
-
-        Ok(())
-    }
-
-    /// A function to update a value in the environment recursively
-    ///
-    /// This function takes a name and a function that takes a mutable reference to an Object
-    /// It then searches for the value in the environment and applies the function to it
-    pub fn mutate(
-        &mut self,
-        name: impl Into<Rc<str>>,
-        func: impl FnOnce(&mut Object) -> Result<Object, String>,
-    ) -> Result<Object, String> {
-        let name = name.into();
-        if let Some(id) = self.variables.get_mut(&name) {
-            if let Some(HeapObject { ref mut obj, .. }) = self.heap.write().unwrap().get_mut(id) {
-                func(obj)
-            }
-            // If the object is not in the heap, return an error
-            else {
-                Err("Cannot mutate variable that does not exist".to_string())
-            }
-        } else if let Some(outer) = &self.outer {
-                outer.write().unwrap().mutate(name, func)
-        } else {
-            Err("Cannot mutate variable that does not exist".to_string())
-        }
-    }
-
-    /// Delete a value from the environment
-    ///
-    /// If the value is not in the current scope, it will try to delete it from the outer scope
-    /// If the value is not in the outer scope, it will return None
-    pub fn delete(&mut self, name: impl Into<Rc<str>>) -> Option<Object> {
-        let name = name.into();
-        if let Some(id) = self.variables.remove(&name) {
-            let mut heap = self.heap.write().unwrap();
-            let heap_obj = heap.remove(&id)?;
-            Some(heap_obj.obj)
-        } else if let Some(outer) = &self.outer {
-            let mut outer_env = outer.write().unwrap();
-            outer_env.delete(name)
-        } else {
-            None
-        }
+    pub fn store_object(&self, object: Object) -> ObjectId {
+        self.inner.lock().unwrap().store_object(object)
     }
 }
 
-impl Drop for InnerEnvironment {
-    fn drop(&mut self) {
-        for uuid in self.variables.clone().values() {
-            self.handle_drop_for_id(*uuid);
-        }
-    }
-}
-
-pub struct HeapObject {
-    ref_count: usize,
-    obj: Object,
-}
-
-impl Debug for InnerEnvironment {
-    /// Debug implementation for InnerEnvironment
-    ///
-    /// Prints the store and whether there is an outer environment
-    /// does not print the outer environment, as that would cause an infinite loop
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let has_outer = self.outer.is_some();
-        write!(
-            f,
-            "InnerEnvironment {{ store: {{ {:?} }}, has_outer: {} }}",
-            self.variables, has_outer
-        )
-    }
-}
 
 impl Clone for Environment {
     fn clone(&self) -> Self {

@@ -144,9 +144,13 @@ pub const STRING_METHODS: [MethodInner; 9] = [
                 _ => return Err("Split method called with non-string argument".to_string()),
             };
 
-            let split: Vec<_> = s.split(delimiter).map(|s| s.into()).collect();
+            let split: Vec<Object> = s.split(delimiter).map(|s| s.into()).collect();
 
-            Ok(Object::Array(split))
+            Ok(Object::Iterator(IteratorObject {
+                iterator: Box::new(
+                    split.into_iter(),
+                ),
+            }))
         },
     },
     MethodInner {
@@ -194,11 +198,14 @@ pub const STRING_METHODS: [MethodInner; 9] = [
                 _ => return invalid_object_err(),
             };
 
-            Ok(Object::Array(
-                s.chars()
-                    .map(|c| Object::String(c.to_string().into()))
-                    .collect(),
-            ))
+            Ok(Object::Iterator(IteratorObject {
+                iterator: Box::new(
+                    s.chars()
+                        .map(|c| Object::String(c.to_string().into()))
+                        .collect_vec()
+                        .into_iter(),
+                ),
+            }))
         },
     },
     MethodInner {

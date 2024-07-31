@@ -99,6 +99,7 @@ pub enum ErrorKind {
     PropertyNotFound,
     InvalidDereference,
     AnonFunction,
+    InvalidIndex,
 }
 
 impl Display for Error {

@@ -75,7 +75,7 @@ impl TryFrom<Object> for IteratorObject {
         match obj {
             Object::Iterator(iterator) => Ok(iterator),
             Object::Array(array) => Ok(IteratorObject {
-                iterator: Box::new(array.into_iter()),
+                iterator: Box::new(array.into_iter().map(|id| Object::Reference(id))),
             }),
             Object::String(string) => {
                 let string = string.to_string();

@@ -25,6 +25,7 @@ pub(crate) use self::{
 
 use crate::{Environment, EvalConfig, Evaluator, Object};
 use crate::evaluator::objects::iterators::IteratorObject;
+use crate::evaluator::runtime::environment::ObjectId;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Method {
@@ -213,9 +214,12 @@ pub const ITERATOR_METHODS: [MethodInner; 11] =
         MethodInner {
             name: "collect",
             args_len: 0..=0,
-            function: |obj, _, _, _, _| {
+            function: |obj, _, _, env, _| {
                 if let Object::Iterator(iterator) = obj {
-                    let vec: Vec<Object> = iterator.collect();
+                    let vec: Vec<ObjectId> = iterator
+                        .map(|item| env.store_object(item))
+                        .collect();
+                    
                     Ok(Object::Array(vec))
                 } else {
                     Err(format!("Expected Iterator, got {}", obj))

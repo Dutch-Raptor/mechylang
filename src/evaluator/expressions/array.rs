@@ -1,5 +1,6 @@
 use crate::{Environment, Error, Evaluator, Object};
 use crate::errors::ErrorKind;
+use crate::evaluator::runtime::environment::ObjectId;
 use crate::parser::expressions::{ArrayLiteral, ExpressionToken, IndexExpression};
 
 impl Evaluator {
@@ -12,34 +13,37 @@ impl Evaluator {
             .iter()
             .map(|element| self.eval_expression(element, env))
             .collect::<Result<Vec<Object>, Error>>()?;
-
-        Ok(Object::Array(elements))
+        
+        // store all the elements in the environment
+        let element_ids = elements
+            .iter()
+            .map(|element| env.store_object(element.clone()))
+            .collect::<Vec<_>>();
+        
+        Ok(Object::Array(element_ids))
     }
-
-
-    pub(super) fn eval_index_expression(
+    
+    pub(in crate::evaluator) fn eval_index_expression_object_id(
         &mut self,
         index: &IndexExpression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<ObjectId, Error> {
         let left = self.eval_expression(&index.left, env)?;
 
-        let array = match left {
-            Object::Array(ref arr) => arr,
-            _ => {
-                return Err(self.error(
-                    Some(index.left.token()),
-                    &format!("Expected an array. Got {:?}", left).to_string(),
-                    ErrorKind::TypeError,
-                ))
-            }
-        };
+        match &left {
+            Object::Array(_) => self.eval_array_index_expression(index, env, &left),
+            _ => Err(self.error(Some(index.left.token()), "Expected an array", ErrorKind::TypeError)),
+        }
+    }
+
+    fn eval_array_index_expression(&mut self, index: &IndexExpression, env: &mut Environment, left: &Object) -> Result<ObjectId, Error> {
+        let array = left.as_array().expect("Left should be an array in eval_array_index_expression");
 
         let evaluated_index = self.eval_expression(&index.index, env)?;
 
         match evaluated_index {
             Object::Integer(i) => match array.get(i as usize) {
-                Some(item) => Ok(item.clone()),
+                Some(id) => Ok(*id),
                 None => Err(self.error(
                     Some(index.index.token()),
                     &format!(
@@ -64,5 +68,15 @@ impl Evaluator {
                 ))
             }
         }
+    }
+
+    pub(super) fn eval_index_expression(
+        &mut self,
+        index: &IndexExpression,
+        env: &mut Environment,
+    ) -> Result<Object, Error> {
+        let object_id = self.eval_index_expression_object_id(index, env)?;
+        
+        Ok(env.get_by_id(object_id).expect("objectId in array should be valid"))
     }
 }

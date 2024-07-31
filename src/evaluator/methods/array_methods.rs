@@ -22,10 +22,12 @@ pub const ARRAY_PUSH: MethodInner = MethodInner {
         let value = args[0].clone();
 
         let ident = get_mutable_ident(ident)?;
+        
+        let value_id = env.store_object(value);
 
         env.mutate(ident.to_string(), move |arr| {
             if let Object::Array(ref mut arr) = arr {
-                arr.push(value.clone());
+                arr.push(value_id);
                 Ok(Object::Unit)
             } else {
                 Err(format!("Expected array, got {}", arr))
@@ -55,14 +57,22 @@ pub const ARRAY_POP: MethodInner = MethodInner {
         let item = env
             .mutate(ident.to_string(), move |arr| {
                 if let Object::Array(ref mut arr) = arr {
-                    arr.pop()
-                        .map(Ok)
-                        .unwrap_or(Err("Array is empty".to_string()))
+                    let obj_id = arr.pop();
+                    
+                    match obj_id {
+                        Some(id) => Ok(Object::Reference(id)),
+                        None => Ok(Object::Unit),
+                    }
                 } else {
                     Err(format!("Expected array, got {}", arr))
                 }
             })
             .map_err(|e| e.to_string())?;
+        
+        if let Object::Reference(id) = item {
+            return Ok(env.get_by_id(id).expect("objectId in array should be valid"));
+        } 
+        
         Ok(item)
     },
 };
@@ -86,14 +96,20 @@ pub const ARRAY_FIRST: MethodInner = MethodInner {
         let item = env
             .mutate(ident.to_string(), move |arr| {
                 if let Object::Array(ref mut arr) = arr {
-                    arr.first()
-                        .map(|v| Ok(v.clone()))
-                        .unwrap_or(Err("Array is empty".to_string()))
+                        match arr.first() {
+                            Some(id) => Ok(Object::Reference(*id)),
+                            None => Ok(Object::Unit),
+                        }
                 } else {
                     Err(format!("Expected array, got {}", arr))
                 }
             })
             .map_err(|e| e.to_string())?;
+        
+        if let Object::Reference(id) = item {
+            return Ok(env.get_by_id(id).expect("objectId in array should be valid"));
+        }
+        
         Ok(item)
     },
 };
@@ -118,14 +134,20 @@ pub const ARRAY_LAST: MethodInner = MethodInner {
         let item = env
             .mutate(ident.to_string(), move |arr| {
                 if let Object::Array(ref mut arr) = arr {
-                    arr.last()
-                        .map(|v| Ok(v.clone()))
-                        .unwrap_or(Err("Array is empty".to_string()))
+                        match arr.last() {
+                            Some(id) => Ok(Object::Reference(*id)),
+                            None => Ok(Object::Unit),
+                        }
                 } else {
                     Err(format!("Expected array, got {}", arr))
                 }
             })
             .map_err(|e| e.to_string())?;
+        
+        if let Object::Reference(id) = item {
+            return Ok(env.get_by_id(id).expect("objectId in array should be valid"));
+        }
+        
         Ok(item)
     },
 };
@@ -186,10 +208,12 @@ pub const ARRAY_INSERT: MethodInner = MethodInner {
             }
             _ => return Err("Expected array".to_string()),
         }
+        
+        let value_id = env.store_object(value);
 
         env.mutate(ident.to_string(), move |arr| {
             if let Object::Array(ref mut arr) = arr {
-                arr.insert(index as usize, value.clone());
+                arr.insert(index as usize, value_id);
                 Ok(Object::Unit)
             } else {
                 Err(format!("Expected array, got {}", arr))
@@ -238,12 +262,17 @@ pub const ARRAY_REMOVE: MethodInner = MethodInner {
         let item = env
             .mutate(ident.to_string(), move |arr| {
                 if let Object::Array(ref mut arr) = arr {
-                    Ok(arr.remove(index as usize))
+                    Ok(Object::Reference(arr.remove(index as usize)))
                 } else {
                     Err(format!("Expected array, got {}", arr))
                 }
             })
             .map_err(|e| e.to_string())?;
+        
+        if let Object::Reference(id) = item {
+            return Ok(env.get_by_id(id).expect("objectId in array should be valid"));
+        }
+        
         Ok(item)
     },
 };
@@ -259,11 +288,18 @@ pub const ARRAY_REMOVE: MethodInner = MethodInner {
 pub const ARRAY_CONTAINS: MethodInner = MethodInner {
     name: "contains",
     args_len: 1..=1,
-    function: |obj, _, args, _, _| {
+    function: |obj, _, args, env, _| {
         let value = args[0].clone();
 
         match obj {
-            Object::Array(arr) => Ok(Object::Boolean(arr.contains(&value))),
+            Object::Array(arr) => {
+                for id in arr {
+                    if env.get_by_id(id).expect("objectId in array should be valid") == value {
+                        return Ok(Object::Boolean(true));
+                    }
+                }
+                return Ok(Object::Boolean(false));
+            }
             _ => Err("Argument to `contains` not supported".to_string()),
         }
     },

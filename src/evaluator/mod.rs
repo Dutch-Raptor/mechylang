@@ -10,7 +10,6 @@ use self::runtime::environment::Environment;
 pub mod eval_tests;
 pub mod methods;
 pub mod objects;
-pub mod properties;
 pub mod runtime;
 mod config;
 mod statements;

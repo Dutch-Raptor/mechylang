@@ -1,6 +1,5 @@
 pub(crate) mod function;
 pub(crate) mod iterators;
-pub(crate) mod reference;
 pub(crate) mod traits;
 
 use std::{
@@ -11,7 +10,8 @@ use std::{
 
 use itertools::Itertools;
 use crate::evaluator::objects::function::Callable;
-use self::{function::Function, iterators::IteratorObject, reference::Reference};
+use crate::evaluator::runtime::environment::ObjectId;
+use self::{function::Function, iterators::IteratorObject};
 
 use super::{methods::Method, runtime::builtins::BuiltinFunction};
 
@@ -88,7 +88,7 @@ pub enum Object {
     /// ## Methods
     ///
     /// Arrays have many methods, take a look at the [array methods module](crate::evaluator::methods::array_methods) for more information.
-    Array(Vec<Object>),
+    Array(Vec<ObjectId>),
     RangeFrom(Rc<Object>),
     RangeTo(Rc<Object>),
     RangeToInclusive(Rc<Object>),
@@ -102,9 +102,9 @@ pub enum Object {
     Continue,
     Method(Method),
 
-    Reference(Reference),
+    Reference(ObjectId),
 
-    Struct(HashMap<String, Object>),
+    Struct(HashMap<String, ObjectId>),
 }
 
 impl Object {
@@ -136,14 +136,14 @@ impl Object {
         }
     }
     
-    pub fn as_array(&self) -> Option<&Vec<Object>> {
+    pub fn as_array(&self) -> Option<&Vec<ObjectId>> {
         match self {
             Object::Array(a) => Some(a),
             _ => None,
         }
     }
     
-    pub fn as_struct(&self) -> Option<&HashMap<String, Object>> {
+    pub fn as_struct(&self) -> Option<&HashMap<String, ObjectId>> {
         match self {
             Object::Struct(s) => Some(s),
             _ => None,
@@ -203,7 +203,7 @@ impl Object {
         }
     }
     
-    pub fn as_reference(&self) -> Option<&Reference> {
+    pub fn as_reference(&self) -> Option<&ObjectId> {
         match self {
             Object::Reference(reference) => Some(reference),
             _ => None,
@@ -337,8 +337,8 @@ impl From<String> for Object {
     }
 }
 
-impl From<Vec<Object>> for Object {
-    fn from(array: Vec<Object>) -> Self {
+impl From<Vec<ObjectId>> for Object {
+    fn from(array: Vec<ObjectId>) -> Self {
         Object::Array(array)
     }
 }

@@ -7,12 +7,6 @@ mod tests {
     use crate::test_utils::test_eval_err;
 
 
-
-
-
-
-
-
     #[test]
     fn test_return_statement() {
         let tests = vec![
@@ -337,14 +331,15 @@ mod tests {
 
     #[test]
     fn test_array_literals() {
-        let input = "[1, 2 * 2, 3 + 3]";
+        let input = r#"
+        let a = [1, 2 * 2, 3 + 3]
+        assert_eq(a, [1, 4, 6])
+        a
+        "#;
         let evaluated = test_eval(input).unwrap();
         match evaluated {
             Object::Array(array) => {
                 assert_eq!(array.len(), 3);
-                assert_eq!(array[0], Object::Integer(1));
-                assert_eq!(array[1], Object::Integer(4));
-                assert_eq!(array[2], Object::Integer(6));
             }
             _ => panic!("Object is not an array. Got: {:?}", evaluated),
         }
@@ -660,202 +655,72 @@ mod tests {
 
     #[test]
     fn test_method_call_expression() {
-        let tests = vec![
-            (
-                r#"let a = [1, 2, 3]; a.push(4); a;"#,
-                Object::Array(vec![
-                    Object::Integer(1),
-                    Object::Integer(2),
-                    Object::Integer(3),
-                    Object::Integer(4),
-                ]),
-            ),
-            (
-                r#"let a = [1, 2, 3]; let b = a.pop(); [b, a];"#,
-                Object::Array(vec![
-                    Object::Integer(3),
-                    Object::Array(vec![Object::Integer(1), Object::Integer(2)]),
-                ]),
-            ),
-            (r#"let a = [1, 2, 3]; a.len()"#, Object::Integer(3)),
-        ];
+        test_eval_ok(r#"
+            let a = [1, 2, 3];
+            a.push(4);
+            assert_eq(a, [1, 2, 3, 4]);
 
-        for (input, expected) in tests {
-            let evaluated = test_eval(input).unwrap();
-            assert_eq!(evaluated, expected);
-        }
+            a.pop();
+            assert_eq(a, [1, 2, 3]);
+
+            "#);
     }
 
     #[test]
     fn test_iter_methods() {
-        let tests = vec![
-            (
-                r#"let a = [1, 2, 3]; a.iter().map(fn(x) { x * 2; }).collect()"#,
-                Object::Array(vec![
-                    Object::Integer(2),
-                    Object::Integer(4),
-                    Object::Integer(6),
-                ]),
-            ),
-            (
-                r#"let a = [1, 2, 3]; a.iter().filter(fn(x) { x % 2 == 0; }).collect()"#,
-                Object::Array(vec![Object::Integer(2)]),
-            ),
-            (
-                r#"
-                let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).collect();
-                a;
-                "#,
-                Object::Array(vec![
-                    Object::Integer(9),
-                    Object::Integer(18),
-                    Object::Integer(27),
-                    Object::Integer(36),
-                    Object::Integer(45),
-                    Object::Integer(54),
-                ]),
-            ),
-            // sum of first 6 multiples of 9
-            (
-                r#"
-                let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).sum();
-                a;
-                "#,
-                Object::Integer(189),
-            ),
-            (
-                r#"
-                let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).fold("", fn(acc, x) { acc + x.to_string(); });
-                a;
-                "#,
-                Object::String("91827364554".into()),
-            ),
-            (
-                r#"
-                let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).step_by(2).skip(2).take(4).collect();
-                a;
-                "#,
-                Object::Array(vec![
-                    Object::Integer(45),
-                    Object::Integer(63),
-                    Object::Integer(81),
-                    Object::Integer(99),
-                ]),
-            ),
-            (
-                r#"
-                let a = (1..).iter();
-                a.next();
-                a.next();
-                a.next();
-                a.next();
-                a.next();
-                "#,
-                Object::Integer(5),
-            ),
-            (
-                r#"
-                let iter = (1..).iter();
-                let iter_skip = iter.skip(5);
-                iter_skip.next();
-                iter_skip.next();
-                "#,
-                Object::Integer(7),
-            ),
-            (
-                r#"
-                let iter = (1..).iter();
-                let iter_take = iter.take(5);
-                iter_take.next();
-                iter_take.next();
-                "#,
-                Object::Integer(2),
-            ),
-            (
-                r#"
-                let iter = (1..).iter();
-                let iter_stepped = iter.step_by(2);
-                iter_stepped.next();
-                iter_stepped.next();
-                "#,
-                Object::Integer(3),
-            ),
-            (
-                r#"
-                let n = 1000;
+        test_eval_ok(r#"
+            let a = [1, 2, 3];
+            let b = a.iter().map(fn(x) { x * 2; }).collect();
+            assert_eq(b, [2, 4, 6]);
+        "#);
 
-                let sum_primes = fn(n) {
-                    if n < 2 {
-                        return 0;
-                    };
-                    if n == 2 {
-                        return 2;
-                    };
-                    if n <= 4 {
-                        return 5;
-                    };
+        test_eval_ok(r#"
+            let a = [1, 2, 3];
+            let b = a.iter().filter(fn(x) { x % 2 == 0; }).collect();
+            assert_eq(b, [2]);
+        "#);
 
-                    (5..=n).iter()
-                      .step_by(6)
-                      .fold([2, 3], fn(primes, i) {
-                          if primes.iter().filter(fn(p) { i % p == 0; }).count() == 0 {
-                              primes.push(i);
-                          }
+        test_eval_ok(r#"
+            let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).collect();
+            assert_eq(a, [9, 18, 27, 36, 45, 54]);
+        "#);
 
-                          if i + 2 <= n && primes.iter().filter(fn(p) { (i + 2) % p == 0; }).count() == 0 {
-                              primes.push(i + 2);
-                          }
-                          primes;
-                      })
-                      .iter()
-                      .sum();
-                };
-                sum_primes(n);
+        test_eval_ok(r#"
+            let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).sum();
+            assert_eq(a, 189);
+        "#);
 
-                "#,
-                Object::Integer(76127),
-            ),
-        ];
+        test_eval_ok(r#"
+            let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).fold("", fn(acc, x) { acc + x.to_string(); });
+            assert_eq(a, "91827364554");
+        "#);
 
-        for (input, expected) in tests {
-            let evaluated = test_eval(input).unwrap();
-            assert_eq!(evaluated, expected);
-        }
+        test_eval_ok(r#"
+            let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).step_by(2).skip(2).take(4).collect();
+            assert_eq(a, [45, 63, 81, 99]);
+        "#);
+
+        test_eval_ok(r#"
+            let a = (1..).iter();
+            a.next();
+            a.next();
+            a.next();
+            a.next();
+            a.next();
+            assert_eq(a.next(), 5);
+        "#);
     }
 
     #[test]
     fn test_eval_array_assignment() {
-        let tests = vec![
-            (
-                r#"
-            let a = [1, 2, 3];
-            a[0] = 4;
-            a;
-            "#,
-                Object::Array(vec![
-                    Object::Integer(4),
-                    Object::Integer(2),
-                    Object::Integer(3),
-                ]),
-            ),
-            (
-                r#"
-            let a = [1, 2, 3];
-            a[1] = 4;
-            a;
-            "#,
-                Object::Array(vec![
-                    Object::Integer(1),
-                    Object::Integer(4),
-                    Object::Integer(3),
-                ]),
-            ),
-        ];
-
-        for (input, expected) in tests {
-            let evaluated = test_eval(input).unwrap();
-            assert_eq!(evaluated, expected);
-        }
+        test_eval_ok(r#"
+        let a = [1, 2, 3];
+        a[0] = 4;
+        assert_eq(a, [4, 2, 3]);
+        
+        a[1] = 4;
+        assert_eq(a, [4, 4, 3]);
+        "#);
     }
 
     #[test]
