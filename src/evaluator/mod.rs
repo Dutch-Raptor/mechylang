@@ -57,9 +57,13 @@ impl Evaluator {
             eval_config: config.into(),
         };
 
-        evaluator
+        let a = evaluator
             .eval_program(statements, env)
-            .map_err(|err| InterpreterErrors(vec![err]))
+            .map_err(|err| InterpreterErrors(vec![err]));
+        
+        println!("{:?}", a);
+        
+        a
     }
 
 

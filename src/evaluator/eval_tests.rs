@@ -347,6 +347,30 @@ mod tests {
 
     #[test]
     fn test_array_index_expressions() {
+        test_eval_ok(r#"
+        let a = [1, 2, 3];
+        assert_eq(a[0], 1);
+        assert_eq(a[1], 2);
+        assert_eq(a[2], 3);
+        "#);
+        
+        
+        test_eval_ok(r#"
+        let a = [1, 2, 3];
+        let i = 0;
+        assert_eq(a[i], 1);
+        "#);
+        
+        test_eval_ok(r#"
+        let a = [1, 2, 3];
+        assert_eq(a[1 + 1], 3);
+        "#);
+        
+        test_eval_ok(r#"
+        let i = 0;
+        assert_eq([1][i], 1);
+        "#);
+        
         let tests = vec![
             ("[1, 2, 3][0]", Object::Integer(1)),
             ("[1, 2, 3][1]", Object::Integer(2)),

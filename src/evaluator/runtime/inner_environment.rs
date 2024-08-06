@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::{Mutex};
 use crate::evaluator::runtime::environment::{ObjectId};
-use crate::Object;
+use crate::{Object, trace};
 
 #[derive(Default)]
 pub struct InnerEnvironment {
@@ -51,7 +51,17 @@ impl Debug for InnerEnvironment {
 impl InnerEnvironment {
     pub fn get_id(&self, name: impl Into<Rc<str>>) -> Option<ObjectId> {
         let name = name.into();
-        self.variables.get(&name).copied()
+
+        match self.variables.get(&name) {
+            Some(id) => Some(*id),
+            None => self
+                .outer
+                .as_ref()
+                .and_then(
+                    |outer|
+                    outer.lock().unwrap().get_id(name)
+                )
+        }
     }
 
     fn set_object(&mut self, name: Rc<str>, obj: Object) -> ObjectId {
@@ -81,18 +91,29 @@ impl InnerEnvironment {
 
     /// Handles dropping an object by id, decreases the ref count for any objects that are referenced by the object being dropped
     fn handle_drop_for_id(&self, id: ObjectId) {
+        let _trace = trace!(format!("Dropping object with id: {}", id));
         let mut heap = self.heap.lock().unwrap();
-        if let Some(HeapObject { ref_count, obj }) = heap.get_mut(&id) {
-            *ref_count -= 1;
-            self.handle_drop_for_object(obj);
+         if let Some(HeapObject { ref_count, obj }) = heap.get_mut(&id) {
+             let _ref_count_trace = trace!(format!("Decreasing ref count ({}) for object with id: {}", ref_count, id));
+             *ref_count -= 1;
 
-            if *ref_count == 0 {
-                heap.remove(&id);
-            }
-        }
+             if *ref_count == 0 {
+                 let _obj_trace = trace!(format!("Dropping object with id: {}", id));
+                 let obj = obj.clone();
+                 heap.remove(&id);
+                 
+                 // Drop the heap lock before calling handle_drop_for_object 
+                 // as it may recursively call handle_drop_for_id
+                 drop(heap);
+
+                 self.handle_drop_for_object(&obj);
+             }
+         }
+        
     }
 
     fn handle_drop_for_object(&self, object: &Object) {
+        let _trace = trace!(format!("Dropping object: {:?}", object));
         match object {
             Object::Array(arr) => {
                 for id in arr {
@@ -106,7 +127,7 @@ impl InnerEnvironment {
             }
             Object::Reference(id) => {
                 self.handle_drop_for_id(*id);
-            },
+            }
             _ => {}
         }
     }
@@ -154,7 +175,7 @@ impl InnerEnvironment {
 
         self.set_object(name, val);
     }
-    
+
     pub fn set_by_id(&mut self, id: ObjectId, val: Object) {
         let mut heap = self.heap.lock().unwrap();
         let heap_obj = heap.get_mut(&id).unwrap();
@@ -229,7 +250,8 @@ impl InnerEnvironment {
 
 impl Drop for InnerEnvironment {
     fn drop(&mut self) {
-        for uuid in self.variables.clone().values() {
+        let _trace = trace!("Dropping inner environment");
+        for uuid in self.variables.values() {
             self.handle_drop_for_id(*uuid);
         }
     }

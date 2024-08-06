@@ -7,7 +7,33 @@ impl<F: FnOnce()> Drop for Defer<F> {
     }
 }
 
-pub fn defer<F: FnOnce()>(f: F) -> impl Drop {
+/// Defers the execution of a function until the end of the current scope
+/// 
+/// This function takes a function to be executed and returns a `Drop` trait object
+/// that will call the function when it is dropped. This is useful for deferring the execution
+/// of a function until the end of the current scope, preventing it from being executed
+/// immediately.
+/// 
+/// # Arguments
+/// 
+/// * `f` - The function to be executed when the `Defer` object is dropped.
+/// 
+/// # Example
+/// 
+/// ```compile_fail - compile fails because trace is not public
+/// use mechylang::trace;
+/// 
+/// fn main() {
+///     let _defer = trace::defer(|| {
+///         println!("Hello from the defer function!");
+///     });
+/// 
+///     println!("Hello from main!");
+/// } 
+/// // Stdout: Hello from main!
+/// // Stdout: Hello from the defer function!
+/// ```
+pub(crate) fn defer<F: FnOnce()>(f: F) -> impl Drop {
     Defer(Some(f))
 }
 
