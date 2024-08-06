@@ -4,19 +4,33 @@ use mechylang::{Environment, EvalConfig, Evaluator, Object};
 use rustyline::{error::ReadlineError, DefaultEditor};
 
 pub struct Repl {
-    exit_pressed: bool,
+    pub print_ast: bool,
+    pub print_tokens: bool,
 }
 
 impl Repl {
     pub fn new() -> Self {
         Self {
-            exit_pressed: false,
+            print_ast: false,
+            print_tokens: false,
         }
     }
 
-    pub fn run(&mut self) -> rustyline::Result<()> {
+    pub fn with_print_ast(mut self, print_ast: bool) -> Self {
+        self.print_ast = print_ast;
+        self
+    }
+
+    pub fn with_print_tokens(mut self, print_tokens: bool) -> Self {
+        self.print_tokens = print_tokens;
+        self
+    }
+
+    pub fn run(&self) -> rustyline::Result<()> {
         let mut env = Environment::new();
         let mut rl = DefaultEditor::new()?;
+
+        let mut exit_pressed = false;
 
         cprintln!("Welcome to mechylang!");
 
@@ -30,7 +44,7 @@ impl Repl {
                 readline,
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof)
             ) {
-                self.exit_pressed = false;
+                exit_pressed = false;
             }
 
             match readline {
@@ -40,7 +54,12 @@ impl Repl {
                     }
 
                     rl.add_history_entry(line.as_str())?;
-                    let evaluated = Evaluator::eval(line, &mut env, EvalConfig::default());
+                    let evaluated = Evaluator::eval(
+                        line, &mut env,
+                        EvalConfig::default()
+                            .with_print_ast(self.print_ast)
+                            .with_print_tokens(self.print_tokens),
+                    );
                     match evaluated {
                         Ok(Object::Unit) => {} // Don't print unit
                         Ok(evaluated) => {
@@ -52,11 +71,11 @@ impl Repl {
                     }
                 }
                 Err(ReadlineError::Interrupted) => {
-                    if self.exit_pressed {
+                    if exit_pressed {
                         break;
                     }
                     cprintln!("Press Ctrl-C again to quit");
-                    self.exit_pressed = true;
+                    exit_pressed = true;
                     continue;
                 }
                 Err(ReadlineError::Eof) => {
