@@ -1,0 +1,1 @@
+searchState.loadedDescShard("mechylang_cli", 0, "Run a file\nRun the REPL\nThe command to run (will default to REPL)\nReturns the argument unchanged.\nReturns the argument unchanged.\nCalls <code>U::from(self)</code>.\nCalls <code>U::from(self)</code>.\nThe file to run\nReturns the argument unchanged.\nCalls <code>U::from(self)</code>.")

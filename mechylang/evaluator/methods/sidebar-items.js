@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["INTEGER_METHODS","ITERATOR_METHODS"],"enum":["MethodError"],"fn":["get_mutable_ident"],"mod":["array_methods","boolean_methods","numeric_methods","range_methods","string_methods","struct_methods"],"struct":["Method","MethodInner"],"trait":["ObjectMethods"]};
