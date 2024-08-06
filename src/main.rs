@@ -22,7 +22,13 @@ enum Command {
         file: PathBuf,
     },
     /// Run the REPL
-    Repl,
+    Repl {
+        #[arg(long)]
+        print_tokens: bool,
+        
+        #[arg(long)]
+        print_ast: bool,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -41,19 +47,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
-            Command::Repl => repl()?,
+            Command::Repl { print_tokens, print_ast } => {
+                Repl::new().with_print_ast(print_ast)
+                    .with_print_tokens(print_tokens)
+                    .run()?;
+            }
         }
     } else {
-        let mut repl = Repl::new();
-        repl.run()?;
+        Repl::new().run()?;
     };
-
-    Ok(())
-}
-
-fn repl() -> Result<(), Box<dyn std::error::Error>> {
-    let mut repl = Repl::new();
-    repl.run()?;
 
     Ok(())
 }

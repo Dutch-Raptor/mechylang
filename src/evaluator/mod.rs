@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::rc::Rc;
+use itertools::Itertools;
 use crate::{Error, Lexer, Object, Parser, Token, trace};
 use crate::errors::InterpreterErrors;
 use crate::evaluator::objects::function::Function;
@@ -45,9 +46,21 @@ impl Evaluator {
         config: EvalConfig,
     ) -> EvalResult {
         let input: Rc<str> = input.into();
+
+        if config.print_tokens {
+            println!("Tokens: {:?}\n", Lexer::new(input.clone()).map(|token| token.kind).collect_vec());
+        }
+
+        if config.print_ast {
+            let parsed = Parser::from_source(input.clone()).parse()?;
+            println!("Parsed: {}\n", parsed.statements.iter().join("\n"));
+            println!("AST: {:#?}\n", parsed.statements);
+        }
+        
         let lexer = Lexer::new(input);
         let lines = lexer.lines();
         let mut parser = Parser::new(lexer);
+        
 
         let Program { statements } = parser.parse()?;
 
