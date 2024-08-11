@@ -593,6 +593,7 @@
 //!
 //! [examples]: crate::docs::examples
 
+#[cfg(doc)]
 pub mod docs;
 mod errors;
 pub mod evaluator;
