@@ -2,9 +2,8 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
-use crate::lexer::tokens::TokenKind;
+use crate::{Error, Token, trace, TokenKind};
+use crate::error::ErrorKind;
 use crate::parser::Parser;
 use crate::parser::statements::Statement;
 
@@ -132,7 +131,7 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::ErrorKind;
+    use crate::error::ErrorKind;
     use crate::Parser;
     use crate::parser::expressions::block_expression::BlockExpression;
     use crate::parser::statements::expression_statement::ExpressionStatement;

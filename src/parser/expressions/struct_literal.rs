@@ -2,12 +2,9 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
-use crate::parser::expressions::precedence::Precedence;
-use crate::parser::Parser;
-use crate::{Error, Token};
-use crate::errors::ErrorKind;
+use crate::{Error, Expression, Parser, Token, TokenKind};
+use crate::error::ErrorKind;
+use crate::parser::expressions::Precedence;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StructLiteral {

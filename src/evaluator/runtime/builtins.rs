@@ -115,7 +115,6 @@ use std::{
     ops::RangeInclusive,
 };
 use std::rc::Rc;
-use itertools::Itertools;
 use crate::evaluator::objects::function::Callable;
 use crate::parser::expressions::Identifier;
 
@@ -245,7 +244,7 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
                 .lock()
                 .lines()
                 .collect::<Result<Vec<String>, Error>>()
-                .map(|val| Object::String(val.iter().join("\n").into()))
+                .map(|val| Object::String(val.join("\n").into()))
                 .map_err(|_| ("Failed to get input".to_string(), BuiltinError::IOError))
         },
     },

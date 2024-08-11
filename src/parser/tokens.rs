@@ -1,8 +1,8 @@
 use color_print::cformat;
-use crate::errors::ErrorKind;
-use crate::lexer::tokens::{Position, TokenKind};
+use crate::error::ErrorKind;
 use crate::parser::Parser;
-use crate::{Error, Token};
+use crate::{Error, Token, TokenKind};
+use crate::lexer::{Position, Span};
 
 impl Parser {
     /// Advances the parser to the next token in the input stream.
@@ -18,12 +18,18 @@ impl Parser {
             Some(token) => token,
             None => Token {
                 kind: TokenKind::EOF,
-                position: Position {
-                    line: self.peek_token.position.line,
-                    column: self.peek_token.position.column + self.peek_token.position.length + 1,
-                    length: 1,
-                    file: self.peek_token.position.file.clone(),
-                },
+                span: Span {
+                    start: Position {
+                        line: self.peek_token.span.start.line,
+                        column: self.peek_token.span.end.column + 1,
+                        file: self.peek_token.span.start.file.clone(),
+                    },
+                    end: Position {
+                        line: self.peek_token.span.start.line,
+                        column: self.peek_token.span.end.column + 1,
+                        file: self.peek_token.span.start.file.clone(),
+                    },
+                }
             },
         };
 

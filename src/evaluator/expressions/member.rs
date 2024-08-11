@@ -1,5 +1,5 @@
 use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::evaluator::methods::{MethodError, ObjectMethods};
 use crate::parser::expressions::{Expression, MemberExpression};
 

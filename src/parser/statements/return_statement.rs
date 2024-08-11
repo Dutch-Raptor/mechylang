@@ -3,9 +3,8 @@ use std::fmt::{Display, Formatter};
 use color_print::cformat;
 use serde::Serialize;
 use crate::parser::Parser;
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
-use crate::lexer::tokens::TokenKind;
+use crate::{Error, Token, trace, TokenKind};
+use crate::error::ErrorKind;
 use crate::parser::expressions::{Expression, Precedence};
 
 #[derive(Debug, PartialEq, Serialize)]

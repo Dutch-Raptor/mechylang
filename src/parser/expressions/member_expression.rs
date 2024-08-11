@@ -2,10 +2,8 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::parser::expressions::Expression;
-use crate::parser::expressions::identifier::Identifier;
-use crate::parser::Parser;
-use crate::{Error, Token, TokenKind};
+use crate::{Error, Expression, Parser, Token, TokenKind};
+use crate::parser::expressions::Identifier;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct MemberExpression {

@@ -1,15 +1,17 @@
 use std::rc::Rc;
-use crate::{Error, Lexer, Token};
-use crate::errors::InterpreterErrors;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::program::Program;
+use crate::{Error, Lexer, Token, TokenKind};
+use crate::error::InterpreterErrors;
 use crate::tracer::reset_trace;
 
 pub mod expressions;
 pub mod statements;
-pub mod program;
-pub mod errors;
-pub mod tokens;
+mod program;
+mod errors;
+mod tokens;
+
+pub use expressions::Expression;
+pub use statements::Statement;
+pub use program::Program;
 
 /// The `Parser` struct is responsible for parsing the source code into an abstract syntax tree (AST).
 /// It uses a lexer to tokenize the input and processes these tokens to produce the AST.
@@ -144,7 +146,7 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use color_print::cprintln;
-    use crate::errors::InterpreterErrors;
+    use crate::error::InterpreterErrors;
     use crate::parser::Parser;
     use crate::parser::statements::Statement;
 

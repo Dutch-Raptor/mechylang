@@ -1,5 +1,5 @@
 use crate::{Environment, Error, Evaluator, Object};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::parser::expressions::{ArrayLiteral, ExpressionToken, IndexExpression};
 
 impl Evaluator {

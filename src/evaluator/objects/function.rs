@@ -4,10 +4,9 @@ use std::{
 };
 use std::ops::RangeInclusive;
 use crate::{
-    parser::{expressions::Identifier},
+    parser::{expressions::{BlockExpression, Identifier}},
     Environment, EvalConfig, Evaluator, Object,
 };
-use crate::parser::expressions::block_expression::BlockExpression;
 
 #[derive(Clone)]
 pub struct Function {
@@ -33,7 +32,7 @@ impl Callable for Function {
 
 pub trait Callable {
     fn call(&self, args: Vec<Object>, env: Option<Environment>, config: Rc<EvalConfig>) -> Result<Object, String>;
-    
+
     fn args_len(&self) -> RangeInclusive<usize>;
 }
 

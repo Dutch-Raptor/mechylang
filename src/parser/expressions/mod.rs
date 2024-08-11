@@ -14,51 +14,51 @@
 //! - All expression variants
 //! - implementations for `Display` for all expression variants
 //! - implementations for the parse functions for all expression variants for the parser
-pub mod precedence;
-pub mod identifier;
-pub mod number_expressions;
-pub mod boolean_literal;
-pub mod string_literal;
-pub mod prefix_expression;
-pub mod infix_expression;
-pub mod if_expression;
-pub mod function_literal;
-pub mod call_expression;
-pub mod array_literal;
-pub mod index_expression;
-pub mod range_expressions;
-pub mod for_expression;
-pub mod while_expression;
-pub mod member_expression;
-pub mod struct_literal;
-pub mod block_expression;
+mod precedence;
+mod identifier;
+mod number_expressions;
+mod boolean_literal;
+mod string_literal;
+mod prefix_expression;
+mod infix_expression;
+mod if_expression;
+mod function_literal;
+mod call_expression;
+mod array_literal;
+mod index_expression;
+mod range_expressions;
+mod for_expression;
+mod while_expression;
+mod member_expression;
+mod struct_literal;
+mod block_expression;
 
 use std::fmt::{self, Display, Formatter};
 
 use serde::Serialize;
 
-use crate::lexer::tokens::{Token, TokenKind};
-pub use crate::parser::expressions::array_literal::ArrayLiteral;
-pub use crate::parser::expressions::boolean_literal::BooleanLiteral;
-pub use crate::parser::expressions::call_expression::CallExpression;
-pub use crate::parser::expressions::number_expressions::{FloatLiteral, IntegerLiteral};
-pub use crate::parser::expressions::for_expression::ForExpression;
-pub use crate::parser::expressions::function_literal::FunctionLiteral;
-pub use crate::parser::expressions::identifier::Identifier;
-pub use crate::parser::expressions::if_expression::IfExpression;
-pub use crate::parser::expressions::index_expression::IndexExpression;
-pub use crate::parser::expressions::infix_expression::{InfixExpression, InfixOperator};
-pub use crate::parser::expressions::member_expression::MemberExpression;
-pub use crate::parser::expressions::precedence::Precedence;
-pub use crate::parser::expressions::prefix_expression::{PrefixExpression, PrefixOperator};
-pub use crate::parser::expressions::range_expressions::{RangeExpression, RangeFromExpression, RangeFullExpression, RangeToExpression};
-pub use crate::parser::expressions::string_literal::StringLiteral;
-pub use crate::parser::expressions::struct_literal::StructLiteral;
-pub use crate::parser::expressions::while_expression::WhileExpression;
+pub use precedence::Precedence;
+pub use array_literal::ArrayLiteral;
+pub use boolean_literal::BooleanLiteral;
+pub use call_expression::CallExpression;
+pub use number_expressions::{FloatLiteral, IntegerLiteral};
+pub use for_expression::ForExpression;
+pub use function_literal::FunctionLiteral;
+pub use identifier::Identifier;
+pub use if_expression::IfExpression;
+pub use index_expression::IndexExpression;
+pub use infix_expression::{InfixExpression, InfixOperator};
+pub use member_expression::MemberExpression;
+pub use prefix_expression::{PrefixExpression, PrefixOperator};
+pub use range_expressions::{RangeExpression, RangeFromExpression, RangeFullExpression, RangeToExpression};
+pub use string_literal::StringLiteral;
+pub use struct_literal::StructLiteral;
+pub use while_expression::WhileExpression;
+pub use block_expression::BlockExpression;
 use crate::parser::Parser;
-use crate::{Error, trace};
-use crate::errors::ErrorKind;
-use crate::parser::expressions::block_expression::BlockExpression;
+use crate::error::ErrorKind;
+use crate::{Error, Token, TokenKind, trace};
+
 
 /// Represents an expression in Mechylang.
 ///

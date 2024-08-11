@@ -2,11 +2,9 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
-use crate::parser::expressions::precedence::Precedence;
 use crate::parser::Parser;
-use crate::{Error, Token};
+use crate::{Error, Expression, Token, TokenKind};
+use crate::parser::expressions::Precedence;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct IndexExpression {

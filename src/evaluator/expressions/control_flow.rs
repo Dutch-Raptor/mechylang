@@ -1,5 +1,5 @@
 use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::evaluator::objects::iterators::IteratorObject;
 use crate::parser::expressions::{ExpressionToken, ForExpression, IfExpression, WhileExpression};
 

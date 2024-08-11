@@ -1,5 +1,5 @@
 use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::evaluator::objects::traits::UnwrapReturnValue;
 use crate::evaluator::runtime::builtins::BuiltinFunction;
 use crate::parser::expressions::Identifier;

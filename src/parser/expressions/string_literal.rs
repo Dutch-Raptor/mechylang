@@ -2,10 +2,8 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::Parser;
-use crate::{Error, Token};
-use crate::errors::ErrorKind;
+use crate::{Error, Token, TokenKind, Parser};
+use crate::error::ErrorKind;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StringLiteral {
@@ -37,7 +35,7 @@ impl Parser {
 }
 #[cfg(test)]
 mod tests {
-    use crate::lexer::tokens::TokenKind;
+    use crate::TokenKind;
     use crate::parser::expressions::Expression;
     use crate::parser::tests::parse;
     use crate::parser::statements::Statement;

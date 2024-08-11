@@ -2,11 +2,8 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
-use crate::parser::Parser;
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
+use crate::{Error, Expression, Parser, Token, TokenKind, trace};
+use crate::error::ErrorKind;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct InfixExpression {

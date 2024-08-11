@@ -1,5 +1,5 @@
 use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::parser::Parser;
 
 impl Parser {

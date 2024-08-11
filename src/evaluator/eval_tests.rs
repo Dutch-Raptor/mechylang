@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::{Object};
-    use crate::{errors::ErrorKind, test_utils::test_eval_ok};
+    use crate::{error::ErrorKind, test_utils::test_eval_ok};
     use crate::evaluator::runtime::builtins::BuiltinError;
     use crate::evaluator::tests::test_eval;
     use crate::test_utils::test_eval_err;

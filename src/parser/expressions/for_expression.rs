@@ -2,12 +2,11 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
 use crate::parser::expressions::Expression;
 use crate::parser::expressions::identifier::Identifier;
 use crate::parser::expressions::precedence::Precedence;
 use crate::parser::Parser;
-use crate::{Error, Token, trace};
+use crate::{Error, Token, TokenKind, trace};
 use crate::parser::expressions::block_expression::BlockExpression;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]

@@ -1,17 +1,11 @@
 use std::collections::HashMap;
 use std::rc::Rc;
-use itertools::Itertools;
-use crate::{Error, Lexer, Object, Parser, Token, trace};
-use crate::errors::InterpreterErrors;
+use crate::error::InterpreterErrors;
 use crate::evaluator::objects::function::Function;
-use crate::parser::program::Program;
-use crate::parser::statements::Statement;
-use self::runtime::environment::Environment;
 
-pub mod eval_tests;
-pub mod methods;
-pub mod objects;
-pub mod properties;
+mod eval_tests;
+mod methods;
+mod objects;
 pub mod runtime;
 mod config;
 mod statements;
@@ -20,7 +14,10 @@ mod errors;
 #[cfg(test)]
 mod tests;
 
-pub use self::config::EvalConfig;
+pub use config::EvalConfig;
+pub use objects::Object;
+pub use runtime::{Environment};
+use crate::{Error, Lexer, Parser, Program, Statement, Token, TokenKind, trace};
 
 pub fn eval_file(file: &str) -> Result<(), Vec<String>> {
     let input = std::fs::read_to_string(file).unwrap();
@@ -48,12 +45,12 @@ impl Evaluator {
         let input: Rc<str> = input.into();
 
         if config.print_tokens {
-            println!("Tokens: {:?}\n", Lexer::new(input.clone()).map(|token| token.kind).collect_vec());
+            println!("Tokens: {:?}\n", Lexer::new(input.clone()).map(|token| token.kind).collect::<Vec<TokenKind>>());
         }
 
         if config.print_ast {
             let parsed = Parser::from_source(input.clone()).parse()?;
-            println!("Parsed: {}\n", parsed.statements.iter().join("\n"));
+            println!("Parsed: {}\n", parsed.statements.iter().map(|s| s.to_string()).collect::<Vec<String>>().join("\n"));
             println!("AST: {:#?}\n", parsed.statements);
         }
         

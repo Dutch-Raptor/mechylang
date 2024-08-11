@@ -1,13 +1,10 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
-use crate::parser::expressions::identifier::Identifier;
-use crate::parser::expressions::precedence::Precedence;
+use crate::parser::expressions::{Expression, Identifier, Precedence};
 use crate::parser::Parser;
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
+use crate::{Error, Token, trace, TokenKind};
+use crate::error::ErrorKind;
 
 /// Represents a `let` statement in Mechylang.
 ///
@@ -112,7 +109,7 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::ErrorKind;
+    use crate::error::ErrorKind;
     use crate::Parser;
     use crate::parser::expressions::Expression;
 

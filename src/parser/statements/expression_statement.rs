@@ -1,9 +1,8 @@
 use std::fmt::{Display, Formatter, self};
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
 use crate::parser::expressions::{Expression, Precedence};
 use crate::parser::Parser;
-use crate::{Error, Token, trace};
+use crate::{Error, Token, trace, TokenKind};
 
 /// Represents an expression statement in Mechylang.
 ///

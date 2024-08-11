@@ -2,12 +2,8 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
-use crate::parser::expressions::precedence::Precedence;
-use crate::parser::Parser;
-use crate::{Error, Token};
-use crate::parser::expressions::block_expression::BlockExpression;
+use crate::{Error, Expression, Parser, Token, TokenKind};
+use crate::parser::expressions::{BlockExpression, Precedence};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct WhileExpression {

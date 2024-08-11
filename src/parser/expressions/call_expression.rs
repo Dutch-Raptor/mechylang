@@ -2,10 +2,9 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
 use crate::parser::expressions::Expression;
 use crate::parser::Parser;
-use crate::{Error, Token};
+use crate::{Error, Token, TokenKind};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct CallExpression {
@@ -41,7 +40,7 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::Lexer;
-    use crate::lexer::tokens::TokenKind;
+    use crate::TokenKind;
     use crate::parser::expressions::Expression;
     use crate::parser::Parser;
     use crate::parser::statements::Statement;

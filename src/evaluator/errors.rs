@@ -1,5 +1,5 @@
 use crate::{Error, Evaluator, Token, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 
 impl Evaluator {
     pub(super) fn error(&self, token: Option<&Token>, message: &str, error_kind: ErrorKind) -> Error {

@@ -9,7 +9,6 @@ use std::{
     rc::Rc,
 };
 
-use itertools::Itertools;
 use crate::evaluator::objects::function::Callable;
 use self::{function::Function, iterators::IteratorObject, reference::Reference};
 
@@ -296,6 +295,7 @@ impl Display for Object {
                 let items = map
                     .iter()
                     .map(|(key, value)| format!("{}: {}", key, value))
+                    .collect::<Vec<String>>()
                     .join(", ");
                 write!(f, "{{{}}}", items)
             }

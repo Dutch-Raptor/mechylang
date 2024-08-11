@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::parser::expressions::{Expression, PrefixExpression, PrefixOperator};
 
 impl Evaluator {

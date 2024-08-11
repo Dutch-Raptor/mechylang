@@ -1,10 +1,9 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
-use crate::parser::expressions::Expression;
-use crate::parser::expressions::precedence::Precedence;
 use crate::parser::Parser;
-use crate::{Error, Token, TokenKind, trace};
+use crate::{Error, Expression, Token, TokenKind, trace};
+use crate::parser::expressions::Precedence;
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct BreakStatement {

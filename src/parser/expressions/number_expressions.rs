@@ -1,12 +1,8 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
-use crate::parser::Parser;
-
+use crate::error::ErrorKind;
+use crate::{Error, Expression, Parser, Token, TokenKind, trace};
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FloatLiteral {
     pub token: Token,

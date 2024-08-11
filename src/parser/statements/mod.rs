@@ -1,24 +1,23 @@
-pub mod function_statement;
-pub mod let_statement;
-pub mod return_statement;
-pub mod expression_statement;
-pub mod break_statement;
-pub mod continue_statement;
+mod function_statement;
+mod let_statement;
+mod return_statement;
+mod expression_statement;
+mod break_statement;
+mod continue_statement;
 
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use color_print::cformat;
 use serde::Serialize;
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::Parser;
-use crate::parser::statements::break_statement::BreakStatement;
-use crate::parser::statements::continue_statement::ContinueStatement;
-use crate::parser::statements::expression_statement::ExpressionStatement;
-use crate::parser::statements::function_statement::FunctionStatement;
-use crate::parser::statements::let_statement::LetStatement;
-use crate::parser::statements::return_statement::ReturnStatement;
+use crate::{Error, Token, trace, TokenKind, Parser};
+
+pub use function_statement::FunctionStatement;
+pub use let_statement::LetStatement;
+pub use return_statement::ReturnStatement;
+pub use expression_statement::ExpressionStatement;
+pub use break_statement::BreakStatement;
+pub use continue_statement::ContinueStatement;
+use crate::error::ErrorKind;
 
 /// Represents the various types of statements in Mechylang.
 ///
@@ -198,7 +197,7 @@ impl Parser {
         }
        
         // if previous token was on a different line
-        if current_token.position.line != previous_token.position.line {
+        if current_token.span.start.line != previous_token.span.start.line {
             return true;
         }
 

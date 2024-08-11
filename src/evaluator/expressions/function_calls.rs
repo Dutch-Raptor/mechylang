@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use crate::{Environment, Error, EvalConfig, Evaluator, Object, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::evaluator::methods::Method;
 use crate::evaluator::objects::function::Function;
 use crate::evaluator::objects::traits::UnwrapReturnValue;

@@ -1,2 +1,4 @@
 pub mod builtins;
-pub mod environment;
+mod environment;
+
+pub use environment::Environment;

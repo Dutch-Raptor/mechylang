@@ -1,10 +1,9 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
 use crate::parser::Parser;
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
+use crate::{Error, Token, TokenKind, trace};
+use crate::error::ErrorKind;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct BooleanLiteral {

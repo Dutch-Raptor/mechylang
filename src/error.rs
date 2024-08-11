@@ -6,16 +6,15 @@ use std::{
 };
 use std::vec::IntoIter;
 use color_print::cformat;
-use itertools::Itertools;
-
-use crate::{evaluator::runtime::builtins::BuiltinError, Token};
+use crate::evaluator::runtime::builtins::BuiltinError;
+use crate::Token;
 
 #[derive(Debug, PartialEq)]
 pub struct InterpreterErrors(pub Vec<Error>);
 
 impl Display for InterpreterErrors {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.iter().map(|err| err.to_string()).join("\n"))
+        write!(f, "{}", self.0.iter().map(|err| err.to_string()).collect::<Vec<String>>().join("\n"))
     }
 }
 
@@ -57,7 +56,7 @@ impl Error {
         let message = message.to_string();
 
         let line = token
-            .and_then(|token| lines.get(token.position.line - 1))
+            .and_then(|token| lines.get(token.span.start.line - 1))
             .map(|line| line.to_string());
 
         Self {
@@ -136,14 +135,11 @@ impl Error {
     }
 
     fn fmt_with_token(&self, f: &mut Formatter<'_>, token: &Token) -> fmt::Result {
-        let caret_offset = match token.position.column {
-            c if c < 1 => 0,
-            _ => token.position.column - 1,
-        };
+        let caret_offset = token.span.start.column;
 
-        let caret_len = token.position.length;
+        let caret_len = token.span.length();
 
-        let pos = format!("{}:{}", token.position.line, token.position.column);
+        let pos = format!("{}:{}", token.span.start.line, token.span.start.column);
         let pos_len = pos.len();
 
         let context = match &self.context {
@@ -159,15 +155,15 @@ impl Error {
         };
 
         // Print context before line with error
-        if token.position.line > 1 {
+        if token.span.start.line > 1 {
             let lines_before = 2;
-            let start_idx = if token.position.line - 1 < lines_before {
+            let start_idx = if token.span.start.line - 1 < lines_before {
                 0
             } else {
-                token.position.line - lines_before - 1
+                token.span.start.line - lines_before - 1
             };
 
-            for i in start_idx..token.position.line - 1 {
+            for i in start_idx..token.span.start.line - 1 {
                 let line = match self.lines.get(i) {
                     Some(line) => line,
                     None => continue,
@@ -210,15 +206,15 @@ impl Error {
         }
 
         // Print context after line with error
-        if self.lines.len() >= token.position.line - 1 {
+        if self.lines.len() >= token.span.start.line - 1 {
             let lines_after = 2;
-            let end_idx = if token.position.line + lines_after - 1 > self.lines.len() {
+            let end_idx = if token.span.start.line + lines_after - 1 > self.lines.len() {
                 self.lines.len()
             } else {
-                token.position.line + lines_after
+                token.span.start.line + lines_after
             };
 
-            for i in token.position.line..end_idx {
+            for i in token.span.start.line..end_idx {
                 let line = match self.lines.get(i) {
                     Some(line) => line,
                     None => continue,

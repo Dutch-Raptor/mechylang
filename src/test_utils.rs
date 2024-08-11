@@ -1,4 +1,4 @@
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::Lexer;
 
 /// Runs the passed in `Mechylang` code and panics if it fails.
