@@ -15,8 +15,10 @@ pub struct Position {
 
 #[derive(Debug, PartialEq, Clone, Default, Serialize)]
 pub struct Span {
+    /// The start position of the span (inclusive)
     pub start: Position,
-    pub end: Position,
+    /// The end position of the span (exclusive)
+    pub end: Position, 
 }
 
 impl Span {
@@ -156,6 +158,34 @@ impl TokenKind {
             "as" => Some(TokenKind::As),
             "true" => Some(TokenKind::True),
             "false" => Some(TokenKind::False),
+            _ => None,
+        }
+    }
+    
+    pub fn as_number(&self) -> Option<&str> {
+        match self {
+            TokenKind::Number(value) => Some(value),
+            _ => None,
+        }
+    }
+    
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            TokenKind::String(value) => Some(value),
+            _ => None,
+        }
+    }
+    
+    pub fn as_identifier(&self) -> Option<&str> {
+        match self {
+            TokenKind::Identifier(value) => Some(value),
+            _ => None,
+        }
+    }
+    
+    pub fn as_char(&self) -> Option<char> {
+        match self {
+            TokenKind::Char(value) => Some(*value),
             _ => None,
         }
     }

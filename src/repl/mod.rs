@@ -1,11 +1,12 @@
 use color_print::cprintln;
 
-use mechylang::{Environment, EvalConfig, Evaluator, Object};
+use mechylang::{Environment, EvalConfig, Evaluator, Lexer, Object, Parser, TokenKind};
 use rustyline::{error::ReadlineError, DefaultEditor};
 
 pub struct Repl {
     pub print_ast: bool,
     pub print_tokens: bool,
+    pub print_tokens_with_span: bool,
 }
 
 impl Repl {
@@ -13,6 +14,7 @@ impl Repl {
         Self {
             print_ast: false,
             print_tokens: false,
+            print_tokens_with_span: false,
         }
     }
 
@@ -25,8 +27,13 @@ impl Repl {
         self.print_tokens = print_tokens;
         self
     }
+    
+    pub fn with_print_tokens_with_span(mut self, print_tokens_with_span: bool) -> Self {
+        self.print_tokens_with_span = print_tokens_with_span;
+        self
+    }
 
-    pub fn run(&self) -> rustyline::Result<()> {
+    pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let mut env = Environment::new();
         let mut rl = DefaultEditor::new()?;
 
@@ -54,11 +61,27 @@ impl Repl {
                     }
 
                     rl.add_history_entry(line.as_str())?;
+
+
+                    if self.print_tokens {
+                        println!("Tokens: {:?}\n", Lexer::new(line.clone()).map(|token| token.kind).collect::<Vec<TokenKind>>());
+                    }
+                    
+                    if self.print_tokens_with_span {
+                        println!("Tokens: {:#?}\n", Lexer::new(line.clone()).map(|token| format!("{:>24?} {:?}", token.kind, token.span)).collect::<Vec<String>>());
+                    }
+
+                    if self.print_ast {
+                        if let Ok(parsed) = Parser::from_source(line.clone()).parse() {
+                            println!("Parsed: {}\n", parsed.statements.iter().map(|s| s.to_string()).collect::<Vec<String>>().join("\n"));
+                            println!("AST: {:#?}\n", parsed.statements);
+                        }
+                    }
+                    
+                    
                     let evaluated = Evaluator::eval(
                         line, &mut env,
                         EvalConfig::default()
-                            .with_print_ast(self.print_ast)
-                            .with_print_tokens(self.print_tokens),
                     );
                     match evaluated {
                         Ok(Object::Unit) => {} // Don't print unit

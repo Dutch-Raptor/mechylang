@@ -17,7 +17,7 @@ mod tests;
 pub use config::EvalConfig;
 pub use objects::Object;
 pub use runtime::{Environment};
-use crate::{Error, Lexer, Parser, Program, Statement, Token, TokenKind, trace};
+use crate::{Error, Lexer, Parser, Program, Span, Statement, TokenKind, trace};
 
 pub fn eval_file(file: &str) -> Result<(), Vec<String>> {
     let input = std::fs::read_to_string(file).unwrap();
@@ -29,7 +29,7 @@ pub fn eval_file(file: &str) -> Result<(), Vec<String>> {
 
 pub struct Evaluator {
     lines: Rc<[String]>,
-    current_token: Option<Token>,
+    current_span: Span,
     globals: HashMap<Rc<str>, Object>,
     eval_config: Rc<EvalConfig>,
 }
@@ -44,15 +44,6 @@ impl Evaluator {
     ) -> EvalResult {
         let input: Rc<str> = input.into();
 
-        if config.print_tokens {
-            println!("Tokens: {:?}\n", Lexer::new(input.clone()).map(|token| token.kind).collect::<Vec<TokenKind>>());
-        }
-
-        if config.print_ast {
-            let parsed = Parser::from_source(input.clone()).parse()?;
-            println!("Parsed: {}\n", parsed.statements.iter().map(|s| s.to_string()).collect::<Vec<String>>().join("\n"));
-            println!("AST: {:#?}\n", parsed.statements);
-        }
         
         let lexer = Lexer::new(input);
         let lines = lexer.lines();
@@ -63,7 +54,7 @@ impl Evaluator {
 
         let evaluator = Evaluator {
             lines,
-            current_token: None,
+            current_span: Span::default(),
             globals: HashMap::new(),
             eval_config: config.into(),
         };

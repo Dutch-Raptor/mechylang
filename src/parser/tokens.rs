@@ -60,7 +60,7 @@ impl Parser {
                     token,
                     self.cur_token.kind
                 ),
-                Some(&self.cur_token),
+                self.cur_token.span.clone(),
                 None,
             ))
         }
@@ -120,5 +120,19 @@ impl Parser {
     /// - `bool`: `true` if the `peek_token`'s kind matches the provided `token`; otherwise, `false`.
     pub(crate) fn is_peek_token(&self, token: TokenKind) -> bool {
         self.peek_token.kind == token
+    }
+    
+    /// Creates a new `Span` with the given start position. And the end position is the current token's end position.
+    ///
+    /// # Arguments
+    /// * `start` - The start position of the new `Span`.
+    ///
+    /// # Returns
+    /// A new `Span` with the given start position and the end position set to the current token's end position.
+    pub(super) fn span_with_start(&self, start: Position) -> Span {
+        Span {
+            start,
+            end: self.cur_token.span.end.clone(),
+        }
     }
 }

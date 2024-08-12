@@ -145,7 +145,7 @@ impl Parser {
                 self.parse_statement()?
             }
             TokenKind::Break => Statement::Break(self.parse_break_statement()?),
-            TokenKind::Continue => Statement::Continue(ContinueStatement { token: self.cur_token.clone() }),
+            TokenKind::Continue => Statement::Continue(ContinueStatement { span: self.cur_token.span.clone() }),
             TokenKind::Fn => self.parse_function_statement()?,
             _ => Statement::Expression(self.parse_expression_statement()?),
         };

@@ -342,7 +342,7 @@ impl Lexer {
                         return None;
                     }
                 };
-                token_length = literal.len();
+                token_length = literal.len() + 2; // + 2 for the quotes
                 Some(TokenKind::String(literal))
             }
             _ => {

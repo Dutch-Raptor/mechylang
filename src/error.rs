@@ -7,7 +7,7 @@ use std::{
 use std::vec::IntoIter;
 use color_print::cformat;
 use crate::evaluator::runtime::builtins::BuiltinError;
-use crate::Token;
+use crate::{Span};
 
 #[derive(Debug, PartialEq)]
 pub struct InterpreterErrors(pub Vec<Error>);
@@ -17,6 +17,8 @@ impl Display for InterpreterErrors {
         write!(f, "{}", self.0.iter().map(|err| err.to_string()).collect::<Vec<String>>().join("\n"))
     }
 }
+
+impl std::error::Error for InterpreterErrors {}
 
 impl Deref for InterpreterErrors {
     type Target = Vec<Error>;
@@ -38,7 +40,7 @@ impl IntoIterator for InterpreterErrors {
 #[derive(Debug, PartialEq)]
 pub struct Error {
     pub kind: ErrorKind,
-    pub token: Option<Box<Token>>,
+    pub span: Box<Span>,
     pub message: String,
     pub line: Option<String>,
     pub context: Option<String>,
@@ -49,19 +51,20 @@ impl Error {
     pub fn new(
         kind: ErrorKind,
         message: impl ToString,
-        token: Option<&Token>,
+        span: Span,
         lines: &[impl ToString],
         context: Option<String>,
     ) -> Self {
         let message = message.to_string();
 
-        let line = token
-            .and_then(|token| lines.get(token.span.start.line - 1))
+        let line = span.start.line
+            .checked_sub(1)
+            .and_then(|line| lines.get(line))
             .map(|line| line.to_string());
 
         Self {
             kind,
-            token: token.map(|token| Box::new(token.clone())),
+            span: Box::new(span),
             message,
             line,
             context,
@@ -102,44 +105,11 @@ pub enum ErrorKind {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match &self.token {
-            Some(ref token) => self.fmt_with_token(f, token),
-            None => self.fmt_without_token(f),
-        }
-    }
-}
+        let caret_offset = self.span.start.column.saturating_sub(1);
 
-impl Error {
-    fn fmt_without_token(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let message = self.message.split('\n').collect::<Vec<&str>>();
-        let first_line = message[0];
-        let rest = match message.len() {
-            1 => &[],
-            _ => &message[1..],
-        };
+        let caret_len = self.span.length();
 
-        writeln!(f, "{}", cformat!("{:?}", self.kind))?;
-
-        self.line
-            .as_ref()
-            .map(|line| writeln!(f, "{}", cformat!("{}", line)))
-            .unwrap_or(Ok(()))?;
-
-        writeln!(f, "{}", cformat!("{}", first_line))?;
-
-        for line in rest {
-            write!(f, "\n{}", cformat!("{}", line))?;
-        }
-
-        Ok(())
-    }
-
-    fn fmt_with_token(&self, f: &mut Formatter<'_>, token: &Token) -> fmt::Result {
-        let caret_offset = token.span.start.column;
-
-        let caret_len = token.span.length();
-
-        let pos = format!("{}:{}", token.span.start.line, token.span.start.column);
+        let pos = format!("{}:{}", self.span.start.line, self.span.start.column);
         let pos_len = pos.len();
 
         let context = match &self.context {
@@ -155,15 +125,15 @@ impl Error {
         };
 
         // Print context before line with error
-        if token.span.start.line > 1 {
+        if self.span.start.line > 1 {
             let lines_before = 2;
-            let start_idx = if token.span.start.line - 1 < lines_before {
+            let start_idx = if self.span.start.line - 1 < lines_before {
                 0
             } else {
-                token.span.start.line - lines_before - 1
+                self.span.start.line - lines_before - 1
             };
 
-            for i in start_idx..token.span.start.line - 1 {
+            for i in start_idx..self.span.start.line - 1 {
                 let line = match self.lines.get(i) {
                     Some(line) => line,
                     None => continue,
@@ -206,15 +176,15 @@ impl Error {
         }
 
         // Print context after line with error
-        if self.lines.len() >= token.span.start.line - 1 {
+        if self.lines.len() >= self.span.start.line - 1 {
             let lines_after = 2;
-            let end_idx = if token.span.start.line + lines_after - 1 > self.lines.len() {
+            let end_idx = if self.span.start.line + lines_after - 1 > self.lines.len() {
                 self.lines.len()
             } else {
-                token.span.start.line + lines_after
+                self.span.start.line + lines_after
             };
 
-            for i in token.span.start.line..end_idx {
+            for i in self.span.start.line..end_idx {
                 let line = match self.lines.get(i) {
                     Some(line) => line,
                     None => continue,
@@ -222,6 +192,32 @@ impl Error {
 
                 writeln!(f, "{}", cformat!("<dim>{:<pos_len$} | {}</>", i + 1, line))?;
             }
+        }
+
+        Ok(())
+    }
+}
+
+impl Error {
+    fn fmt_without_token(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let message = self.message.split('\n').collect::<Vec<&str>>();
+        let first_line = message[0];
+        let rest = match message.len() {
+            1 => &[],
+            _ => &message[1..],
+        };
+
+        writeln!(f, "{}", cformat!("{:?}", self.kind))?;
+
+        self.line
+            .as_ref()
+            .map(|line| writeln!(f, "{}", cformat!("{}", line)))
+            .unwrap_or(Ok(()))?;
+
+        writeln!(f, "{}", cformat!("{}", first_line))?;
+
+        for line in rest {
+            write!(f, "\n{}", cformat!("{}", line))?;
         }
 
         Ok(())

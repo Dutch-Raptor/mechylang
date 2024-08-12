@@ -2,20 +2,20 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use crate::parser::Parser;
-use crate::{Error, Expression, Token, TokenKind, trace};
+use crate::{Error, Expression, Span, TokenKind, trace};
 use crate::parser::expressions::Precedence;
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct BreakStatement {
-    pub token: Token,
+    pub span: Span,
     pub value: Option<Expression>,
 }
 
 impl Display for BreakStatement {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.value {
-            Some(value) => write!(f, "{} {};", self.token, value),
-            None => write!(f, "{};", self.token),
+            Some(value) => write!(f, "break {};", value),
+            None => write!(f, "break;"),
         }
     }
 }
@@ -24,7 +24,7 @@ impl Parser {
     pub(super) fn parse_break_statement(&mut self) -> Result<BreakStatement, Error> {
         let _trace = trace!("parse_break_statement");
         debug_assert!(self.is_cur_token(TokenKind::Break), "Expected current token to be `Break`");
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
 
 
         // check if we have a value to return
@@ -36,7 +36,10 @@ impl Parser {
             None
         };
 
-        Ok(BreakStatement { token, value })
+        Ok(BreakStatement { 
+            span: self.span_with_start(start), 
+            value 
+        })
     }
 }
 
@@ -77,5 +80,4 @@ mod tests {
             _ => panic!("expected expression statement"),
         };
     }
-
 }

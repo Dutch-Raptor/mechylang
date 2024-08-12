@@ -22,7 +22,7 @@ impl Callable for Function {
         env: Option<Environment>,
         config: Rc<EvalConfig>,
     ) -> Result<Object, String> {
-        Evaluator::eval_function(self.clone(), args, env, config)
+        Evaluator::eval_function(self.clone(), args, env, config, self.body.span.clone())
     }
 
     fn args_len(&self) -> RangeInclusive<usize> {

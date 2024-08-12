@@ -57,7 +57,7 @@ pub use while_expression::WhileExpression;
 pub use block_expression::BlockExpression;
 use crate::parser::Parser;
 use crate::error::ErrorKind;
-use crate::{Error, Token, TokenKind, trace};
+use crate::{Error, Span, TokenKind, trace};
 
 
 /// Represents an expression in Mechylang.
@@ -272,7 +272,7 @@ pub enum Expression {
     /// ();
     /// # "#);
     /// ```
-    Unit(Token),
+    Unit(Span),
     /// Represents a struct literal (instantiation of an anonymous struct).
     /// ```
     /// # use mechylang::test_utils::test_parse_ok;
@@ -283,35 +283,35 @@ pub enum Expression {
     StructLiteral(StructLiteral),
 }
 
-pub trait ExpressionToken {
-    fn token(&self) -> &Token;
+pub trait ExpressionSpanExt {
+    fn span(&self) -> &Span;
 }
 
-impl ExpressionToken for Expression {
-    fn token(&self) -> &Token {
+impl ExpressionSpanExt for Expression {
+    fn span(&self) -> &Span {
         match self {
-            Expression::Identifier(ident) => &ident.token,
-            Expression::IntegerLiteral(lit) => &lit.token,
-            Expression::FloatLiteral(lit) => &lit.token,
-            Expression::StructLiteral(lit) => &lit.token,
-            Expression::Prefix(expr) => &expr.token,
-            Expression::Infix(expr) => &expr.token,
-            Expression::Boolean(boolean) => &boolean.token,
-            Expression::If(if_expr) => &if_expr.token,
-            Expression::Function(func) => &func.token,
-            Expression::Call(call) => &call.token,
-            Expression::Block(block) => &block.token,
-            Expression::StringLiteral(lit) => &lit.token,
-            Expression::ArrayLiteral(lit) => &lit.token,
-            Expression::Index(index) => &index.token,
-            Expression::Range(range) => &range.token,
-            Expression::RangeTo(range) => &range.token,
-            Expression::RangeFrom(range) => &range.token,
-            Expression::RangeFull(range) => &range.token,
-            Expression::For(for_expr) => &for_expr.token,
-            Expression::While(while_expr) => &while_expr.token,
-            Expression::Member(member) => &member.token,
-            Expression::Unit(token) => token,
+            Expression::Identifier(ident) => &ident.span,
+            Expression::IntegerLiteral(lit) => &lit.span,
+            Expression::FloatLiteral(lit) => &lit.span,
+            Expression::StructLiteral(lit) => &lit.span,
+            Expression::Prefix(expr) => &expr.span,
+            Expression::Infix(expr) => &expr.span,
+            Expression::Boolean(boolean) => &boolean.span,
+            Expression::If(if_expr) => &if_expr.span,
+            Expression::Function(func) => &func.span,
+            Expression::Call(call) => &call.span,
+            Expression::Block(block) => &block.span,
+            Expression::StringLiteral(lit) => &lit.span,
+            Expression::ArrayLiteral(lit) => &lit.span,
+            Expression::Index(index) => &index.span,
+            Expression::Range(range) => &range.span,
+            Expression::RangeTo(range) => &range.span,
+            Expression::RangeFrom(range) => &range.span,
+            Expression::RangeFull(range) => &range.span,
+            Expression::For(for_expr) => &for_expr.span,
+            Expression::While(while_expr) => &while_expr.span,
+            Expression::Member(member) => &member.span,
+            Expression::Unit(span) => span,
         }
     }
 }
@@ -414,7 +414,7 @@ impl Parser {
 
         if self.cur_token.kind == TokenKind::RightParen {
             return Ok(Expression::Unit(
-                self.cur_token.clone()
+                self.cur_token.span.clone()
             ));
         }
 
@@ -466,7 +466,7 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::expressions::{Expression, InfixExpression, InfixOperator, Precedence, PrefixExpression};
+    use crate::parser::expressions::{Expression, InfixExpression, InfixOperator, Precedence, PrefixExpression, PrefixOperator};
     use crate::{Parser, TokenKind};
 
     #[test]
@@ -483,12 +483,11 @@ mod tests {
             // Check the infix expression
             if let Expression::Prefix(
                 PrefixExpression {
-                    token: ref left_token,
                     right: ref expr,
+                    operator: PrefixOperator::Minus,
                     ..
                 }
             ) = *left {
-                assert_eq!(left_token.kind, TokenKind::Minus);
                 assert!(matches!(expr.as_ref(), Expression::Identifier(_)));
             } else {
                 panic!("Expected prefix expression for left operand");

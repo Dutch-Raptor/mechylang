@@ -20,7 +20,7 @@ impl Evaluator {
             Ok(builtin.into())
         } else {
             Err(self.error(
-                Some(&ident.token),
+                ident.span.clone(),
                 format!("Identifier not found: {}", ident.value).as_str(),
                 ErrorKind::IdentifierNotFound,
             ))

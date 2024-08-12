@@ -2,12 +2,12 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Expression, Parser, Token, TokenKind};
+use crate::{Error, Expression, Parser, Span, TokenKind};
 use crate::parser::expressions::{BlockExpression, Precedence};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct WhileExpression {
-    pub token: Token,
+    pub span: Span,
     pub condition: Rc<Expression>,
     pub body: BlockExpression,
     pub else_block: Option<BlockExpression>,
@@ -28,7 +28,7 @@ impl Parser {
     /// ```text
     /// while <condition> { <body> }
     pub(super) fn parse_while_expression(&mut self) -> Result<WhileExpression, Error> {
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
 
         self.next_token();
 
@@ -41,7 +41,7 @@ impl Parser {
         let else_block = self.parse_else_block()?;
 
         Ok(WhileExpression {
-            token,
+            span: self.span_with_start(start),
             condition: Rc::new(condition),
             body,
             else_block,

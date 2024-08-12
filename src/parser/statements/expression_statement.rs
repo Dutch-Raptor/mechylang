@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter, self};
 use serde::Serialize;
 use crate::parser::expressions::{Expression, Precedence};
 use crate::parser::Parser;
-use crate::{Error, Token, trace, TokenKind};
+use crate::{Error, trace, TokenKind, Span};
 
 /// Represents an expression statement in Mechylang.
 ///
@@ -26,9 +26,9 @@ use crate::{Error, Token, trace, TokenKind};
 /// ```
 #[derive(Debug, PartialEq, Serialize)]
 pub struct ExpressionStatement {
-    /// The token associated with the statement. Typically, this is the first
+    /// The span of the expression statement in the source code.
+    pub span: Span,
     /// token of the expression.
-    pub token: Token,
     /// The expression that this statement evaluates.
     pub expression: Expression,
 }
@@ -57,9 +57,14 @@ impl Parser {
     /// This function returns an error if an error occurs while parsing the expression.
     pub(super) fn parse_expression_statement(&mut self) -> Result<ExpressionStatement, Error> {
         let _trace = trace!("parse_expression_statement");
+        
+        let start = self.cur_token.span.start.clone();
+        
+        let expression = self.parse_expression(Precedence::Lowest)?;
+        
         let statement = ExpressionStatement {
-            token: self.cur_token.clone(),
-            expression: self.parse_expression(Precedence::Lowest)?,
+            span: self.span_with_start(start),
+            expression,
         };
 
         if self.is_cur_token(TokenKind::Semicolon) {

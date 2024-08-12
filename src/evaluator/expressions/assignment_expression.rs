@@ -1,6 +1,6 @@
 use crate::{Environment, Error, Evaluator, Object, trace};
 use crate::error::ErrorKind;
-use crate::parser::expressions::{Expression, ExpressionToken, InfixExpression, InfixOperator, PrefixExpression, PrefixOperator};
+use crate::parser::expressions::{Expression, ExpressionSpanExt, InfixExpression, InfixOperator, PrefixExpression, PrefixOperator};
 
 impl Evaluator {
     pub(super) fn eval_assignment_expression(
@@ -10,7 +10,7 @@ impl Evaluator {
     ) -> Result<Object, Error> {
         let _trace = trace!(&format!("eval_assignment_expression: {}", infix));
         // set current token to the identifier token
-        self.current_token = Some(infix.left.token().clone());
+        self.current_span = infix.left.span().clone();
 
         let new_value = {
             if infix.operator == InfixOperator::AssignEqual {
@@ -23,7 +23,7 @@ impl Evaluator {
                             .assignment_related_operator()
                             .expect("eval_assignment_expression to only be called for assignment operators"),
                         right: infix.right.clone(),
-                        token: infix.token.clone(),
+                        span: infix.span.clone(),
                     },
                     env,
                 )?
@@ -34,7 +34,7 @@ impl Evaluator {
             Expression::Identifier(ident) => {
                 env.update(ident.value.clone(), new_value).map_err(|_| {
                     self.error(
-                        Some(infix.left.token()),
+                        infix.left.span().clone(),
                         &format!("Identifier {} not found", ident.value).to_string(),
                         ErrorKind::IdentifierNotFound,
                     )
@@ -84,7 +84,7 @@ impl Evaluator {
                     }
                     _ => {
                         return Err(self.error(
-                            Some(&infix.token),
+                            infix.span.clone(),
                             &format!("Cannot index non-identifier: {:?}", index_expr.left)
                                 .to_string(),
                             ErrorKind::MutateError,
@@ -93,7 +93,7 @@ impl Evaluator {
                 }
                     .map_err(|err| {
                         self.error(
-                            Some(&infix.token),
+                            infix.span.clone(),
                             &format!("Error mutating variable: {}", err).to_string(),
                             ErrorKind::MutateError,
                         )
@@ -101,7 +101,7 @@ impl Evaluator {
             }
 
             Expression::Prefix(PrefixExpression {
-                                   token: _,
+                                   span: _,
                                    operator: PrefixOperator::Asterisk,
                                    right: _,
                                }) => {

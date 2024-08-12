@@ -1,7 +1,7 @@
 use crate::{Environment, Error, Evaluator, Object, trace};
 use crate::error::ErrorKind;
 use crate::evaluator::objects::iterators::IteratorObject;
-use crate::parser::expressions::{ExpressionToken, ForExpression, IfExpression, WhileExpression};
+use crate::parser::expressions::{ExpressionSpanExt, ForExpression, IfExpression, WhileExpression};
 
 impl Evaluator {
     pub(super) fn eval_if_expression(
@@ -34,7 +34,7 @@ impl Evaluator {
 
         let iterator = IteratorObject::try_from(iterable).map_err(|err| {
             self.error(
-                Some(for_expr.iterable.token()),
+                for_expr.iterable.span().clone(),
                 &format!("Error iterating over object: {}", err).to_string(),
                 ErrorKind::TypeError,
             )

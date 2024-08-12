@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::{Environment, Error, EvalConfig, Evaluator, Object, trace};
+use crate::{Environment, Error, EvalConfig, Evaluator, Object, Span, trace};
 use crate::error::ErrorKind;
 use crate::evaluator::methods::Method;
 use crate::evaluator::objects::function::Function;
 use crate::evaluator::objects::traits::UnwrapReturnValue;
 use crate::evaluator::runtime::builtins::BuiltinFunction;
-use crate::parser::expressions::{CallExpression, ExpressionToken};
+use crate::parser::expressions::{CallExpression, ExpressionSpanExt};
 
 impl Evaluator {
     pub(super) fn eval_call_expression(
@@ -18,7 +18,7 @@ impl Evaluator {
         let function = self.eval_expression(&call.function, env)?;
 
         // set current token so error messages are more helpful
-        self.current_token = Some(call.function.token().clone());
+        self.current_span = call.function.span().clone();
         
         let arguments = call.arguments
             .iter()
@@ -35,18 +35,10 @@ impl Evaluator {
         
         if let Object::Function(function) = function {
             return self.apply_function(function, arguments, None)
-                .map_err(|err| {
-                    // only apply current token if there is no token set
-                    if err.token.is_some() {
-                        return err;
-                    }
-
-                    return self.error(Some(call.function.token()), err.message.as_str(), err.kind);
-                });
         }
         
         return Err(self.error(
-            None,
+            call.function.span().clone(),
             format!("Cannot call {}", function).as_str(),
             ErrorKind::TypeError,
         ))
@@ -66,7 +58,7 @@ impl Evaluator {
 
         if !function.args_len.contains(&arguments.len()) {
             return Err(self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 format!(
                     "Wrong number of arguments. Expected {}, got {}",
                     match function.args_len.start() - function.args_len.end() {
@@ -86,7 +78,7 @@ impl Evaluator {
 
         (function.function)(&arguments, env, &self.eval_config).map_err(|(msg, err_type)| {
             self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 msg.as_str(),
                 ErrorKind::BuiltInError(err_type),
             )
@@ -101,7 +93,7 @@ impl Evaluator {
     ) -> Result<Object, Error> {
         if !method.args_len.contains(&arguments.len()) {
             return Err(self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 &format!(
                     "Wrong number of arguments: expected {}, got {}",
                     match method.args_len.start() - method.args_len.end() {
@@ -134,7 +126,7 @@ impl Evaluator {
         )
             .map_err(|err| {
                 self.error(
-                    self.current_token.as_ref(),
+                    self.current_span.clone(),
                     &format!("Error evaluating method: {}", err),
                     ErrorKind::MethodError,
                 )
@@ -179,7 +171,7 @@ impl Evaluator {
 
         if function.params.len() != arguments.len() {
             return Err(self.error(
-                None,
+                self.current_span.clone(),
                 format!(
                     "Wrong number of arguments: expected {}, got {}",
                     function.params.len(),
@@ -203,10 +195,11 @@ impl Evaluator {
         arguments: Vec<Object>,
         env: Option<Environment>,
         config: Rc<EvalConfig>,
+        span: Span,
     ) -> Result<Object, String> {
         let mut evaluator = Evaluator {
             globals: HashMap::new(),
-            current_token: None,
+            current_span: span,
             lines: vec![].into(),
             eval_config: config,
         };

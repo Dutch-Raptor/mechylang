@@ -2,12 +2,12 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use crate::parser::Parser;
-use crate::{Error, Token, TokenKind, trace};
+use crate::{Error, Span, TokenKind, trace};
 use crate::error::ErrorKind;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct BooleanLiteral {
-    pub token: Token,
+    pub span: Span,
     pub value: bool,
 }
 
@@ -21,18 +21,17 @@ impl Parser {
 
     pub(super) fn parse_boolean(&self) -> Result<BooleanLiteral, Error> {
         let _trace = trace!("parse_boolean");
-        let token = self.cur_token.clone();
-        let value = match token.kind {
+        let value = match self.cur_token.kind {
             TokenKind::True => true,
             TokenKind::False => false,
             _ => {
                 return Err(self.error_current(
                     ErrorKind::UnexpectedToken,
-                    format!("Expected boolean literal, got {:?}", token.kind),
+                    format!("Expected boolean literal, got {:?}", self.cur_token.kind),
                 ))
             }
         };
 
-        Ok(BooleanLiteral { token, value })
+        Ok(BooleanLiteral { span: self.cur_token.span.clone(), value })
     }
 }

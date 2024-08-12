@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
-use crate::{Error, Expression, Parser, Token, TokenKind};
+use crate::{Error, Expression, Parser, Span, TokenKind};
 use crate::error::ErrorKind;
 use crate::parser::expressions::Precedence;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StructLiteral {
-    pub token: Token,
+    pub span: Span,
     pub entries: HashMap<String, Expression>,
 }
 
@@ -36,7 +36,7 @@ impl Parser {
     /// Trailing commas are optional
     pub(super) fn parse_struct_literal(&mut self) -> Result<StructLiteral, Error> {
         debug_assert!(self.is_cur_token(TokenKind::Struct), "Expected current token to be `struct`");
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
 
         self.expect_peek(TokenKind::LeftSquirly)?;
 
@@ -46,10 +46,10 @@ impl Parser {
         let mut entries = HashMap::new();
 
         while self.cur_token.kind != TokenKind::RightSquirly {
-            let key = match self.cur_token.kind {
-                TokenKind::Identifier(ref ident) => ident.clone(),
-                _ => return Err(self.error_current(ErrorKind::TypeError, "Struct keys must be identifiers.")),
-            };
+            let key = self.cur_token.kind
+                .as_identifier()
+                .ok_or_else(|| self.error_current(ErrorKind::TypeError, "Struct keys must be identifiers."))?
+                .to_string();
 
             // ensure key is followed by a colon
             self.expect_peek(TokenKind::Colon)?;
@@ -74,7 +74,7 @@ impl Parser {
         self.expect_current(TokenKind::RightSquirly)?;
 
         Ok(StructLiteral {
-            token,
+            span: self.span_with_start(start),
             entries,
         })
     }
@@ -86,8 +86,7 @@ mod tests {
     use crate::parser::expressions::number_expressions::IntegerLiteral;
     use crate::parser::expressions::string_literal::StringLiteral;
     use crate::parser::expressions::struct_literal::StructLiteral;
-    use crate::parser::statements::let_statement::LetStatement;
-    use crate::parser::statements::Statement;
+    use crate::parser::statements::{LetStatement, Statement};
     use crate::parser::tests::parse;
 
     #[test]

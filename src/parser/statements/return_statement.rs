@@ -3,21 +3,21 @@ use std::fmt::{Display, Formatter};
 use color_print::cformat;
 use serde::Serialize;
 use crate::parser::Parser;
-use crate::{Error, Token, trace, TokenKind};
+use crate::{Error, trace, TokenKind, Span};
 use crate::error::ErrorKind;
 use crate::parser::expressions::{Expression, Precedence};
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct ReturnStatement {
-    pub token: Token,
+    pub span: Span,
     pub return_value: Option<Expression>,
 }
 
 impl Display for ReturnStatement {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match &self.return_value {
-            Some(value) => write!(f, "{} {};", self.token, value),
-            None => write!(f, "{};", self.token),
+            Some(value) => write!(f, "return {};", value),
+            None => write!(f, "return;"),
         }
     }
 }
@@ -43,12 +43,12 @@ impl Parser {
     pub(super) fn parse_return_statement(&mut self) -> Result<ReturnStatement, Error> {
         let _trace = trace!("parse_return_statement");
         debug_assert!(self.is_cur_token(TokenKind::Return), "Expected current token to be `Return`");
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
         self.next_token();
 
         if let TokenKind::Semicolon = self.cur_token.kind {
              return Ok(ReturnStatement {
-                 token,
+                 span: self.span_with_start(start),
                  return_value: None,
              });
         }
@@ -66,7 +66,7 @@ impl Parser {
                         "Expected an expression or semicolon after <i>`return`</i>, got <i>{:?}</i> instead",
                         self.cur_token.kind
                     ),
-                    Some(&self.cur_token),
+                    self.cur_token.span.clone(),
                     None,
                 ));
             }
@@ -74,7 +74,7 @@ impl Parser {
         };
 
         Ok(ReturnStatement {
-            token,
+            span: self.span_with_start(start),
             return_value: Some(expression),
         })
     }

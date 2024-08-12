@@ -603,6 +603,6 @@ pub mod test_utils;
 mod tracer;
 
 pub use error::Error;
-pub use lexer::{Lexer, Token, TokenKind};
+pub use lexer::{Lexer, Token, TokenKind, Span, Position};
 pub use parser::{Parser, Expression, Statement, Program};
 pub use evaluator::{EvalConfig, Evaluator, eval_file, Object, Environment};

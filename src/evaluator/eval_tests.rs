@@ -172,7 +172,7 @@ mod tests {
                     assert_eq!(error.message, message);
                     assert_eq!(error.kind, error_kind);
                     assert_eq!(error.line.as_ref().unwrap().trim(), line_with_err);
-                    assert_eq!(error.token.as_ref().unwrap().position.line, line_nr);
+                    assert_eq!(error.span.as_ref().start.line, line_nr);
                 }
                 _ => panic!("No error object returned. Got: {:?}", evaluated),
             }

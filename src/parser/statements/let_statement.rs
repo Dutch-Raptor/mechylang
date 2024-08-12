@@ -3,8 +3,9 @@ use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use crate::parser::expressions::{Expression, Identifier, Precedence};
 use crate::parser::Parser;
-use crate::{Error, Token, trace, TokenKind};
+use crate::{Error, trace, TokenKind};
 use crate::error::ErrorKind;
+use crate::lexer::Span;
 
 /// Represents a `let` statement in Mechylang.
 ///
@@ -38,8 +39,8 @@ use crate::error::ErrorKind;
 /// and is included in the abstract syntax tree (AST) to represent variable declarations.
 #[derive(Debug, PartialEq, Serialize)]
 pub struct LetStatement {
-    /// The token representing the `let` keyword.
-    pub token: Token,
+    /// The span of the `let` statement in the source code.
+    pub span: Span,
     /// The identifier for the variable being declared.
     pub name: Identifier,
     /// The expression representing the initial value assigned to the variable.
@@ -48,7 +49,7 @@ pub struct LetStatement {
 
 impl Display for LetStatement {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{} {} = {};", self.token, self.name, self.value)
+        write!(f, "let {} = {};", self.name, self.value)
     }
 }
 
@@ -74,7 +75,7 @@ impl Parser {
     pub(super) fn parse_let_statement(&mut self) -> Result<LetStatement, Error> {
         let _trace = trace!("parse_let_statement");
         debug_assert!(self.is_cur_token(TokenKind::Let), "Expected current token to be `Let`");
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
 
         let name = match self.peek_token.kind {
             TokenKind::Identifier(ref name) => name.clone(),
@@ -87,7 +88,7 @@ impl Parser {
         };
 
         let name = Identifier {
-            token: self.peek_token.clone(),
+            span: self.peek_token.span.clone(),
             value: name.into(),
         };
 
@@ -100,7 +101,7 @@ impl Parser {
         let expression = self.parse_expression(Precedence::Lowest)?;
 
         Ok(LetStatement {
-            token,
+            span: self.span_with_start(start),
             name,
             value: expression,
         })

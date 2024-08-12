@@ -2,12 +2,12 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Expression, Parser, Token, TokenKind};
-use crate::parser::expressions::Identifier;
+use crate::{Error, Expression, Parser, Span, TokenKind};
+use crate::parser::expressions::{ExpressionSpanExt, Identifier};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct MemberExpression {
-    pub token: Token,
+    pub span: Span,
     pub object: Rc<Expression>,
     pub property: Identifier,
 }
@@ -44,13 +44,13 @@ impl Parser {
     /// * An unexpected token is encountered after the dot `.` symbol.
     pub(super) fn parse_member(&mut self, left: Expression) -> Result<MemberExpression, Error> {
         debug_assert!(self.is_cur_token(TokenKind::Dot), "Expected current token to be `.`");
+        let start = left.span().start.clone();
         self.next_token();
-        let token = self.cur_token.clone();
 
         let property = self.parse_identifier()?;
 
         Ok(MemberExpression {
-            token,
+            span: self.span_with_start(start),
             object: Rc::new(left),
             property,
         })
@@ -61,8 +61,7 @@ impl Parser {
 mod tests {
     use crate::parser::expressions::Expression;
     use crate::parser::expressions::number_expressions::IntegerLiteral;
-    use crate::parser::statements::expression_statement::ExpressionStatement;
-    use crate::parser::statements::Statement;
+    use crate::parser::statements::{ExpressionStatement, Statement};
     use crate::parser::tests::parse;
 
     #[test]

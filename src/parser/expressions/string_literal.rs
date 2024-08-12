@@ -2,12 +2,12 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Token, TokenKind, Parser};
+use crate::{Error, Parser, Span};
 use crate::error::ErrorKind;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StringLiteral {
-    pub token: Token,
+    pub span: Span,
     pub value: Rc<str>,
 }
 
@@ -19,18 +19,16 @@ impl Display for StringLiteral {
 
 impl Parser {
     pub(super) fn parse_string(&mut self) -> Result<StringLiteral, Error> {
-        let token = self.cur_token.clone();
-        let value = match self.cur_token.kind {
-            TokenKind::String(ref s) => s.clone(),
-            _ => {
-                return Err(self.error_current(
-                    ErrorKind::UnexpectedToken,
-                    format!("Expected a string, got {:?}", self.cur_token),
-                ))
-            }
-        };
+        let start = self.cur_token.span.start.clone();
+        
+        let value = self.cur_token.kind
+            .as_string()
+            .ok_or_else(|| self.error_current(
+                ErrorKind::UnexpectedToken,
+                format!("Expected a string, got {:?}", self.cur_token.kind),
+            ))?;
 
-        Ok(StringLiteral { token, value: value.into() })
+        Ok(StringLiteral { span: self.span_with_start(start), value: value.into() })
     }
 }
 #[cfg(test)]
@@ -54,10 +52,6 @@ mod tests {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::StringLiteral(ref literal) => {
                     assert_eq!(literal.value, "hello world".into());
-                    assert_eq!(
-                        literal.token.kind,
-                        TokenKind::String("hello world".into())
-                    );
                 }
                 _ => panic!("expected string literal expression"),
             },

@@ -4,13 +4,13 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::parser::Parser;
 use crate::parser::statements::Statement;
-use crate::{Error, Token, trace, TokenKind};
+use crate::{Error, trace, TokenKind, Span};
 use crate::error::ErrorKind;
 use crate::parser::expressions::{BlockExpression, Identifier};
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct FunctionStatement {
-    pub token: Token,
+    pub span: Span,
     pub name: Identifier,
     pub parameters: Rc<[Identifier]>,
     pub body: BlockExpression,
@@ -21,8 +21,8 @@ impl Display for FunctionStatement {
         let params = self.parameters.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", ");
         write!(
             f,
-            "{} {}({}) {}",
-            self.token, self.name, params, self.body
+            "fn {}({}) {}",
+            self.name, params, self.body
         )
     }
 }
@@ -47,11 +47,11 @@ impl Parser {
         let _trace = trace!("parse_function_statement");
         debug_assert!(self.is_cur_token(TokenKind::Fn), "Expected current token to be `Fn`");
 
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
 
         let name = match self.peek_token.kind {
             TokenKind::Identifier(ref name) => Identifier {
-                token: self.cur_token.clone(),
+                span: self.cur_token.span.clone(),
                 value: name.clone().into(),
             },
             TokenKind::LeftParen => {
@@ -77,7 +77,7 @@ impl Parser {
 
         let statement = Statement::Function(FunctionStatement {
             name,
-            token,
+            span: self.span_with_start(start),
             parameters,
             body,
         });
