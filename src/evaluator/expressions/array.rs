@@ -1,6 +1,6 @@
 use crate::{Environment, Error, Evaluator, Object};
-use crate::errors::ErrorKind;
-use crate::parser::expressions::{ArrayLiteral, ExpressionToken, IndexExpression};
+use crate::error::ErrorKind;
+use crate::parser::expressions::{ArrayLiteral, ExpressionSpanExt, IndexExpression};
 
 impl Evaluator {
     pub(super) fn eval_array_expression(
@@ -28,7 +28,7 @@ impl Evaluator {
             Object::Array(ref arr) => arr,
             _ => {
                 return Err(self.error(
-                    Some(index.left.token()),
+                    index.left.span().clone(),
                     &format!("Expected an array. Got {:?}", left).to_string(),
                     ErrorKind::TypeError,
                 ))
@@ -41,7 +41,7 @@ impl Evaluator {
             Object::Integer(i) => match array.get(i as usize) {
                 Some(item) => Ok(item.clone()),
                 None => Err(self.error(
-                    Some(index.index.token()),
+                    index.index.span().clone(),
                     &format!(
                         "Index out of bounds: {}, {} has len({})",
                         i,
@@ -54,7 +54,7 @@ impl Evaluator {
             },
             _ => {
                 return Err(self.error(
-                    Some(index.index.token()),
+                    index.index.span().clone(),
                     &format!(
                         "Index operator not supported for {:?}[{:?}]",
                         left, evaluated_index

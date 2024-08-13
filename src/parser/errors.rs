@@ -1,5 +1,5 @@
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
+use crate::{Error, Span, trace};
+use crate::error::ErrorKind;
 use crate::parser::Parser;
 
 impl Parser {
@@ -7,23 +7,29 @@ impl Parser {
         &self,
         kind: ErrorKind,
         msg: impl ToString,
-        token: Option<&Token>,
+        span: Span,
         context: Option<String>,
     ) -> Error {
-        let error = Error::new(kind, msg, token, &self.lines, context);
+        let error = Error::new(kind, msg, span, &self.lines, context);
+        trace!(format!("Error: {:?}", error).as_str());
+        error
+    }
+    
+    pub fn error_span(&self, kind: ErrorKind, msg: impl ToString, span: Span) -> Error {
+        let error = Error::new(kind, msg, span, &self.lines, None);
         trace!(format!("Error: {:?}", error).as_str());
         error
     }
 
     pub(crate) fn error_current(&self, kind: ErrorKind, msg: impl ToString) -> Error {
-        self.error(kind, msg, Some(&self.cur_token), None)
+        self.error(kind, msg, self.cur_token.span.clone(), None)
     }
 
     pub(crate) fn error_current_with_context(&self, kind: ErrorKind, msg: impl ToString, context: String) -> Error {
         self.error(
             kind,
             msg,
-            Some(&self.cur_token),
+            self.cur_token.span.clone(),
             Some(context),
         )
     }
@@ -32,7 +38,7 @@ impl Parser {
         self.error(
             kind,
             msg,
-            Some(&self.peek_token),
+            self.peek_token.span.clone(),
             None,
         )
     }
@@ -42,7 +48,7 @@ impl Parser {
         self.error(
             kind,
             msg,
-            Some(&self.peek_token),
+            self.peek_token.span.clone(),
             Some(context),
         )
     }

@@ -1,5 +1,5 @@
 use crate::{Environment, Error, Evaluator, Object};
-use crate::parser::expressions::block_expression::BlockExpression;
+use crate::parser::expressions::BlockExpression;
 
 impl Evaluator {
     pub(super) fn eval_scoped_block_expression(

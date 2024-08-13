@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::{Object};
-    use crate::{errors::ErrorKind, test_utils::test_eval_ok};
+    use crate::{error::ErrorKind, test_utils::test_eval_ok};
     use crate::evaluator::runtime::builtins::BuiltinError;
     use crate::evaluator::tests::test_eval;
     use crate::test_utils::test_eval_err;
@@ -172,7 +172,7 @@ mod tests {
                     assert_eq!(error.message, message);
                     assert_eq!(error.kind, error_kind);
                     assert_eq!(error.line.as_ref().unwrap().trim(), line_with_err);
-                    assert_eq!(error.token.as_ref().unwrap().position.line, line_nr);
+                    assert_eq!(error.span.as_ref().start.line, line_nr);
                 }
                 _ => panic!("No error object returned. Got: {:?}", evaluated),
             }

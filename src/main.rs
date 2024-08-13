@@ -25,7 +25,10 @@ enum Command {
     Repl {
         #[arg(long)]
         print_tokens: bool,
-        
+
+        #[arg(long, default_value_t = false)]
+        print_tokens_with_span: bool,
+
         #[arg(long)]
         print_ast: bool,
     },
@@ -47,9 +50,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
-            Command::Repl { print_tokens, print_ast } => {
-                Repl::new().with_print_ast(print_ast)
+            Command::Repl { print_tokens, print_ast, print_tokens_with_span } => {
+                Repl::new()
+                    .with_print_ast(print_ast)
                     .with_print_tokens(print_tokens)
+                    .with_print_tokens_with_span(print_tokens_with_span)
                     .run()?;
             }
         }

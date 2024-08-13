@@ -1,5 +1,5 @@
 use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::evaluator::objects::traits::UnwrapReturnValue;
 use crate::evaluator::runtime::builtins::BuiltinFunction;
 use crate::parser::expressions::Identifier;
@@ -20,7 +20,7 @@ impl Evaluator {
             Ok(builtin.into())
         } else {
             Err(self.error(
-                Some(&ident.token),
+                ident.span.clone(),
                 format!("Identifier not found: {}", ident.value).as_str(),
                 ErrorKind::IdentifierNotFound,
             ))

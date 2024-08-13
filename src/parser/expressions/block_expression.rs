@@ -2,9 +2,8 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
-use crate::lexer::tokens::TokenKind;
+use crate::{Error, trace, TokenKind, Span};
+use crate::error::ErrorKind;
 use crate::parser::Parser;
 use crate::parser::statements::Statement;
 
@@ -68,7 +67,7 @@ use crate::parser::statements::Statement;
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BlockExpression {
-    pub token: Token,
+    pub span: Span,
     pub statements: Rc<[Statement]>,
 }
 
@@ -105,8 +104,8 @@ impl Parser {
     pub(in crate::parser) fn parse_block_expression(&mut self) -> Result<BlockExpression, Error> {
         let _trace = trace!("parse_block_expression");
         debug_assert!(self.is_cur_token(TokenKind::LeftSquirly), "Expected current token to be `{{`");
+        let start = self.cur_token.span.start.clone();
         self.next_token();
-        let token = self.cur_token.clone();
 
         let mut statements = Vec::new();
 
@@ -125,18 +124,17 @@ impl Parser {
             ));
         }
 
-        Ok(BlockExpression { token, statements: statements.into() })
+        Ok(BlockExpression { span: self.span_with_start(start), statements: statements.into() })
     }
 }
 
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::ErrorKind;
+    use crate::error::ErrorKind;
     use crate::Parser;
     use crate::parser::expressions::block_expression::BlockExpression;
-    use crate::parser::statements::expression_statement::ExpressionStatement;
-    use crate::parser::statements::Statement;
+    use crate::parser::statements::{ExpressionStatement, Statement};
     
    /// Test parsing a block expression with multiple statements
     #[test]

@@ -1,13 +1,13 @@
 use std::rc::Rc;
 use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::parser::expressions::{Expression, PrefixExpression, PrefixOperator};
 
 impl Evaluator {
 
     pub(super) fn eval_prefix_expression(&mut self, env: &mut Environment, prefix: &PrefixExpression) -> Result<Object, Error> {
         let right = self.eval_expression(&prefix.right, env)?;
-        self.current_token = Some(prefix.token.clone());
+        self.current_span = prefix.span.clone();
 
         Ok(match prefix.operator {
             PrefixOperator::Bang => self.eval_bang_operator_expression(right),
@@ -39,7 +39,7 @@ impl Evaluator {
             Object::Integer(integer) => Ok((-integer).into()),
             Object::Float(float) => Ok((-float).into()),
             _ => Err(self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 format!("Unknown operator: -{:?}", right).as_str(),
                 ErrorKind::UnknownOperator,
             )),
@@ -50,7 +50,7 @@ impl Evaluator {
         match right {
             Object::Integer(integer) => Ok(Object::Integer(!integer)),
             _ => Err(self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 &format!("Invalid operator: ~{:?}", right).to_string(),
                 ErrorKind::InvalidOperator,
             )),

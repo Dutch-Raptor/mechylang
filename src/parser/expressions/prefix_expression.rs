@@ -2,16 +2,13 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
-use crate::parser::Parser;
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
-use crate::parser::expressions::precedence::Precedence;
+use crate::{Error, Expression, Parser, Span, TokenKind, trace};
+use crate::error::ErrorKind;
+use crate::parser::expressions::Precedence;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct PrefixExpression {
-    pub token: Token,
+    pub span: Span,
     pub operator: PrefixOperator,
     pub right: Rc<Expression>,
 }
@@ -119,9 +116,9 @@ impl Parser {
 
     pub(super) fn parse_prefix_expression(&mut self) -> Result<PrefixExpression, Error> {
         let _trace = trace!("parse_prefix_expression");
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
 
-        let operator = match token.kind {
+        let operator = match &self.cur_token.kind {
             TokenKind::Bang => PrefixOperator::Bang,
             TokenKind::Minus => PrefixOperator::Minus,
             TokenKind::BitwiseNot => PrefixOperator::BitwiseNot,
@@ -129,7 +126,7 @@ impl Parser {
             _ => {
                 return Err(self.error_current(
                     ErrorKind::MissingPrefix,
-                    format!("Expected a prefix operator, got {:?}", token),
+                    format!("Expected a prefix operator, got {:?}", self.cur_token.kind),
                 ))
             }
         };
@@ -139,7 +136,7 @@ impl Parser {
         let right = self.parse_expression(Precedence::Prefix)?;
 
         Ok(PrefixExpression {
-            token,
+            span: self.span_with_start(start),
             operator,
             right: Rc::new(right),
         })

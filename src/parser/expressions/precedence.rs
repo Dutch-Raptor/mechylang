@@ -1,7 +1,9 @@
-use crate::errors::ErrorKind;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::Parser;
-use crate::Token;
+use crate::{
+    parser::Parser,
+    TokenKind,
+    error::ErrorKind,
+    Token
+};
 
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
 pub enum Precedence {

@@ -2,15 +2,14 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
 use crate::parser::expressions::identifier::Identifier;
 use crate::parser::{Parser};
-use crate::{Error, Token, trace};
+use crate::{Error, trace, TokenKind, Span};
 use crate::parser::expressions::block_expression::BlockExpression;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionLiteral {
-    pub token: Token,
+    pub span: Span,
     pub parameters: Rc<[Identifier]>,
     pub body: BlockExpression,
 }
@@ -24,7 +23,7 @@ impl Display for FunctionLiteral {
             .collect::<Vec<String>>()
             .join(", ");
 
-        write!(f, "{}({}) {{\n{}\n}}", self.token, params, self.body)
+        write!(f, "fn({}) {{\n{}\n}}", params, self.body)
     }
 }
 
@@ -32,7 +31,7 @@ impl Parser {
 
     pub(super) fn parse_function_literal(&mut self) -> Result<FunctionLiteral, Error> {
         let _trace = trace!("parse_function_literal");
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
 
         self.expect_peek(TokenKind::LeftParen)?;
 
@@ -43,7 +42,7 @@ impl Parser {
         let body = self.parse_block_expression()?;
 
         Ok(FunctionLiteral {
-            token,
+            span: self.span_with_start(start),
             parameters: parameters.into(),
             body,
         })

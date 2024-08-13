@@ -2,16 +2,12 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
-use crate::parser::expressions::precedence::Precedence;
-use crate::parser::Parser;
-use crate::{Error, Token, trace};
-use crate::parser::expressions::block_expression::BlockExpression;
+use crate::{Error, trace, TokenKind, Expression, Parser, Span};
+use crate::parser::expressions::{BlockExpression, Precedence};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct IfExpression {
-    pub token: Token,
+    pub span: Span,
     pub condition: Rc<Expression>,
     pub consequence: BlockExpression,
     pub alternative: Option<BlockExpression>,
@@ -32,7 +28,7 @@ impl Parser {
     pub(super) fn parse_if_expression(&mut self) -> Result<IfExpression, Error> {
         let _trace = trace!("parse_if_expression");
         debug_assert!(self.is_cur_token(TokenKind::If), "Expected current token to be `if`");
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
 
         self.next_token();
         let condition = self.parse_expression(Precedence::Lowest)?;
@@ -45,7 +41,7 @@ impl Parser {
         let alternative = self.parse_else_block()?;
 
         Ok(IfExpression {
-            token,
+            span: self.span_with_start(start),
             condition: Rc::new(condition),
             consequence,
             alternative,

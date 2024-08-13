@@ -2,17 +2,16 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
 use crate::parser::expressions::Expression;
 use crate::parser::expressions::identifier::Identifier;
 use crate::parser::expressions::precedence::Precedence;
 use crate::parser::Parser;
-use crate::{Error, Token, trace};
+use crate::{Error, Span, TokenKind, trace};
 use crate::parser::expressions::block_expression::BlockExpression;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct ForExpression {
-    pub token: Token,
+    pub span: Span,
     pub iterator: Identifier,
     pub iterable: Rc<Expression>,
     pub body: BlockExpression,
@@ -46,7 +45,7 @@ impl Parser {
     /// ```
     pub(super) fn parse_for_expression(&mut self) -> Result<ForExpression, Error> {
         let _trace = trace!("parse_for_expression");
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
 
         self.next_token();
 
@@ -82,7 +81,7 @@ impl Parser {
         let else_block = self.parse_else_block()?;
 
         Ok(ForExpression {
-            token,
+            span: self.span_with_start(start),
             iterator,
             iterable: Rc::new(iterable),
             body,

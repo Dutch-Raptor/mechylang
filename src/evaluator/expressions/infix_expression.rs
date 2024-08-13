@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::parser::expressions::{InfixExpression, InfixOperator};
 
 impl Evaluator {
@@ -18,7 +18,7 @@ impl Evaluator {
         let left = self.eval_expression(&infix.left, env)?;
         let right = self.eval_expression(&infix.right, env)?;
 
-        self.current_token = Some(infix.token.clone());
+        self.current_span = infix.span.clone();
 
         match (&left, &right) {
             (Object::Unit, _) | (_, Object::Unit) => {
@@ -43,7 +43,7 @@ impl Evaluator {
                 self.eval_string_infix_expression(&infix.operator, left.clone(), right.clone())
             }
             _ => Err(self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 format!("Type mismatch: {:?} {} {:?}", left, infix.operator, right).as_str(),
                 ErrorKind::TypeMismatch,
             )),
@@ -61,7 +61,7 @@ impl Evaluator {
             InfixOperator::CompareNotEqual => Ok(Object::Boolean(left != right)),
             InfixOperator::CompareEqual => Ok(Object::Boolean(left == right)),
             _ => Err(self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 &format!("Invalid operator: {:?} {:?} {:?}", left, operator, right).to_string(),
                 ErrorKind::InvalidOperator,
             )),
@@ -76,7 +76,7 @@ impl Evaluator {
     ) -> Result<Object, Error> {
         let invalid = || {
             self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 format!(
                     "Invalid operator: Integer({:?}) {} Integer({:?})",
                     left, operator, right
@@ -124,7 +124,7 @@ impl Evaluator {
     ) -> Result<Object, Error> {
         let invalid = || {
             self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 format!(
                     "Invalid operator: Float({:?}) {} Float({:?})",
                     left, operator, right
@@ -165,7 +165,7 @@ impl Evaluator {
     ) -> Result<Object, Error> {
         let invalid = || {
             self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 format!(
                     "Invalid operator: Boolean({:?}) {} Boolean({:?})",
                     left, operator, right
@@ -219,7 +219,7 @@ impl Evaluator {
             | InfixOperator::AssignAsterisk | InfixOperator::AssignSlash | InfixOperator::AssignPercent
             | InfixOperator::AssignBitwiseOr | InfixOperator::AssignBitwiseAnd | InfixOperator::AssignBitwiseXor
             => Err(self.error(
-                self.current_token.as_ref(),
+                self.current_span.clone(),
                 format!(
                     "Invalid operator: String({:?}) {} String({:?})",
                     left, operator, right

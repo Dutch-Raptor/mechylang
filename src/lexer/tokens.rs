@@ -1,36 +1,55 @@
 use std::fmt::{self, Display, Formatter};
-
+use std::sync::Arc;
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, Clone, Default, Serialize)]
 pub struct Position {
+    /// The line number, starting at 1.
     pub line: usize,
+    /// The column number, starting at 1.
     pub column: usize,
-    pub length: usize,
-    pub file: Option<String>,
+    /// The file name.
+    /// This is `None` if the token is not associated with a file.
+    pub file: Option<Arc<str>>,
+}
+
+#[derive(Debug, PartialEq, Clone, Default, Serialize)]
+pub struct Span {
+    /// The start position of the span (inclusive)
+    pub start: Position,
+    /// The end position of the span (exclusive)
+    pub end: Position, 
+}
+
+impl Span {
+    pub fn length(&self) -> usize {
+        self.end.column - self.start.column
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Token {
     pub kind: TokenKind,
-    pub position: Position,
+    pub span: Span,
 }
 
 impl Token {
+    pub fn length(&self) -> usize {
+        self.span.length()
+    }
 }
 
 impl Default for Token {
     fn default() -> Self {
         Self {
             kind: TokenKind::EOF,
-            position: Position::default(),
+            span: Span::default(),
         }
     }
 }
 
 /// Tokens for the lexer
 // ignore the unused variants for now
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum TokenKind {
     // Keywords
@@ -139,6 +158,34 @@ impl TokenKind {
             "as" => Some(TokenKind::As),
             "true" => Some(TokenKind::True),
             "false" => Some(TokenKind::False),
+            _ => None,
+        }
+    }
+    
+    pub fn as_number(&self) -> Option<&str> {
+        match self {
+            TokenKind::Number(value) => Some(value),
+            _ => None,
+        }
+    }
+    
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            TokenKind::String(value) => Some(value),
+            _ => None,
+        }
+    }
+    
+    pub fn as_identifier(&self) -> Option<&str> {
+        match self {
+            TokenKind::Identifier(value) => Some(value),
+            _ => None,
+        }
+    }
+    
+    pub fn as_char(&self) -> Option<char> {
+        match self {
+            TokenKind::Char(value) => Some(*value),
             _ => None,
         }
     }

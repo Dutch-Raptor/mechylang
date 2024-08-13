@@ -2,14 +2,13 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
 use crate::parser::expressions::Expression;
 use crate::parser::Parser;
-use crate::{Error, Token};
+use crate::{Error, Span, TokenKind};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct ArrayLiteral {
-    pub token: Token,
+    pub span: Span,
     pub elements: Rc<[Expression]>,
 }
 
@@ -30,12 +29,12 @@ impl Parser {
 
     pub(super) fn parse_array_expression(&mut self) -> Result<ArrayLiteral, Error> {
         debug_assert!(self.is_cur_token(TokenKind::LeftSquare), "Expected current token to be `[`");
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
         let elements = self.parse_expression_list(TokenKind::RightSquare)?;
         
         debug_assert!(self.is_cur_token(TokenKind::RightSquare), "Expected current token to be `]`");
 
-        Ok(ArrayLiteral { token, elements: elements.into() })
+        Ok(ArrayLiteral { span: self.span_with_start(start), elements: elements.into() })
     }
 }
 

@@ -593,20 +593,16 @@
 //!
 //! [examples]: crate::docs::examples
 
+#[cfg(doc)]
 pub mod docs;
-mod errors;
+mod error;
 pub mod evaluator;
-mod lexer;
-mod parser;
+pub mod lexer;
+pub mod parser;
 pub mod test_utils;
 mod tracer;
 
-pub use errors::Error;
-pub use evaluator::EvalConfig;
-pub use evaluator::Evaluator;
-pub use evaluator::eval_file;
-pub use evaluator::objects::Object;
-pub use evaluator::runtime::environment::Environment;
-pub use lexer::Lexer;
-pub use lexer::tokens::{Token, TokenKind};
-pub use parser::Parser;
+pub use error::Error;
+pub use lexer::{Lexer, Token, TokenKind, Span, Position};
+pub use parser::{Parser, Expression, Statement, Program};
+pub use evaluator::{EvalConfig, Evaluator, eval_file, Object, Environment};

@@ -2,15 +2,13 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
-use crate::parser::Parser;
-use crate::{Error, Token, trace};
-use crate::errors::ErrorKind;
+use crate::{Error, Expression, Parser, Span, Token, TokenKind, trace};
+use crate::error::ErrorKind;
+use crate::parser::expressions::ExpressionSpanExt;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct InfixExpression {
-    pub token: Token,
+    pub span: Span,
     pub left: Rc<Expression>,
     pub operator: InfixOperator,
     pub right: Rc<Expression>,
@@ -221,12 +219,11 @@ impl Parser {
 
     pub(super) fn parse_infix_expression(&mut self, left: Expression) -> Result<InfixExpression, Error> {
         let _trace = trace!("parse_infix_expression");
-        let token = self.cur_token.clone();
 
-        let operator = Self::parse_infix_operator(&token)
+        let operator = Self::parse_infix_operator(&self.cur_token)
             .ok_or(self.error_current(
                 ErrorKind::MissingInfix,
-                format!("expected infix operator, got {:?}", token),
+                format!("expected infix operator, got {:?}", self.cur_token.kind),
             ))?;
 
         let precedence = self.cur_precedence();
@@ -234,7 +231,7 @@ impl Parser {
         let right = self.parse_expression(precedence)?;
 
         Ok(InfixExpression {
-            token,
+            span: self.span_with_start(left.span().start.clone()),
             operator,
             left: Rc::new(left),
             right: Rc::new(right),

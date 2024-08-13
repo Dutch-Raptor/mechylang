@@ -2,16 +2,13 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
-use crate::parser::Parser;
-use crate::{Error, Token};
-use crate::errors::ErrorKind;
-use crate::parser::expressions::precedence::Precedence;
+use crate::{Error, Expression, Parser, Span, Token, TokenKind};
+use crate::error::ErrorKind;
+use crate::parser::expressions::Precedence;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RangeExpression {
-    pub token: Token,
+    pub span: Span,
     pub left: Rc<Expression>,
     pub right: Rc<Expression>,
     pub inclusive: bool,
@@ -30,7 +27,7 @@ impl Display for RangeExpression {
 }
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RangeToExpression {
-    pub token: Token,
+    pub span: Span,
     pub right: Rc<Expression>,
     pub inclusive: bool,
 }
@@ -43,7 +40,7 @@ impl Display for RangeToExpression {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RangeFromExpression {
-    pub token: Token,
+    pub span: Span,
     pub left: Rc<Expression>,
     pub inclusive: bool,
 }
@@ -61,7 +58,7 @@ impl Display for RangeFromExpression {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RangeFullExpression {
-    pub token: Token,
+    pub span: Span,
 }
 
 impl Display for RangeFullExpression {
@@ -72,10 +69,10 @@ impl Display for RangeFullExpression {
 
 impl Parser {
     pub(super) fn parse_range_infix_expression(&mut self, left: Expression) -> Result<Expression, Error> {
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
 
         let precedence = self.cur_precedence();
-        let inclusive = Self::range_is_inclusive(&token).ok_or(self.error_current(
+        let inclusive = Self::range_is_inclusive(&self.cur_token).ok_or_else(|| self.error_current(
             ErrorKind::UnexpectedToken,
             format!("Expected a range operator, got {:?}", self.cur_token),
         ))?;
@@ -88,7 +85,7 @@ impl Parser {
         // [1..] // RangeFrom
         if self.peek_token.kind == TokenKind::RightParen || self.peek_token.kind == TokenKind::RightSquare {
             return Ok(Expression::RangeFrom(RangeFromExpression {
-                token,
+                span: self.span_with_start(start),
                 left: Rc::new(left),
                 inclusive,
             }));
@@ -100,7 +97,7 @@ impl Parser {
         let right = self.parse_expression(precedence)?;
 
         Ok(Expression::Range(RangeExpression {
-            token,
+            span: self.span_with_start(start),
             left: Rc::new(left),
             right: Rc::new(right),
             inclusive,
@@ -111,13 +108,14 @@ impl Parser {
     /// Parses a RangeTo expression
     /// e.g. `..5` or `..=5`
     pub(super) fn parse_range_prefix_expression(&mut self) -> Result<Expression, Error> {
-        let token = self.cur_token.clone();
+        let start = self.cur_token.span.start.clone();
+        let range_token = self.cur_token.clone();
 
         // check if we are dealing with a FullRange expression
         // e.g. `..`
         // if so, we would have a `..` token followed by a ')' or a ']' token
         if self.peek_token.kind == TokenKind::RightParen || self.peek_token.kind == TokenKind::RightSquare {
-            return Ok(Expression::RangeFull(RangeFullExpression { token }));
+            return Ok(Expression::RangeFull(RangeFullExpression { span: self.span_with_start(start) }));
         }
 
         self.next_token();
@@ -125,13 +123,13 @@ impl Parser {
 
         let right = self.parse_expression(Precedence::Prefix)?;
 
-        let inclusive = Self::range_is_inclusive(&token).ok_or(self.error_current(
+        let inclusive = Self::range_is_inclusive(&range_token).ok_or_else(|| self.error_current(
             ErrorKind::UnexpectedToken,
             format!("Expected a range operator, got {:?}", self.cur_token),
         ))?;
 
         Ok(Expression::RangeTo(RangeToExpression {
-            token,
+            span: self.span_with_start(start),
             right: Rc::new(right),
             inclusive,
         }))

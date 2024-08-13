@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
-use crate::Token;
+use crate::{Span};
 
 /// Represents a `continue` statement in Mechylang.
 ///
@@ -13,11 +13,11 @@ use crate::Token;
 /// * `token` - The token representing the `continue` keyword in the source code.
 #[derive(Debug, PartialEq, Serialize)]
 pub struct ContinueStatement {
-    pub token: Token,
+    pub span: Span,
 }
 
 impl Display for ContinueStatement {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{};", self.token)
+        write!(f, "continue;")
     }
 }

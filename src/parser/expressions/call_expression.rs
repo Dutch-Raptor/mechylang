@@ -2,14 +2,13 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::lexer::tokens::TokenKind;
-use crate::parser::expressions::Expression;
+use crate::parser::expressions::{Expression, ExpressionSpanExt};
 use crate::parser::Parser;
-use crate::{Error, Token};
+use crate::{Error, Span, TokenKind};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct CallExpression {
-    pub token: Token,
+    pub span: Span,
     pub function: Rc<Expression>,
     pub arguments: Rc<[Expression]>,
 }
@@ -31,7 +30,7 @@ impl Parser {
         let arguments = self.parse_expression_list(TokenKind::RightParen)?;
 
         Ok(CallExpression {
-            token: self.cur_token.clone(),
+            span: self.span_with_start(left.span().start.clone()),
             function: Rc::new(left),
             arguments: arguments.into(),
         })
@@ -41,7 +40,7 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::Lexer;
-    use crate::lexer::tokens::TokenKind;
+    use crate::TokenKind;
     use crate::parser::expressions::Expression;
     use crate::parser::Parser;
     use crate::parser::statements::Statement;
@@ -66,10 +65,6 @@ mod tests {
                     match call.function.as_ref() {
                         Expression::Identifier(ref ident) => {
                             assert_eq!(ident.value, "add".into());
-                            assert_eq!(
-                                ident.token.kind,
-                                TokenKind::Identifier("add".into())
-                            );
                         }
                         _ => panic!("expected identifier expression"),
                     };

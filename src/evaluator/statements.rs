@@ -1,6 +1,5 @@
-use crate::parser::statements::Statement;
-use crate::{Evaluator, Environment, Error, Object, trace};
-use crate::parser::statements::let_statement::LetStatement;
+use crate::{Evaluator, Environment, Error, Object, trace, Statement};
+use crate::parser::statements::LetStatement;
 
 impl Evaluator {
     pub(super) fn eval_statement(

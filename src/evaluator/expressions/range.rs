@@ -1,6 +1,6 @@
 use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::errors::ErrorKind;
-use crate::parser::expressions::{Expression, ExpressionToken};
+use crate::error::ErrorKind;
+use crate::parser::expressions::{Expression, ExpressionSpanExt};
 
 impl Evaluator {
     pub(super) fn eval_range_expression(
@@ -37,7 +37,7 @@ impl Evaluator {
             Expression::RangeFull(_) => Object::RangeFull,
             _ => {
                 return Err(self.error(
-                    Some(expression.token()),
+                    expression.span().clone(),
                     &format!("Invalid range expression: {:?}", expression).to_string(),
                     ErrorKind::UnexpectedToken,
                 ));

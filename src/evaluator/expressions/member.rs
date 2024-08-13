@@ -1,5 +1,5 @@
 use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::errors::ErrorKind;
+use crate::error::ErrorKind;
 use crate::evaluator::methods::{MethodError, ObjectMethods};
 use crate::parser::expressions::{Expression, MemberExpression};
 
@@ -25,7 +25,7 @@ impl Evaluator {
             Err(MethodError::NotFound) => {}
             Err(err @ MethodError::IterMethodOnIterable(_)) => {
                 return Err(self.error(
-                    Some(&member.property.token),
+                    member.property.span.clone(),
                     &err.to_string(),
                     ErrorKind::TypeError,
                 ))
@@ -34,7 +34,7 @@ impl Evaluator {
 
         // try to read property from object
         Err(self.error(
-            Some(&member.property.token),
+            member.property.span.clone(),
             &format!(
                 "Property or method '{}' not found on object: {:?}",
                 property, object

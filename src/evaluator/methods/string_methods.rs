@@ -1,6 +1,5 @@
 use crate::evaluator::objects::iterators::IteratorObject;
 use crate::Object;
-use itertools::Itertools;
 
 use super::MethodInner;
 
@@ -214,7 +213,7 @@ pub const STRING_METHODS: [MethodInner; 9] = [
                 iterator: Box::new(
                     s.lines()
                         .map(Object::from)
-                        .collect_vec()
+                        .collect::<Vec<Object>>()
                         .into_iter(),
                 ),
             }))

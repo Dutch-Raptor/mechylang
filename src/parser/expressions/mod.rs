@@ -14,51 +14,51 @@
 //! - All expression variants
 //! - implementations for `Display` for all expression variants
 //! - implementations for the parse functions for all expression variants for the parser
-pub mod precedence;
-pub mod identifier;
-pub mod number_expressions;
-pub mod boolean_literal;
-pub mod string_literal;
-pub mod prefix_expression;
-pub mod infix_expression;
-pub mod if_expression;
-pub mod function_literal;
-pub mod call_expression;
-pub mod array_literal;
-pub mod index_expression;
-pub mod range_expressions;
-pub mod for_expression;
-pub mod while_expression;
-pub mod member_expression;
-pub mod struct_literal;
-pub mod block_expression;
+mod precedence;
+mod identifier;
+mod number_expressions;
+mod boolean_literal;
+mod string_literal;
+mod prefix_expression;
+mod infix_expression;
+mod if_expression;
+mod function_literal;
+mod call_expression;
+mod array_literal;
+mod index_expression;
+mod range_expressions;
+mod for_expression;
+mod while_expression;
+mod member_expression;
+mod struct_literal;
+mod block_expression;
 
 use std::fmt::{self, Display, Formatter};
 
 use serde::Serialize;
 
-use crate::lexer::tokens::{Token, TokenKind};
-pub use crate::parser::expressions::array_literal::ArrayLiteral;
-pub use crate::parser::expressions::boolean_literal::BooleanLiteral;
-pub use crate::parser::expressions::call_expression::CallExpression;
-pub use crate::parser::expressions::number_expressions::{FloatLiteral, IntegerLiteral};
-pub use crate::parser::expressions::for_expression::ForExpression;
-pub use crate::parser::expressions::function_literal::FunctionLiteral;
-pub use crate::parser::expressions::identifier::Identifier;
-pub use crate::parser::expressions::if_expression::IfExpression;
-pub use crate::parser::expressions::index_expression::IndexExpression;
-pub use crate::parser::expressions::infix_expression::{InfixExpression, InfixOperator};
-pub use crate::parser::expressions::member_expression::MemberExpression;
-pub use crate::parser::expressions::precedence::Precedence;
-pub use crate::parser::expressions::prefix_expression::{PrefixExpression, PrefixOperator};
-pub use crate::parser::expressions::range_expressions::{RangeExpression, RangeFromExpression, RangeFullExpression, RangeToExpression};
-pub use crate::parser::expressions::string_literal::StringLiteral;
-pub use crate::parser::expressions::struct_literal::StructLiteral;
-pub use crate::parser::expressions::while_expression::WhileExpression;
+pub use precedence::Precedence;
+pub use array_literal::ArrayLiteral;
+pub use boolean_literal::BooleanLiteral;
+pub use call_expression::CallExpression;
+pub use number_expressions::{FloatLiteral, IntegerLiteral};
+pub use for_expression::ForExpression;
+pub use function_literal::FunctionLiteral;
+pub use identifier::Identifier;
+pub use if_expression::IfExpression;
+pub use index_expression::IndexExpression;
+pub use infix_expression::{InfixExpression, InfixOperator};
+pub use member_expression::MemberExpression;
+pub use prefix_expression::{PrefixExpression, PrefixOperator};
+pub use range_expressions::{RangeExpression, RangeFromExpression, RangeFullExpression, RangeToExpression};
+pub use string_literal::StringLiteral;
+pub use struct_literal::StructLiteral;
+pub use while_expression::WhileExpression;
+pub use block_expression::BlockExpression;
 use crate::parser::Parser;
-use crate::{Error, trace};
-use crate::errors::ErrorKind;
-use crate::parser::expressions::block_expression::BlockExpression;
+use crate::error::ErrorKind;
+use crate::{Error, Span, TokenKind, trace};
+
 
 /// Represents an expression in Mechylang.
 ///
@@ -272,7 +272,7 @@ pub enum Expression {
     /// ();
     /// # "#);
     /// ```
-    Unit(Token),
+    Unit(Span),
     /// Represents a struct literal (instantiation of an anonymous struct).
     /// ```
     /// # use mechylang::test_utils::test_parse_ok;
@@ -283,35 +283,35 @@ pub enum Expression {
     StructLiteral(StructLiteral),
 }
 
-pub trait ExpressionToken {
-    fn token(&self) -> &Token;
+pub trait ExpressionSpanExt {
+    fn span(&self) -> &Span;
 }
 
-impl ExpressionToken for Expression {
-    fn token(&self) -> &Token {
+impl ExpressionSpanExt for Expression {
+    fn span(&self) -> &Span {
         match self {
-            Expression::Identifier(ident) => &ident.token,
-            Expression::IntegerLiteral(lit) => &lit.token,
-            Expression::FloatLiteral(lit) => &lit.token,
-            Expression::StructLiteral(lit) => &lit.token,
-            Expression::Prefix(expr) => &expr.token,
-            Expression::Infix(expr) => &expr.token,
-            Expression::Boolean(boolean) => &boolean.token,
-            Expression::If(if_expr) => &if_expr.token,
-            Expression::Function(func) => &func.token,
-            Expression::Call(call) => &call.token,
-            Expression::Block(block) => &block.token,
-            Expression::StringLiteral(lit) => &lit.token,
-            Expression::ArrayLiteral(lit) => &lit.token,
-            Expression::Index(index) => &index.token,
-            Expression::Range(range) => &range.token,
-            Expression::RangeTo(range) => &range.token,
-            Expression::RangeFrom(range) => &range.token,
-            Expression::RangeFull(range) => &range.token,
-            Expression::For(for_expr) => &for_expr.token,
-            Expression::While(while_expr) => &while_expr.token,
-            Expression::Member(member) => &member.token,
-            Expression::Unit(token) => token,
+            Expression::Identifier(ident) => &ident.span,
+            Expression::IntegerLiteral(lit) => &lit.span,
+            Expression::FloatLiteral(lit) => &lit.span,
+            Expression::StructLiteral(lit) => &lit.span,
+            Expression::Prefix(expr) => &expr.span,
+            Expression::Infix(expr) => &expr.span,
+            Expression::Boolean(boolean) => &boolean.span,
+            Expression::If(if_expr) => &if_expr.span,
+            Expression::Function(func) => &func.span,
+            Expression::Call(call) => &call.span,
+            Expression::Block(block) => &block.span,
+            Expression::StringLiteral(lit) => &lit.span,
+            Expression::ArrayLiteral(lit) => &lit.span,
+            Expression::Index(index) => &index.span,
+            Expression::Range(range) => &range.span,
+            Expression::RangeTo(range) => &range.span,
+            Expression::RangeFrom(range) => &range.span,
+            Expression::RangeFull(range) => &range.span,
+            Expression::For(for_expr) => &for_expr.span,
+            Expression::While(while_expr) => &while_expr.span,
+            Expression::Member(member) => &member.span,
+            Expression::Unit(span) => span,
         }
     }
 }
@@ -414,7 +414,7 @@ impl Parser {
 
         if self.cur_token.kind == TokenKind::RightParen {
             return Ok(Expression::Unit(
-                self.cur_token.clone()
+                self.cur_token.span.clone()
             ));
         }
 
@@ -466,7 +466,7 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::expressions::{Expression, InfixExpression, InfixOperator, Precedence, PrefixExpression};
+    use crate::parser::expressions::{Expression, InfixExpression, InfixOperator, Precedence, PrefixExpression, PrefixOperator};
     use crate::{Parser, TokenKind};
 
     #[test]
@@ -483,12 +483,11 @@ mod tests {
             // Check the infix expression
             if let Expression::Prefix(
                 PrefixExpression {
-                    token: ref left_token,
                     right: ref expr,
+                    operator: PrefixOperator::Minus,
                     ..
                 }
             ) = *left {
-                assert_eq!(left_token.kind, TokenKind::Minus);
                 assert!(matches!(expr.as_ref(), Expression::Identifier(_)));
             } else {
                 panic!("Expected prefix expression for left operand");
