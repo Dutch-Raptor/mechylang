@@ -17,7 +17,7 @@ mod tests;
 pub use config::EvalConfig;
 pub use objects::Object;
 pub use runtime::{Environment};
-use crate::{Error, Lexer, Parser, Program, Span, Statement, TokenKind, trace};
+use crate::{Error, Lexer, Parser, Program, Span, Statement, trace};
 
 pub fn eval_file(file: &str) -> Result<(), Vec<String>> {
     let input = std::fs::read_to_string(file).unwrap();

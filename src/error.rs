@@ -197,29 +197,3 @@ impl Display for Error {
         Ok(())
     }
 }
-
-impl Error {
-    fn fmt_without_token(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let message = self.message.split('\n').collect::<Vec<&str>>();
-        let first_line = message[0];
-        let rest = match message.len() {
-            1 => &[],
-            _ => &message[1..],
-        };
-
-        writeln!(f, "{}", cformat!("{:?}", self.kind))?;
-
-        self.line
-            .as_ref()
-            .map(|line| writeln!(f, "{}", cformat!("{}", line)))
-            .unwrap_or(Ok(()))?;
-
-        writeln!(f, "{}", cformat!("{}", first_line))?;
-
-        for line in rest {
-            write!(f, "\n{}", cformat!("{}", line))?;
-        }
-
-        Ok(())
-    }
-}
