@@ -1,0 +1,43 @@
+let is_prime = fn() {
+    // Cache primes
+    let primes = [2]
+    let func = fn(target) {
+        for (idx, prime) in primes {
+            // since the lowest prime factor is always lower than the square root of the number
+            // we can stop checking primes once we find a factor that is greater than the square root
+            if prime * prime > target
+            {
+    //            println("checked", idx, "primes,", "skipped", primes.len() - idx, "primes")
+
+                primes.push(target)
+                return true
+            }
+            if target % prime == 0 {
+    //            println("checked", idx, "primes,", "skipped", primes.len() - idx, "primes")
+                return false
+            }
+        }
+    //    println("checked", primes.len(), "primes")
+        primes.push(target)
+        return true
+    }
+
+    func
+}()
+
+let test = "hello"
+
+for i in (1..300_000) {
+    if i == 1 {
+        continue
+    }
+
+    if i == 2 {
+        println(i, "is prime")
+        continue
+    }
+
+    if is_prime(i) {
+        println(i, "is prime")
+    }
+}
