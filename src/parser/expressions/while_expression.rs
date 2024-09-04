@@ -2,8 +2,9 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Expression, Parser, Span, TokenKind};
+use crate::{Expression, Parser, Span, TokenKind};
 use crate::parser::expressions::{BlockExpression, Precedence};
+use crate::parser::{Result};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct WhileExpression {
@@ -27,10 +28,10 @@ impl Parser {
     ///
     /// ```text
     /// while <condition> { <body> }
-    pub(super) fn parse_while_expression(&mut self) -> Result<WhileExpression, Error> {
+    pub(super) fn parse_while_expression(&mut self) -> Result<WhileExpression> {
         let start = self.cur_token.span.start.clone();
 
-        self.next_token();
+        self.next_token()?;
 
         let condition = self.parse_expression(Precedence::Lowest)?;
 

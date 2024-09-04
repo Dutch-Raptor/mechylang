@@ -1,5 +1,6 @@
-use crate::{Environment, Error, Evaluator, Object, trace};
+use crate::{Environment,Evaluator, Object, trace};
 use crate::error::ErrorKind;
+use crate::evaluator::{Result, Error};
 use crate::evaluator::objects::iterators::IteratorObject;
 use crate::parser::expressions::{ExpressionSpanExt, ForExpression, IfExpression, WhileExpression};
 
@@ -8,7 +9,7 @@ impl Evaluator {
         &mut self,
         if_expr: &IfExpression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let condition = self.eval_expression(&if_expr.condition, env)?;
 
         if Self::is_truthy(&condition) {
@@ -25,7 +26,7 @@ impl Evaluator {
         &mut self,
         for_expr: &ForExpression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!("eval_for_expression: {}", for_expr));
 
         let mut result = Object::Unit;
@@ -33,11 +34,10 @@ impl Evaluator {
         let iterable = self.eval_expression(&for_expr.iterable, env)?;
 
         let iterator = IteratorObject::try_from(iterable).map_err(|err| {
-            self.error(
-                for_expr.iterable.span().clone(),
-                &format!("Error iterating over object: {}", err).to_string(),
-                ErrorKind::TypeError,
-            )
+            Error::IteratingOverNonIterable {
+                span: for_expr.iterable.span().clone(),
+                reason: err,
+            }
         })?;
 
         for (index, item) in iterator.enumerate() {
@@ -73,7 +73,7 @@ impl Evaluator {
         &mut self,
         while_expr: &WhileExpression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!("eval_while_expression: {}", while_expr));
 
         let mut result = Object::Unit;

@@ -1,13 +1,14 @@
-use crate::{Environment, Error, Evaluator, Object, trace};
+use crate::{Environment,  Evaluator, Object, trace};
 use crate::error::ErrorKind;
 use crate::parser::expressions::{Expression, ExpressionSpanExt};
+use crate::evaluator::{Result, Error};
 
 impl Evaluator {
     pub(super) fn eval_range_expression(
         &mut self,
         expression: &Expression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!("eval_range_expression: {}", expression));
 
         Ok(match expression {
@@ -36,11 +37,7 @@ impl Evaluator {
             }
             Expression::RangeFull(_) => Object::RangeFull,
             _ => {
-                return Err(self.error(
-                    expression.span().clone(),
-                    &format!("Invalid range expression: {:?}", expression).to_string(),
-                    ErrorKind::UnexpectedToken,
-                ));
+                panic!("Expected range expression, got {:?}", expression);
             }
         })
     }

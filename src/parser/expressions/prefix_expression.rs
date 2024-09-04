@@ -2,9 +2,12 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Expression, Parser, Span, TokenKind, trace};
-use crate::error::ErrorKind;
-use crate::parser::expressions::Precedence;
+use crate::{Expression, Parser, Span, TokenKind, trace};
+use crate::parser::{
+    expressions::Precedence,
+    Error,
+    Result,
+};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct PrefixExpression {
@@ -77,7 +80,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_prefix(&mut self) -> Result<Expression, Error> {
+    pub(crate) fn parse_prefix(&mut self) -> Result<Expression> {
         let _trace = trace!("parse_prefix");
         match self.cur_token.kind {
             TokenKind::Identifier(_) => Ok(Expression::Identifier(self.parse_identifier()?)),
@@ -107,14 +110,14 @@ impl Parser {
             TokenKind::While => Ok(Expression::While(self.parse_while_expression()?)),
 
             TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_prefix_expression(),
-            _ => Err(self.error_current(
-                ErrorKind::MissingPrefix,
-                format!("No registered prefix function for {:?}", self.cur_token.kind),
-            )),
+            _ => Err(Error::InvalidPrefix {
+                span: self.cur_token.span.clone(),
+                found: self.cur_token.kind.clone(),
+            }),
         }
     }
 
-    pub(super) fn parse_prefix_expression(&mut self) -> Result<PrefixExpression, Error> {
+    pub(super) fn parse_prefix_expression(&mut self) -> Result<PrefixExpression> {
         let _trace = trace!("parse_prefix_expression");
         let start = self.cur_token.span.start.clone();
 
@@ -124,14 +127,14 @@ impl Parser {
             TokenKind::BitwiseNot => PrefixOperator::BitwiseNot,
             TokenKind::Ampersand => PrefixOperator::Ampersand,
             _ => {
-                return Err(self.error_current(
-                    ErrorKind::MissingPrefix,
-                    format!("Expected a prefix operator, got {:?}", self.cur_token.kind),
-                ))
+                return Err(Error::InvalidPrefix {
+                    span: self.cur_token.span.clone(),
+                    found: self.cur_token.kind.clone(),
+                })
             }
         };
 
-        self.next_token();
+        self.next_token()?;
 
         let right = self.parse_expression(Precedence::Prefix)?;
 

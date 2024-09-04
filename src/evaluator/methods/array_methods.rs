@@ -1,10 +1,17 @@
 //! # Methods for the `Object::Array` type
 //!
 //! For info on the `Object::Array` type, see [the documentation for the `Object` enum](crate::Object#variant.Array).
+
+use std::sync::Arc;
+use lazy_static::lazy_static;
+use crate::evaluator::Error;
+use crate::evaluator::objects::{ArgumentList, ArgumentType, FunctionTy, MethodTy, ObjectTy};
 use crate::Object;
 
-use super::{get_mutable_ident, MethodInner};
+use super::{MethodInner};
 
+
+lazy_static! {
 /// ## `push(item: Any) -> Null`
 /// Pushes an item to the end of the array
 ///
@@ -15,27 +22,6 @@ use super::{get_mutable_ident, MethodInner};
 /// assert_eq(arr, [1, 2, 3, 4]);
 /// # "#);
 /// ```
-pub const ARRAY_PUSH: MethodInner = MethodInner {
-    name: "push",
-    args_len: 1..=1,
-    function: |_, ident, args, env, _| {
-        let value = args[0].clone();
-
-        let ident = get_mutable_ident(ident)?;
-
-        env.mutate(ident.to_string(), move |arr| {
-            if let Object::Array(ref mut arr) = arr {
-                arr.push(value.clone());
-                Ok(Object::Unit)
-            } else {
-                Err(format!("Expected array, got {}", arr))
-            }
-        })
-        .map_err(|e| e.to_string())?;
-        Ok(Object::Unit)
-    },
-};
-
 /// ## `pop() -> Any`
 /// Removes the last item from the array and returns it
 ///
@@ -46,27 +32,6 @@ pub const ARRAY_PUSH: MethodInner = MethodInner {
 /// assert_eq(arr, [1, 2]);
 /// # "#);
 /// ```
-pub const ARRAY_POP: MethodInner = MethodInner {
-    name: "pop",
-    args_len: 0..=0,
-    function: |_, ident, _, env, _| {
-        let ident = get_mutable_ident(ident)?;
-
-        let item = env
-            .mutate(ident.to_string(), move |arr| {
-                if let Object::Array(ref mut arr) = arr {
-                    arr.pop()
-                        .map(Ok)
-                        .unwrap_or(Err("Array is empty".to_string()))
-                } else {
-                    Err(format!("Expected array, got {}", arr))
-                }
-            })
-            .map_err(|e| e.to_string())?;
-        Ok(item)
-    },
-};
-
 /// ## `first() -> Any`
 /// Returns the first item in the array
 ///
@@ -77,27 +42,6 @@ pub const ARRAY_POP: MethodInner = MethodInner {
 /// assert_eq(arr, [1, 2, 3]);
 /// # "#);
 /// ```
-pub const ARRAY_FIRST: MethodInner = MethodInner {
-    name: "first",
-    args_len: 0..=0,
-    function: |_, ident, _, env, _| {
-        let ident = get_mutable_ident(ident)?;
-
-        let item = env
-            .mutate(ident.to_string(), move |arr| {
-                if let Object::Array(ref mut arr) = arr {
-                    arr.first()
-                        .map(|v| Ok(v.clone()))
-                        .unwrap_or(Err("Array is empty".to_string()))
-                } else {
-                    Err(format!("Expected array, got {}", arr))
-                }
-            })
-            .map_err(|e| e.to_string())?;
-        Ok(item)
-    },
-};
-
 /// ## `last() -> Any`
 ///
 /// Returns the last item in the array
@@ -109,27 +53,6 @@ pub const ARRAY_FIRST: MethodInner = MethodInner {
 /// assert_eq(arr, [1, 2, 3]);
 /// # "#);
 /// ```
-pub const ARRAY_LAST: MethodInner = MethodInner {
-    name: "last",
-    args_len: 0..=0,
-    function: |_, ident, _, env, _| {
-        let ident = get_mutable_ident(ident)?;
-
-        let item = env
-            .mutate(ident.to_string(), move |arr| {
-                if let Object::Array(ref mut arr) = arr {
-                    arr.last()
-                        .map(|v| Ok(v.clone()))
-                        .unwrap_or(Err("Array is empty".to_string()))
-                } else {
-                    Err(format!("Expected array, got {}", arr))
-                }
-            })
-            .map_err(|e| e.to_string())?;
-        Ok(item)
-    },
-};
-
 /// ## `len() -> Integer`
 ///
 /// Returns the length of the array
@@ -141,15 +64,6 @@ pub const ARRAY_LAST: MethodInner = MethodInner {
 /// assert_eq(arr, [1, 2, 3]);
 /// # "#);
 /// ```
-pub const ARRAY_LEN: MethodInner = MethodInner {
-    name: "len",
-    args_len: 0..=0,
-    function: |obj, _, _, _, _| match obj {
-        Object::Array(ref arr) => Ok(Object::Integer(arr.len() as i64)),
-        _ => Err("Argument to `len` not supported".to_string()),
-    },
-};
-
 /// ## `insert(index: Integer, item: Any) -> Null`
 ///
 /// Inserts an item at the given index, shifting all items after it to the right
@@ -161,44 +75,6 @@ pub const ARRAY_LEN: MethodInner = MethodInner {
 /// assert_eq(arr, [1, 4, 2, 3]);
 /// # "#);
 /// ```
-pub const ARRAY_INSERT: MethodInner = MethodInner {
-    name: "insert",
-    args_len: 2..=2,
-    function: |obj, ident, args, env, _| {
-        let index = match args[0] {
-            Object::Integer(i) => i,
-            _ => return Err("Expected integer for index".to_string()),
-        };
-
-        let value = args[1].clone();
-
-        let ident = get_mutable_ident(ident)?;
-
-        match obj {
-            Object::Array(arr) => {
-                if index < 0 || index as usize > arr.len() {
-                    return Err(format!(
-                        "Index {} out of bounds for array of length {}",
-                        index,
-                        arr.len()
-                    ));
-                }
-            }
-            _ => return Err("Expected array".to_string()),
-        }
-
-        env.mutate(ident.to_string(), move |arr| {
-            if let Object::Array(ref mut arr) = arr {
-                arr.insert(index as usize, value.clone());
-                Ok(Object::Unit)
-            } else {
-                Err(format!("Expected array, got {}", arr))
-            }
-        })?;
-        Ok(Object::Unit)
-    },
-};
-
 /// ## `remove(index: Integer) -> Any`
 ///
 /// Removes an item at the given index, shifting all items after it to the left
@@ -211,43 +87,6 @@ pub const ARRAY_INSERT: MethodInner = MethodInner {
 /// assert_eq(arr, [1, 3]);
 /// # "#);
 /// ```
-pub const ARRAY_REMOVE: MethodInner = MethodInner {
-    name: "remove",
-    args_len: 1..=1,
-    function: |obj, ident, args, env, _| {
-        let index = match args[0] {
-            Object::Integer(i) => i,
-            _ => return Err("Expected integer for index".to_string()),
-        };
-
-        let ident = get_mutable_ident(ident)?;
-
-        match obj {
-            Object::Array(arr) => {
-                if index < 0 || index as usize > arr.len() {
-                    return Err(format!(
-                        "Index {} out of bounds for array of length {}",
-                        index,
-                        arr.len()
-                    ));
-                }
-            }
-            _ => return Err("Expected array".to_string()),
-        }
-
-        let item = env
-            .mutate(ident.to_string(), move |arr| {
-                if let Object::Array(ref mut arr) = arr {
-                    Ok(arr.remove(index as usize))
-                } else {
-                    Err(format!("Expected array, got {}", arr))
-                }
-            })
-            .map_err(|e| e.to_string())?;
-        Ok(item)
-    },
-};
-
 /// ## `contains(item: Any) -> Boolean`
 /// Returns true if the array contains the given item
 ///
@@ -256,29 +95,207 @@ pub const ARRAY_REMOVE: MethodInner = MethodInner {
 /// assert_eq([1, 2, 3].contains(1), true);
 /// assert_eq([1, 2, 3].contains(4), false);
 /// # "#);
-pub const ARRAY_CONTAINS: MethodInner = MethodInner {
-    name: "contains",
-    args_len: 1..=1,
-    function: |obj, _, args, _, _| {
-        let value = args[0].clone();
+    pub static ref ARRAY_METHODS: Arc<[MethodInner]> = Arc::new([
+    MethodInner {
+        method_ty: MethodTy {
+            method_name: "push",
+            self_ty: Box::new(ObjectTy::Array { expected_item_types: None }),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_exactly(vec![ArgumentType { name: "item".into(), ty: ObjectTy::Any }]),
+                expected_return_type: Some(Box::new(ObjectTy::Unit)),
+            },
+        },
 
-        match obj {
-            Object::Array(arr) => Ok(Object::Boolean(arr.contains(&value))),
-            _ => Err("Argument to `contains` not supported".to_string()),
-        }
-    },
-};
+        function: |args| {
+            let arg = args.args[0].clone();
 
-pub(crate) const ARRAY_METHODS: [MethodInner; 8] = [
-    ARRAY_CONTAINS,
-    ARRAY_REMOVE,
-    ARRAY_PUSH,
-    ARRAY_POP,
-    ARRAY_FIRST,
-    ARRAY_LAST,
-    ARRAY_INSERT,
-    ARRAY_LEN,
-];
+            if let Some(ident) = args.obj_identifier {
+                return args.env.mutate(ident.to_string(), move |arr| {
+                    if let Object::Array(ref mut arr) = arr {
+                        arr.push(arg.value.clone());
+                        Ok(Object::Unit)
+                    } else {
+                        Err(Error::TypeError {
+                            span: args.method_span.clone(),
+                            expected: vec![ObjectTy::Array { expected_item_types: None }],
+                            found: arr.get_type(),
+                        }.into())
+                    }
+                });
+            };
+
+            Ok(Object::Unit)
+        },
+    }, MethodInner {
+        method_ty: MethodTy {
+            method_name: "contains",
+            self_ty: Box::new(ObjectTy::Array { expected_item_types: None }),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_exactly(vec![ArgumentType { name: "item".into(), ty: ObjectTy::Any }]),
+                expected_return_type: Some(Box::new(ObjectTy::Boolean)),
+            },
+        },
+        function: |args| {
+            let value = args.args[0].clone();
+
+            let arr = args.obj.as_array().expect("Expected array method to be called on an array");
+            Ok(Object::Boolean(arr.contains(&value.value)))
+        },
+    }, MethodInner {
+        method_ty: MethodTy {
+            method_name: "remove",
+            self_ty: Box::new(ObjectTy::Array { expected_item_types: None }),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_exactly(vec![ArgumentType { name: "index".into(), ty: ObjectTy::Integer }]),
+                expected_return_type: Some(Box::new(ObjectTy::Any)),
+            },
+        },
+        function: |args| {
+            let index = args.args.first().and_then(|arg| arg.as_integer()).ok_or_else(|| Error::TypeError {
+                span: args.method_span.clone(),
+                expected: vec![ObjectTy::Integer],
+                found: args.args[0].get_type(),
+            })?;
+
+            if let Some(ident) = args.obj_identifier {
+                return args.env.mutate(ident.to_string(), move |arr| {
+                    if let Object::Array(ref mut arr) = arr {
+                        Ok(arr.remove(index as usize))
+                    } else {
+                        Err(Error::TypeError {
+                            span: args.method_span.clone(),
+                            expected: vec![ObjectTy::Array { expected_item_types: None }],
+                            found: arr.get_type(),
+                        }.into())
+                    }
+                });
+            } else {
+                match args.obj {
+                    Object::Array(ref arr) => Ok(arr.get(index as usize).cloned().unwrap_or(Object::Unit)),
+                    _ => Err(Error::TypeError {
+                        span: args.method_span.clone(),
+                        expected: vec![ObjectTy::Array { expected_item_types: None }],
+                        found: args.obj.get_type(),
+                    }.into()),
+                }
+            }
+        },
+    }, MethodInner {
+        method_ty: MethodTy {
+            method_name: "insert",
+            self_ty: Box::new(ObjectTy::Array { expected_item_types: None }),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_bounded(2..=2, vec![
+                    ArgumentType { name: "index".into(), ty: ObjectTy::Integer },
+                    ArgumentType { name: "item".into(), ty: ObjectTy::Any },
+                ]),
+                expected_return_type: Some(Box::new(ObjectTy::Unit)),
+            },
+        },
+        function: |args| {
+            let ident = match args.obj_identifier {
+                Some(ident) => ident,
+                None => return Ok(Object::Unit), // No identifier, so no need to mutate the array as it will be dropped
+            };
+
+            let index = args.args.first().and_then(|arg| arg.as_integer()).ok_or_else(|| Error::TypeError {
+                span: args.method_span.clone(),
+                expected: vec![ObjectTy::Integer],
+                found: args.args[0].get_type(),
+            })?;
+
+            let value = args.args[1].clone();
+
+            args.env.mutate(ident.to_string(), move |arr| {
+                if let Object::Array(ref mut arr) = arr {
+                    arr.insert(index as usize, value.value.clone());
+                    Ok(Object::Unit)
+                } else {
+                    Err(Error::TypeError {
+                        span: args.method_span.clone(),
+                        expected: vec![ObjectTy::Array { expected_item_types: None }],
+                        found: arr.get_type(),
+                    }.into())
+                }
+            })
+        },
+    }, MethodInner {
+        method_ty: MethodTy {
+            method_name: "len",
+            self_ty: Box::new(ObjectTy::Array { expected_item_types: None }),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::Integer)),
+            },
+        },
+        function: |args| {
+            let arr = args.obj.as_array().expect("Expected array method to be called on an array");
+            Ok(Object::Integer(arr.len() as i64))
+        },
+    }, MethodInner {
+        method_ty: MethodTy {
+            method_name: "last",
+            self_ty: Box::new(ObjectTy::Array { expected_item_types: None }),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::Any)),
+            },
+        },
+        function: |args| {
+            let arr = args.obj.as_array().expect("Expected array method to be called on an array");
+            Ok(arr.last().cloned().unwrap_or(Object::Unit))
+        },
+    }, MethodInner {
+        method_ty: MethodTy {
+            method_name: "first",
+            self_ty: Box::new(ObjectTy::Array { expected_item_types: None }),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::Any)),
+            },
+        },
+        function: |args| {
+            let arr = args.obj.as_array().expect("Expected array method to be called on an array");
+            Ok(arr.first().cloned().unwrap_or(Object::Unit))
+        },
+    }, MethodInner {
+        method_ty: MethodTy {
+            method_name: "pop",
+            self_ty: Box::new(ObjectTy::Array { expected_item_types: None }),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::Any)),
+            },
+        },
+        function: |args| {
+            if let Some(ident) = args.obj_identifier {
+                // If there is an identifier, mutate the array
+                args.env.mutate(ident.to_string(), move |obj| {
+                    if let Object::Array(ref mut arr) = obj {
+                        Ok(arr.pop().unwrap_or(Object::Unit))
+                    } else {
+                        Err(Error::TypeError {
+                            span: args.method_span.clone(),
+                            expected: vec![ObjectTy::Array { expected_item_types: None }],
+                            found: obj.get_type(),
+                        }.into())
+                    }
+                })
+            } else {
+                // If there is no identifier, return the last item in the array
+                match args.obj {
+                    Object::Array(ref arr) => Ok(arr.last().cloned().unwrap_or(Object::Unit)),
+                    _ => Err(Error::TypeError {
+                        span: args.method_span.clone(),
+                        expected: vec![ObjectTy::Array { expected_item_types: None }],
+                        found: args.obj.get_type(),
+                    }.into()),
+                }
+            }
+        },
+    }
+]);
+}
 
 #[cfg(test)]
 mod test {

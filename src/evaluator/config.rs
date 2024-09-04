@@ -1,5 +1,13 @@
+use std::fmt::{Debug, Formatter};
+
 pub struct EvalConfig {
     pub output_fn: Box<dyn Fn(String) + Send>,
+}
+
+impl Debug for EvalConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EvalConfig")
+    }
 }
 
 impl Default for EvalConfig {

@@ -1,5 +1,4 @@
-use crate::Evaluator;
-use crate::evaluator::EvalResult;
+use crate::{Evaluator, Object};
 
 mod integers;
 mod booleans;
@@ -10,11 +9,15 @@ mod if_else;
 mod blocks;
 mod scoping;
 
-pub(super) fn test_eval(input: &str) -> EvalResult {
+pub(super) fn test_eval(input: &str) -> crate::evaluator::Result<Object> {
     Evaluator::eval(input, &mut Default::default(), Default::default())
-        .inspect_err(|errors| {
-            for error in errors.iter() {
-                println!("{}", error);
+        .inspect_err(|error| {
+            println!("error: {:?}", error);
+        })
+        .map_err(|error| {
+            match error {
+                crate::Error::EvaluatorError(error) => error,
+                _ => panic!("Expected an evaluator error, got {:?}", error),
             }
         })
 }

@@ -2,8 +2,9 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use crate::parser::Parser;
-use crate::{Error, Expression, Span, TokenKind, trace};
+use crate::{Expression, Span, TokenKind, trace};
 use crate::parser::expressions::Precedence;
+use crate::parser::{Result};
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct BreakStatement {
@@ -21,15 +22,14 @@ impl Display for BreakStatement {
 }
 
 impl Parser {
-    pub(super) fn parse_break_statement(&mut self) -> Result<BreakStatement, Error> {
+    pub(super) fn parse_break_statement(&mut self) -> Result<BreakStatement> {
         let _trace = trace!("parse_break_statement");
         debug_assert!(self.is_cur_token(TokenKind::Break), "Expected current token to be `Break`");
         let start = self.cur_token.span.start.clone();
 
-
         // check if we have a value to return
         let value = if !Parser::is_statement_terminator(&self.peek_token, &self.cur_token) {
-            self.next_token();
+            self.next_token()?;
             let value = self.parse_expression(Precedence::Lowest)?;
             Some(value)
         } else {

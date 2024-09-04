@@ -4,8 +4,8 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::parser::Parser;
 use crate::parser::statements::Statement;
-use crate::{Error, trace, TokenKind, Span};
-use crate::error::ErrorKind;
+use crate::{trace, TokenKind, Span};
+use crate::parser::{Error, Result};
 use crate::parser::expressions::{BlockExpression, Identifier};
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -43,7 +43,7 @@ impl Parser {
     /// # Errors
     ///
     /// If any parsing error occurs, the method returns an `Err` variant with an `Error` containing the encountered error(s).
-    pub(super) fn parse_function_statement(&mut self) -> Result<Statement, Error> {
+    pub(super) fn parse_function_statement(&mut self) -> Result<Statement> {
         let _trace = trace!("parse_function_statement");
         debug_assert!(self.is_cur_token(TokenKind::Fn), "Expected current token to be `Fn`");
 
@@ -60,13 +60,15 @@ impl Parser {
                 return Ok(Statement::Expression(self.parse_expression_statement()?));
             }
             _ => {
-                return Err(self.error_peek(
-                    ErrorKind::UnexpectedToken, format!("Expected an identifier, got {:?}", self.peek_token.kind),
-                ))
+                return Err(Error::UnexpectedToken {
+                    span: self.peek_token.span.clone(),
+                    expected: vec![TokenKind::Identifier(String::new())],
+                    found: self.peek_token.kind.clone(),
+                });
             }
         };
 
-        self.next_token();
+        self.next_token()?;
 
         self.expect_peek(TokenKind::LeftParen)?;
 

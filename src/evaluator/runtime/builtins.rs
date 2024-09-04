@@ -111,63 +111,81 @@
 use crate::EvalConfig;
 use crate::Object;
 use std::{
-    io::{stdin, BufRead, Error},
+    io::{stdin, BufRead},
     ops::RangeInclusive,
 };
 use std::rc::Rc;
-use crate::evaluator::objects::function::Callable;
+use std::sync::Arc;
+use lazy_static::lazy_static;
+use crate::evaluator::objects::function::{Callable};
+use crate::evaluator::objects::{Argument, ArgumentList, ArgumentType, BuiltinFunctionTy, FunctionTy, ObjectTy};
 use crate::parser::expressions::Identifier;
+use crate::evaluator::Error;
+use crate::evaluator::Result;
 
 use super::environment::Environment;
 
 /// A builtin function that can be called from `mechylang`
 #[derive(Debug, PartialEq, Clone)]
 pub struct BuiltinFunction {
-    /// The name of the builtin function
-    ///
-    /// This is the name that will be used to call the function
-    pub name: &'static str,
-    /// The number of arguments the function takes
-    pub args_len: RangeInclusive<usize>,
+    pub ty: BuiltinFunctionTy,
     /// The function that will be called when the builtin is called
     ///
     /// # Arguments
     /// - `args`: The arguments passed to the function
     /// - `env`: The environment the function is being called in
     /// - `eval`: The evaluator, used for configuration (e.g. printing)
-    pub function: fn(&Vec<Object>, &mut Environment, &EvalConfig) -> BuiltinResult,
+    pub function: fn(&Vec<Argument>, &mut Environment, &EvalConfig) -> Result<Object>,
+}
+
+impl BuiltinFunction {
+    pub fn name(&self) -> &str {
+        self.ty.name
+    }
 }
 
 impl Callable for BuiltinFunction {
-    fn call(&self, args: Vec<Object>, env: Option<Environment>, config: Rc<EvalConfig>) -> Result<Object, String> {
-        let mut env = env.unwrap_or_default();
-        (self.function)(&args, &mut env, &config).map_err(|(e, b)| format!("{:?}: {}", b, e))
+    fn call(&self, _obj: Option<Object>, args: Vec<Argument>, env: &mut Environment, config: Rc<EvalConfig>) -> Result<Object> {
+        (self.function)(&args, env, &config)
     }
 
     fn args_len(&self) -> RangeInclusive<usize> {
-        self.args_len.clone()
+        self.ty.function_ty.arguments.args_len()
+    }
+
+    fn argument_list(&self) -> Option<ArgumentList> {
+        Some(self.ty.function_ty.arguments.clone())
     }
 }
 
-type BuiltinResult = Result<Object, (String, BuiltinError)>;
 
+
+lazy_static! {
 /// A list of all the builtin functions in `mechylang`
-pub const BUILTINS: [BuiltinFunction; 9] = [
+    pub static ref BUILTINS: Arc<[BuiltinFunction]> = Arc::new([
     // The `len` function
     //
     // `Mechylang` arguments:
     // - item: The item to get the length of
     //     - Type: `String` or `Array`
     BuiltinFunction {
-        name: "len",
-        args_len: 1..=1,
-        function: |args, _, _| match args[0] {
+        ty: BuiltinFunctionTy {
+            name: "len",
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_exactly(vec![ArgumentType { name: "item".into(), ty: ObjectTy::AnyOf { types: vec![ObjectTy::String, ObjectTy::Array { expected_item_types: None }] } }]),
+                expected_return_type: Some(Box::new(ObjectTy::Integer)),
+            },
+        },
+        function: |args, _, _| match args[0].value {
             Object::String(ref s) => Ok(Object::Integer(s.len() as i64)),
             Object::Array(ref a) => Ok(Object::Integer(a.len() as i64)),
-            _ => Err((
-                format!("Argument to `len` not supported, got {:?}", args[0]),
-                BuiltinError::WrongArgumentType,
-            )),
+            _ => Err(
+                Error::TypeError {
+                    span: args[0].span.clone().unwrap_or_default(),
+                    expected: vec![ObjectTy::String, ObjectTy::Array { expected_item_types: None }],
+                    found: args[0].get_type(),
+                }.into(),
+            ),
         },
     },
     // The `print` function
@@ -176,8 +194,13 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     // - items: The items to print
     //    - Type: `Any`
     BuiltinFunction {
-        name: "print",
-        args_len: 1..=usize::MAX,
+        ty: BuiltinFunctionTy {
+            name: "print",
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_bounded(0..=usize::MAX, vec![ArgumentType { name: "items".into(), ty: ObjectTy::Any }]),
+                expected_return_type: Some(Box::new(ObjectTy::Unit)),
+            },
+        },
         function: |args, _, eval_config| {
             (eval_config.output_fn)(
                 args.iter()
@@ -187,10 +210,16 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
             );
             Ok(Object::Unit)
         },
-    },
+    }
+    ,
     BuiltinFunction {
-        name: "println",
-        args_len: 1..=usize::MAX,
+        ty: BuiltinFunctionTy {
+            name: "println",
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_bounded(0..=usize::MAX, vec![ArgumentType { name: "items".into(), ty: ObjectTy::Any }]),
+                expected_return_type: Some(Box::new(ObjectTy::Unit)),
+            },
+        },
         function: |args, _, eval_config| {
             (eval_config.output_fn)(format!(
                 "{}\n",
@@ -204,32 +233,48 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     },
     // Assert
     BuiltinFunction {
-        name: "assert",
-        args_len: 1..=1,
-        function: |args, _, eval_config| {
-            if args[0] == Object::Boolean(true) {
+        ty: BuiltinFunctionTy {
+            name: "assert",
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_exactly(vec![ArgumentType { name: "condition".into(), ty: ObjectTy::Boolean }]),
+                expected_return_type: Some(Box::new(ObjectTy::Unit)),
+            },
+        },
+        function: |args, _, _| {
+            let value = args[0].value.clone();
+            if value == Object::Boolean(true) {
                 Ok(Object::Unit)
             } else {
-                (eval_config.output_fn)(format!("Assertion failed: {} is not true", args[0]));
-                Err((
-                    format!("Assertion failed: {} is not true", args[0]),
-                    BuiltinError::AssertionFailed,
-                ))
+                Err(Error::AssertionFailed {
+                    span: args[0].span.clone().unwrap_or_default(),
+                    value: value.clone(),
+                }.into())
             }
         },
     },
     // AssertEq
     BuiltinFunction {
-        name: "assert_eq",
-        args_len: 2..=usize::MAX,
+        ty: BuiltinFunctionTy {
+            name: "assert_eq",
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_bounded(2..=usize::MAX, vec![
+                    ArgumentType { name: "first".into(), ty: ObjectTy::Any },
+                    ArgumentType { name: "second".into(), ty: ObjectTy::Any },
+                    ArgumentType { name: "rest".into(), ty: ObjectTy::Any },
+                ]),
+                expected_return_type: Some(Box::new(ObjectTy::Unit)),
+            },
+        },
         function: |args, _, _| {
             let first = args[0].clone();
             for arg in args.iter().skip(1) {
-                if first != *arg {
-                    return Err((
-                        format!("Assertion failed: {:?} != {:?}", first, arg),
-                        BuiltinError::AssertionFailed,
-                    ));
+                if first.value != arg.value {
+                    return Err(Error::AssertionEqualFailed {
+                        first_span: first.span.clone().unwrap_or_default(),
+                        second_span: arg.span.clone().unwrap_or_default(),
+                        first_value: first.value.clone(),
+                        second_value: arg.value.clone(),
+                    }.into());
                 }
             }
             Ok(Object::Unit)
@@ -237,79 +282,114 @@ pub const BUILTINS: [BuiltinFunction; 9] = [
     },
     // input_read_all
     BuiltinFunction {
-        name: "input_read_all",
-        args_len: 0..=0,
+        ty: BuiltinFunctionTy {
+            name: "input_read_all",
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::String)),
+            },
+        },
         function: |_, _, _| {
             stdin()
                 .lock()
                 .lines()
-                .collect::<Result<Vec<String>, Error>>()
+                .collect::<std::result::Result<Vec<String>, std::io::Error>>()
                 .map(|val| Object::String(val.join("\n").into()))
-                .map_err(|_| ("Failed to get input".to_string(), BuiltinError::IOError))
+                .map_err(|e| Error::IOError {
+                    error: e.into(),
+                }.into())
         },
     },
     // input_read_line
     BuiltinFunction {
-        name: "input_read_line",
-        args_len: 0..=0,
+        ty: BuiltinFunctionTy {
+            name: "input_read_line",
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::String)),
+            },
+        },
         function: |_, _, _| {
             stdin()
                 .lock()
                 .lines()
                 .next()
                 .map(|val| Object::String(val.unwrap_or_default().into()))
-                .ok_or(("Failed to get input".to_string(), BuiltinError::IOError))
+                .ok_or(Error::IOError {
+                    error: std::io::Error::new(std::io::ErrorKind::Other, "Failed to get input").into(),
+                }.into())
         },
     },
     // parse_int
     BuiltinFunction {
-        name: "parse_int",
-        args_len: 1..=1,
-        function: |args, _, _| match &args[0] {
-            Object::String(s) => s.parse::<i64>().map(Object::Integer).map_err(|e| {
-                (
-                    format!("Failed to parse int: {}", e),
-                    BuiltinError::WrongArgumentType,
-                )
-            }),
-            _ => Err((
-                format!("Argument to `parse_int` not supported, got {:?}", args[0]),
-                BuiltinError::WrongArgumentType,
-            )),
+        ty: BuiltinFunctionTy {
+            name: "parse_int",
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_exactly(vec![ArgumentType { name: "string".into(), ty: ObjectTy::String }]),
+                expected_return_type: Some(Box::new(ObjectTy::Integer)),
+            },
+        },
+        
+        function: |args, _, _| {
+            let value = args[0].value.clone();
+            match value {
+                Object::String(s) => s.parse::<i64>().map(Object::Integer).map_err(|e| {
+                    Error::BuiltInError {
+                        span: args[0].span.clone().unwrap_or_default(),
+                        message: format!("Failed to parse int: {}", e),
+                        error_type: BuiltinError::RuntimeError,
+                    }
+                }.into()),
+                _ => Err(Error::TypeError {
+                    span: args[0].span.clone().unwrap_or_default(),
+                    expected: vec![ObjectTy::String],
+                    found: value.get_type(),
+                }.into()),
+            }
         },
     },
     // parse_float
     BuiltinFunction {
-        name: "parse_float",
-        args_len: 1..=1,
-        function: |args, _, _| match &args[0] {
+        ty: BuiltinFunctionTy {
+            name: "parse_float",
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_exactly(vec![ArgumentType { name: "string".into(), ty: ObjectTy::String }]),
+                expected_return_type: Some(Box::new(ObjectTy::Float)),
+            },
+        },
+        function: |args, _, _| match &args[0].value {
             Object::String(s) => s.parse::<f64>().map(Object::Float).map_err(|e| {
-                (
-                    format!("Failed to parse float: {}", e),
-                    BuiltinError::WrongArgumentType,
-                )
-            }),
-            _ => Err((
-                format!("Argument to `parse_float` not supported, got {:?}", args[0]),
-                BuiltinError::WrongArgumentType,
-            )),
+                Error::BuiltInError {
+                    span: args[0].span.clone().unwrap_or_default(),
+                    message: format!("Failed to parse float: {}", e),
+                    error_type: BuiltinError::RuntimeError,
+                }
+            }.into()),
+            _ => Err(Error::TypeError {
+                span: args[0].span.clone().unwrap_or_default(),
+                expected: vec![ObjectTy::String],
+                found: args[0].get_type(),
+            }.into()),
         },
     },
-];
+]);
+    }
 
 #[derive(Debug, PartialEq)]
 pub enum BuiltinError {
     WrongArgumentType,
     AssertionFailed,
     IOError,
+    RuntimeError,
+    RangeError,
 }
 
 impl TryFrom<&Identifier> for BuiltinFunction {
     type Error = ();
-    fn try_from(ident: &Identifier) -> Result<Self, ()> {
+    fn try_from(ident: &Identifier) -> std::result::Result<Self, ()> {
         BUILTINS
             .iter()
-            .find(|b| *b.name == *ident.value)
+            .find(|b| *b.name() == *ident.value)
             .cloned()
             .ok_or(())
     }

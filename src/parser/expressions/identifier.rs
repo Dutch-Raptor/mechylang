@@ -2,9 +2,8 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::parser::Parser;
-use crate::{Error, trace, TokenKind, Span};
-use crate::error::ErrorKind;
+use crate::parser::{Parser, Error, Result};
+use crate::{trace, TokenKind, Span};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Identifier {
@@ -25,16 +24,17 @@ impl From<Identifier> for Rc<str> {
 }
  impl Parser {
 
-     pub(super) fn parse_identifier(&mut self) -> Result<Identifier, Error> {
+     pub(super) fn parse_identifier(&mut self) -> Result<Identifier> {
          let _trace = trace!("parse_identifier");
 
          let literal = match self.cur_token.kind {
              TokenKind::Identifier(ref literal) => literal.clone(),
              _ => {
-                 return Err(self.error_current(
-                     ErrorKind::InvalidIdentifier,
-                     "Expected an identifier".to_string(),
-                 ))
+                 return Err(Error::UnexpectedToken {
+                     span: self.cur_token.span.clone(),
+                     expected: vec![TokenKind::Identifier(String::new())],
+                     found: self.cur_token.kind.clone(),
+                 })
              }
          };
 

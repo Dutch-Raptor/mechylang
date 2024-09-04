@@ -1,8 +1,10 @@
 use color_print::cformat;
 use crate::error::ErrorKind;
 use crate::parser::Parser;
-use crate::{Error, Token, TokenKind};
+use crate::{Token, TokenKind};
 use crate::lexer::{Position, Span};
+
+use crate::parser::{Error, Result};
 
 impl Parser {
     /// Advances the parser to the next token in the input stream.
@@ -12,10 +14,11 @@ impl Parser {
     ///
     /// If there are no more tokens available from the lexer, it sets the `cur_token`
     /// to `EOF` (End of File) and adjusts its position based on the last peeked token.
-    pub(crate) fn next_token(&mut self) {
+    pub(crate) fn next_token(&mut self) -> Result<()> {
         let token = self.lexer.next_token();
         let next = match token {
-            Some(token) => token,
+            Some(Ok(token)) => token,
+            Some(Err(err)) => return Err(Error::LexerError(err)),
             None => Token {
                 kind: TokenKind::EOF,
                 span: Span {
@@ -29,11 +32,12 @@ impl Parser {
                         column: self.peek_token.span.end.column + 1,
                         file: self.peek_token.span.start.file.clone(),
                     },
-                }
+                },
             },
         };
 
         self.cur_token = std::mem::replace(&mut self.peek_token, next);
+        Ok(())
     }
 
     /// Checks if the current token matches the expected token kind.
@@ -49,20 +53,17 @@ impl Parser {
     ///
     /// Returns `Ok(())` if the current token matches the expected `token`.
     /// Returns an `Error` otherwise, indicating an unexpected token.
-    pub(crate) fn expect_current(&self, token: TokenKind) -> Result<(), Error> {
+    pub(crate) fn expect_current(&self, token: TokenKind) -> Result<()> {
         if self.cur_token.kind == token {
             Ok(())
         } else {
-            Err(self.error(
-                ErrorKind::UnexpectedToken,
-                cformat!(
-                    "Expected token to be <strong><K> {} </></>, got <strong><K>{}</></> instead",
-                    token,
-                    self.cur_token.kind
-                ),
-                self.cur_token.span.clone(),
-                None,
-            ))
+            Err(
+                Error::UnexpectedToken {
+                    span: self.cur_token.span.clone(),
+                    expected: vec![token],
+                    found: self.cur_token.kind.clone(),
+                }
+            )
         }
     }
 
@@ -79,19 +80,18 @@ impl Parser {
     ///
     /// Returns `Ok(())` if the next token (peek token) matches the expected `token` and advances to consume it.
     /// Returns an `Error` otherwise, indicating an unexpected token.
-    pub(crate) fn expect_peek(&mut self, token_kind: TokenKind) -> Result<(), Error> {
-        if self.peek_token.kind == token_kind {
-            self.next_token();
+    pub(crate) fn expect_peek(&mut self, expected_token_kind: TokenKind) -> Result<()> {
+        if self.peek_token.kind == expected_token_kind {
+            self.next_token()?;
             Ok(())
         } else {
-            Err(self.error_peek(
-                ErrorKind::UnexpectedToken,
-                cformat!(
-                    "Expected token to be <strong><K> {} </></>, got <strong><K>{}</></> instead",
-                    token_kind,
-                    self.peek_token.kind
-                ),
-            ))
+            Err(
+                Error::UnexpectedToken {
+                    span: self.peek_token.span.clone(),
+                    expected: vec![expected_token_kind],
+                    found: self.peek_token.kind.clone(),
+                }
+            )
         }
     }
 
@@ -121,7 +121,7 @@ impl Parser {
     pub(crate) fn is_peek_token(&self, token: TokenKind) -> bool {
         self.peek_token.kind == token
     }
-    
+
     /// Creates a new `Span` with the given start position. And the end position is the current token's end position.
     ///
     /// # Arguments

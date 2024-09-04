@@ -55,9 +55,9 @@ pub use string_literal::StringLiteral;
 pub use struct_literal::StructLiteral;
 pub use while_expression::WhileExpression;
 pub use block_expression::BlockExpression;
-use crate::parser::Parser;
-use crate::error::ErrorKind;
-use crate::{Error, Span, TokenKind, trace};
+use crate::parser::{Parser,  Error, Result};
+use crate::{Span, TokenKind, trace};
+
 
 
 /// Represents an expression in Mechylang.
@@ -377,17 +377,8 @@ impl Parser {
     /// and then proceeds to handle infix operators based on their precedence. The function uses the provided precedence
     /// level to correctly parse and associate operations, ensuring that expressions are parsed according to Mechylang's
     /// operator precedence rules.
-    pub(crate) fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, Error> {
+    pub(crate) fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression> {
         let _trace = trace!("parse_expression");
-        let token = self.cur_token.clone();
-
-        if !self.has_prefix(&token.kind) {
-            return Err(self.error_current_with_context(
-                ErrorKind::MissingPrefix,
-                format!("Expected a value, got {:?}", token.kind),
-                "parse_expression".to_string(),
-            ));
-        }
 
         let mut left_exp = self.parse_prefix()?;
 
@@ -398,7 +389,7 @@ impl Parser {
                 return Ok(left_exp);
             }
 
-            self.next_token();
+            self.next_token()?;
 
             left_exp = self.parse_infix(left_exp)?;
         }
@@ -407,10 +398,10 @@ impl Parser {
     }
 
 
-    pub(super) fn parse_grouped_expression(&mut self) -> Result<Expression, Error> {
+    pub(super) fn parse_grouped_expression(&mut self) -> Result<Expression> {
         let _trace = trace!("parse_grouped_expression");
         debug_assert!(self.is_cur_token(TokenKind::LeftParen), "Expected current token to be `(`");
-        self.next_token();
+        self.next_token()?;
 
         if self.cur_token.kind == TokenKind::RightParen {
             return Ok(Expression::Unit(
@@ -425,40 +416,49 @@ impl Parser {
         Ok(expression)
     }
 
-    pub(super) fn parse_expression_list(&mut self, end: TokenKind) -> Result<Vec<Expression>, Error> {
+    pub(super) fn parse_expression_list(&mut self, end: TokenKind) -> Result<Vec<Expression>> {
         let mut arguments = Vec::new();
 
         if self.peek_token.kind == end {
-            self.next_token();
+            self.next_token()?;
             return Ok(arguments);
         }
 
-        self.next_token();
+        self.next_token()?;
 
         arguments.push(match self.parse_expression(Precedence::Lowest) {
-            Err(Error { kind: ErrorKind::MissingPrefix, .. }) => {
-                return Err(self.error_current(
-                    ErrorKind::UnexpectedToken,
-                    format!("Expected an expression or a {:?}, got {:?} instead", end, self.cur_token.kind),
-                ))
+            Err(Error::InvalidPrefix { found, .. }) => {
+                return Err(Error::UnexpectedExpressionListEnd {
+                    span: self.cur_token.span.clone(),
+                    expected_end_token: end.clone(),
+                    found: found.clone(),
+                })
             }
             Err(e) => return Err(e),
             Ok(e) => e,
         });
 
         while self.peek_token.kind == TokenKind::Comma {
-            self.next_token();
+            self.next_token()?;
 
             // allow trailing commas
             if self.peek_token.kind == end {
                 break;
             }
 
-            self.next_token();
+            self.next_token()?;
             arguments.push(self.parse_expression(Precedence::Lowest)?);
         }
 
-        self.expect_peek(end)?;
+        if self.peek_token.kind != end {
+            return Err(Error::UnexpectedExpressionListEnd {
+                span: self.cur_token.span.clone(),
+                expected_end_token: end.clone(),
+                found: self.peek_token.kind.clone(),
+            });
+        }
+        
+        self.next_token()?;
 
         Ok(arguments)
     }
@@ -467,7 +467,7 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::parser::expressions::{Expression, InfixExpression, InfixOperator, Precedence, PrefixExpression, PrefixOperator};
-    use crate::{Parser, TokenKind};
+    use crate::{Parser};
 
     #[test]
     fn test_parse_expression_with_prefix_and_infix() {

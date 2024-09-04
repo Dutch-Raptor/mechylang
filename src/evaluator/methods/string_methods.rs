@@ -1,8 +1,13 @@
+use std::sync::Arc;
+use lazy_static::lazy_static;
+use crate::evaluator::Error;
 use crate::evaluator::objects::iterators::IteratorObject;
+use crate::evaluator::objects::{ArgumentList, ArgumentType, FunctionTy, MethodTy, ObjectTy};
 use crate::Object;
 
 use super::MethodInner;
 
+lazy_static! {
 /// # Methods for String
 ///
 /// ## `contains(needle: String) -> Boolean`
@@ -71,77 +76,97 @@ use super::MethodInner;
 /// ```
 ///
 /// ## `chars() -> Array
-/// Returns an array of strings, each containing a single character from the original string.
+/// Returns an iterator of strings, each containing a single character from the original string.
 /// ```
 /// # mechylang::test_utils::test_eval_ok(r#"
-/// assert_eq("hello world".chars(), ["h", "e", "l", "l", "o", " ", "w", "o", "r", "l", "d"]);
+/// assert_eq("hello world".chars().collect(), ["h", "e", "l", "l", "o", " ", "w", "o", "r", "l", "d"]);
 /// # "#);
 /// ```
-pub const STRING_METHODS: [MethodInner; 9] = [
+pub static ref STRING_METHODS: Arc<[MethodInner]> = Arc::new([
     MethodInner {
-        name: "contains",
-        args_len: 1..=1,
-        function: |obj, _, args, _, _| {
-            let haystack = match obj {
-                Object::String(s) => s,
-                _ => return invalid_object_err(),
-            };
+        method_ty: MethodTy {
+            method_name: "contains",
+            self_ty: Box::new(ObjectTy::String),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_exactly(vec![ArgumentType { name: "needle".into(), ty: ObjectTy::String }]),
+                expected_return_type: Some(Box::new(ObjectTy::Boolean)),
+            },
+        },
+        function: |args| {
+            let haystack = args.obj.as_string().expect("Expected string method to be called on a string");
 
-            let needle = match &args[0] {
-                Object::String(s) => s.as_ref(),
-                _ => return Err("Contains method called with non-string argument".to_string()),
-            };
+            let needle = args.args[0].as_string().ok_or_else(|| Error::TypeError {
+                span: args.method_span.clone(),
+                expected: vec![ObjectTy::String],
+                found: args.args[0].get_type(),
+            })?;
 
             Ok(Object::Boolean(haystack.contains(needle)))
         },
     },
     MethodInner {
-        name: "replace",
-        args_len: 2..=2,
-        function: |obj, _, args, _, _| {
-            let haystack = match obj {
-                Object::String(s) => s,
-                _ => return invalid_object_err(),
-            };
+        method_ty: MethodTy {
+            method_name: "replace",
+            self_ty: Box::new(ObjectTy::String),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_exactly( vec![
+                    ArgumentType { name: "needle".into(), ty: ObjectTy::String },
+                    ArgumentType { name: "replacement".into(), ty: ObjectTy::String },
+                ]),
+                expected_return_type: Some(Box::new(ObjectTy::String)),
+            },
+        },
+        function: |args| {
+            let haystack = args.obj.as_string().expect("Expected string method to be called on a string");
 
-            let needle = match &args[0] {
-                Object::String(s) => s.as_ref(),
-                _ => return Err("Replace method called with non-string argument".to_string()),
-            };
+            let needle_arg = &args.args[0];
+            let needle = needle_arg.as_string().ok_or_else(|| Error::TypeError {
+                span: needle_arg.span.clone().unwrap_or(args.method_span.clone()),
+                expected: vec![ObjectTy::String],
+                found: args.args[0].get_type(),
+            })?;
 
-            let replacement = match &args[1] {
-                Object::String(s) => s.as_ref(),
-                _ => return Err("Replace method called with non-string argument".to_string()),
-            };
+            let replacement_arg = &args.args[1];
+            let replacement = replacement_arg.as_string().ok_or_else(|| Error::TypeError {
+                span: replacement_arg.span.clone().unwrap_or(args.method_span.clone()),
+                expected: vec![ObjectTy::String],
+                found: args.args[1].get_type(),
+            })?;
 
             Ok(Object::String(haystack.replace(needle, replacement).into()))
         },
     },
     MethodInner {
-        name: "len",
-        args_len: 0..=0,
-        function: |obj, _, _, _, _| {
-            let s = match obj {
-                Object::String(s) => s,
-                _ => return invalid_object_err(),
-            };
-
+        method_ty: MethodTy {
+            method_name: "len",
+            self_ty: Box::new(ObjectTy::String),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::Integer)),
+            },
+        },
+        function: |args| {
+            let s = args.obj.as_string().expect("Expected string method to be called on a string");
             Ok(Object::Integer(s.len() as i64))
         },
     },
     MethodInner {
-        name: "split",
-        args_len: 1..=1,
-        function: |obj, _, args, _, _| {
-            let s = match obj {
-                Object::String(s) => s,
-                _ => return invalid_object_err(),
-            };
+        method_ty: MethodTy {
+            method_name: "split",
+            self_ty: Box::new(ObjectTy::String),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::new_exactly(vec![ArgumentType { name: "delimiter".into(), ty: ObjectTy::String }]),
+                expected_return_type: Some(Box::new(ObjectTy::Array { expected_item_types: None })),
+            },
+        },
+        function: |args| {
+            let s = args.obj.as_string().expect("Expected string method to be called on a string");
 
-            let delimiter = match &args[0] {
-                Object::String(s) => s.as_ref(),
-                _ => return Err("Split method called with non-string argument".to_string()),
-            };
+            let delimiter = args.args[0].as_string().ok_or_else(|| Error::TypeError {
+                span: args.args[0].span.clone().unwrap_or(args.method_span.clone()),
+                expected: vec![ObjectTy::String],
+                found: args.args[0].get_type(),
+            })?;
 
             let split: Vec<_> = s.split(delimiter).map(|s| s.into()).collect();
 
@@ -149,65 +174,82 @@ pub const STRING_METHODS: [MethodInner; 9] = [
         },
     },
     MethodInner {
-        name: "trim",
-        args_len: 0..=0,
-        function: |obj, _, _, _, _| {
-            let s = match obj {
-                Object::String(s) => s,
-                _ => return invalid_object_err(),
-            };
-
+        method_ty: MethodTy {
+            method_name: "trim",
+            self_ty: Box::new(ObjectTy::String),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::String)),
+            },
+        },
+        function: |args| {
+            let s = args.obj.as_string().expect("Expected string method to be called on a string");
             Ok(Object::String(s.trim().into()))
         },
     },
     MethodInner {
-        name: "to_uppercase",
-        args_len: 0..=0,
-        function: |obj, _, _, _, _| {
-            let s = match obj {
-                Object::String(s) => s,
-                _ => return invalid_object_err(),
-            };
+        method_ty: MethodTy {
+            method_name: "to_uppercase",
+            self_ty: Box::new(ObjectTy::String),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::String)),
+            },
+        },
+        function: |args| {
+            let s = args.obj.as_string().expect("Expected string method to be called on a string");
 
             Ok(Object::String(s.to_uppercase().into()))
         },
     },
     MethodInner {
-        name: "to_lowercase",
-        args_len: 0..=0,
-        function: |obj, _, _, _, _| {
-            let s = match obj {
-                Object::String(s) => s,
-                _ => return invalid_object_err(),
-            };
+        method_ty: MethodTy {
+            method_name: "to_lowercase",
+            self_ty: Box::new(ObjectTy::String),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::String)),
+            },
+        },
+        function: |args| {
+            let s = args.obj.as_string().expect("Expected string method to be called on a string");
 
             Ok(Object::String(s.to_lowercase().into()))
         },
     },
     MethodInner {
-        name: "chars",
-        args_len: 0..=0,
-        function: |obj, _, _, _, _| {
-            let s = match obj {
-                Object::String(s) => s,
-                _ => return invalid_object_err(),
-            };
+        method_ty: MethodTy {
+            method_name: "chars",
+            self_ty: Box::new(ObjectTy::String),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::Iterator { item: Box::new(ObjectTy::String) })),
+            },
+        },
+        function: |args| {
+            let s = args.obj.as_string().expect("Expected string method to be called on a string");
 
-            Ok(Object::Array(
-                s.chars()
-                    .map(|c| Object::String(c.to_string().into()))
-                    .collect(),
-            ))
+            Ok(Object::Iterator(IteratorObject {
+                iterator: Box::new(
+                    s.chars()
+                        .map(|c| Object::String(c.to_string().into()))
+                        .collect::<Vec<Object>>()
+                        .into_iter(),
+                ),
+            }))
         },
     },
     MethodInner {
-        name: "lines",
-        args_len: 0..=0,
-        function: |obj, _, _, _, _| {
-            let s = match obj {
-                Object::String(s) => s,
-                _ => return invalid_object_err(),
-            };
+        method_ty: MethodTy {
+            method_name: "lines",
+            self_ty: Box::new(ObjectTy::String),
+            function_ty: FunctionTy {
+                arguments: ArgumentList::None,
+                expected_return_type: Some(Box::new(ObjectTy::Iterator { item: Box::new(ObjectTy::String) })),
+            },
+        },
+        function: |args| {
+            let s = args.obj.as_string().expect("Expected string method to be called on a string");
 
             Ok(Object::Iterator(IteratorObject {
                 iterator: Box::new(
@@ -219,8 +261,5 @@ pub const STRING_METHODS: [MethodInner; 9] = [
             }))
         },
     },
-];
-
-fn invalid_object_err() -> Result<Object, String> {
-    Err("String method called on non-string object".to_string())
+]);
 }

@@ -1,8 +1,10 @@
 mod tokens;
+mod error;
 
 use std::rc::Rc;
 use std::sync::Arc;
 pub use tokens::{Token, TokenKind, Span, Position};
+pub use error::{Error, Result};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -162,7 +164,7 @@ impl Lexer {
     /// If the end of the input string is reached, a single EOF token
     /// will be returned. After that, every call to next_token() will
     /// return None.
-    pub fn next_token(&mut self) -> Option<Token> {
+    pub fn next_token(&mut self) -> Option<Result<Token>> {
         self.skip_whitespace();
 
         if self.read_position > self.input.chars().count() + 1 {
@@ -338,8 +340,7 @@ impl Lexer {
                 let literal = match self.read_string() {
                     Ok(literal) => literal,
                     Err(err) => {
-                        eprintln!("Error while lexing input: {}", err);
-                        return None;
+                        return Some(Err(err));
                     }
                 };
                 token_length = literal.len() + 2; // + 2 for the quotes
@@ -363,9 +364,9 @@ impl Lexer {
                 }
             }
         };
-
-        let token = token_kind.map(|kind| Token {
-            kind,
+        
+        let token = Token {
+            kind: token_kind?,
             span: Span {
                 start: Position {
                     line,
@@ -378,23 +379,27 @@ impl Lexer {
                     file: self.file.clone(),
                 },
             }
-        });
-
+        };
+        
         self.read_char();
 
-        token
+        Some(Ok(token))
     }
 
     pub fn lines(&self) -> Rc<[String]> {
         self.input.lines().map(|s| s.to_string()).collect()
     }
 
-    fn read_string(&mut self) -> Result<String, String> {
+    fn read_string(&mut self) -> Result<String> {
         let position = self.position + 1;
         // allow for escaped quotes
         while !(self.peek_char() == '"' && self.ch != '\\') {
             if self.ch == '\0' {
-                return Err("Unterminated string".to_string());
+                return Err(Error::UnterminatedString { string_start_position: Position {
+                    line: self.line,
+                    column: self.column,
+                    file: self.file.clone(),
+                }});
             }
             self.read_char();
         }
@@ -422,7 +427,7 @@ fn is_digit(ch: char) -> bool {
 }
 
 impl Iterator for Lexer {
-    type Item = Token;
+    type Item = Result<Token>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token()
@@ -436,13 +441,13 @@ mod test {
         Token,
     };
 
-    use super::Lexer;
+    use super::*;
 
-    fn lex_token_kinds(input: &str) -> Vec<TokenKind> {
-        Lexer::new(input).map(|token| token.kind).collect()
+    fn lex_token_kinds(input: &str) -> Result<Vec<TokenKind>> {
+        Lexer::new(input).map(|token| token.map(|token| token.kind)).collect()
     }
 
-    fn lex(input: &str) -> Vec<Token> {
+    fn lex(input: &str) -> Result<Vec<Token>> {
         Lexer::new(input).collect()
     }
 
@@ -623,7 +628,7 @@ mod test {
         ];
 
         for (input, expected_tokens) in tests {
-            let tokens = lex_token_kinds(input);
+            let tokens = lex_token_kinds(input).unwrap();
             assert_eq!(tokens, expected_tokens);
         }
     }
@@ -639,8 +644,7 @@ mod test {
             TokenKind::Semicolon,
         ];
 
-        let lexer = Lexer::new(input);
-        let tokens: Vec<TokenKind> = lexer.map(|token| token.kind).collect();
+        let tokens = lex_token_kinds(input).unwrap();
 
         assert_eq!(tokens, expected_tokens);
     }
@@ -672,7 +676,7 @@ mod test {
             TokenKind::Semicolon,
         ];
 
-        let tokens = lex_token_kinds(input);
+        let tokens = lex_token_kinds(input).unwrap();
         assert_eq!(tokens, expected_tokens);
 
         let input = r#"
@@ -691,7 +695,7 @@ mod test {
             TokenKind::Semicolon,
         ];
 
-        let tokens = lex_token_kinds(input);
+        let tokens = lex_token_kinds(input).unwrap();
         assert_eq!(tokens, expected_tokens);
     }
 
@@ -716,19 +720,7 @@ mod test {
             TokenKind::Semicolon,
         ];
 
-        let tokens = lex_token_kinds(input);
+        let tokens = lex_token_kinds(input).unwrap();
         assert_eq!(tokens, expected_tokens);
-    }
-
-    #[test]
-    fn test_newline_token_positions() {
-        let input = r#"
-        let x = 5;
-        return
-        "#;
-
-        let lexed = lex(input);
-
-        println!("{:#?}", lexed);
     }
 }

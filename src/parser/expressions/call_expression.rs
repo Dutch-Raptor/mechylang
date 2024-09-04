@@ -4,7 +4,8 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::parser::expressions::{Expression, ExpressionSpanExt};
 use crate::parser::Parser;
-use crate::{Error, Span, TokenKind};
+use crate::{Span, TokenKind};
+use crate::parser::{Result};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct CallExpression {
@@ -26,7 +27,7 @@ impl Display for CallExpression {
     }
 }
 impl Parser {
-    pub(super) fn parse_call_expression(&mut self, left: Expression) -> Result<CallExpression, Error> {
+    pub(super) fn parse_call_expression(&mut self, left: Expression) -> Result<CallExpression> {
         let arguments = self.parse_expression_list(TokenKind::RightParen)?;
 
         Ok(CallExpression {

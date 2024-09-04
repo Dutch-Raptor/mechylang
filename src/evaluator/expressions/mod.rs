@@ -10,16 +10,17 @@ mod range;
 mod member;
 mod r#struct;
 
-use crate::{Environment, Error, Evaluator, Object, trace};
+use crate::{Environment, Evaluator, Object, trace};
 use crate::evaluator::objects::function::Function;
 use crate::parser::expressions::Expression;
+use crate::evaluator::{Result, };
 
 impl Evaluator {
     pub(super) fn eval_expression(
         &mut self,
         expression: &Expression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!("Evaluating expression: {}", expression).to_string());
         match expression {
             Expression::IntegerLiteral(lit) => Ok(Object::Integer(lit.value)),
@@ -32,6 +33,7 @@ impl Evaluator {
             Expression::Identifier(ident) => self.eval_identifier(ident, env),
             Expression::Function(func) => Ok(Object::Function(Function {
                 params: func.parameters.clone(),
+                span: func.span.clone(),
                 body: func.body.clone(),
                 env: env.clone(),
             })),
@@ -50,7 +52,6 @@ impl Evaluator {
             Expression::StructLiteral(lit) => self.eval_struct_expression(lit, env),
         }
     }
-
 
     pub(super) fn is_truthy(condition: &Object) -> bool {
         match condition {

@@ -3,8 +3,8 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
 use crate::parser::expressions::identifier::Identifier;
-use crate::parser::{Parser};
-use crate::{Error, trace, TokenKind, Span};
+use crate::parser::{Parser, Result};
+use crate::{trace, TokenKind, Span};
 use crate::parser::expressions::block_expression::BlockExpression;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -29,7 +29,7 @@ impl Display for FunctionLiteral {
 
 impl Parser {
 
-    pub(super) fn parse_function_literal(&mut self) -> Result<FunctionLiteral, Error> {
+    pub(super) fn parse_function_literal(&mut self) -> Result<FunctionLiteral> {
         let _trace = trace!("parse_function_literal");
         let start = self.cur_token.span.start.clone();
 
@@ -48,23 +48,23 @@ impl Parser {
         })
     }
 
-    pub(in crate::parser) fn parse_function_parameters(&mut self) -> Result<Vec<Identifier>, Error> {
+    pub(in crate::parser) fn parse_function_parameters(&mut self) -> Result<Vec<Identifier>> {
         let mut identifiers = Vec::new();
 
         if self.peek_token.kind == TokenKind::RightParen {
-            self.next_token();
+            self.next_token()?;
             return Ok(identifiers);
         }
 
-        self.next_token();
+        self.next_token()?;
 
         let ident = self.parse_identifier()?;
 
         identifiers.push(ident);
 
         while self.peek_token.kind == TokenKind::Comma {
-            self.next_token();
-            self.next_token();
+            self.next_token()?;
+            self.next_token()?;
 
             let ident = self.parse_identifier()?;
 

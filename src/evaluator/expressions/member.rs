@@ -1,14 +1,14 @@
-use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::error::ErrorKind;
+use crate::{Environment,  Evaluator, Object, trace};
 use crate::evaluator::methods::{MethodError, ObjectMethods};
-use crate::parser::expressions::{Expression, MemberExpression};
+use crate::parser::expressions::{Expression, ExpressionSpanExt, MemberExpression};
+use crate::evaluator::{Result, Error};
 
 impl Evaluator {
     pub(super) fn eval_member_expression(
         &mut self,
         member: &MemberExpression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!("eval_member_expression: {}", member));
 
         let object = self.eval_expression(&member.object, env)?;
@@ -20,27 +20,24 @@ impl Evaluator {
             _ => None,
         };
 
-        match object.get_method(&property, ident) {
+        match object.get_method(&property, member.object.span().clone(), member.property.span.clone(), ident) {
             Ok(method) => return Ok(Object::Method(method)),
             Err(MethodError::NotFound) => {}
-            Err(err @ MethodError::IterMethodOnIterable(_)) => {
-                return Err(self.error(
-                    member.property.span.clone(),
-                    &err.to_string(),
-                    ErrorKind::TypeError,
-                ))
+            Err(MethodError::IterMethodOnIterable(_)) => {
+                return Err(Error::IterMethodOnIterable {
+                    method_span: member.property.span.clone(),
+                    method_name: property.clone(),
+                    object_type: object.get_type(),
+                    object_span: member.object.span().clone(),
+                }.into());
             }
         };
 
         // try to read property from object
-        Err(self.error(
-            member.property.span.clone(),
-            &format!(
-                "Property or method '{}' not found on object: {:?}",
-                property, object
-            )
-                .to_string(),
-            ErrorKind::PropertyNotFound,
-        ))
+        Err(Error::PropertyNotFound {
+            span: member.property.span.clone(),
+            property: property.clone(),
+            object_type: object.get_type(),
+        }.into())
     }
 }

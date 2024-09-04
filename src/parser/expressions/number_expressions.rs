@@ -1,8 +1,8 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
-use crate::error::ErrorKind;
-use crate::{Error, Expression, Parser, Span, TokenKind, trace};
+use crate::{Expression, Parser, Span, TokenKind, trace};
+use crate::parser::{Error, Result};
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FloatLiteral {
     pub span: Span,
@@ -27,26 +27,31 @@ impl Display for IntegerLiteral {
 }
 
 impl Parser {
-    pub(super) fn parse_number(&mut self) -> Result<Expression, Error> {
+    pub(super) fn parse_number(&mut self) -> Result<Expression> {
         let _trace = trace!("parse_number");
         let token = &self.cur_token;
         debug_assert!(matches!(token.kind, TokenKind::Number(_)), "Expected current token to be a number");
 
         let literal = token.kind
             .as_number()
-            .ok_or_else(|| self.error_current(ErrorKind::UnexpectedToken, "Expected a number".to_string()))?;
+            .ok_or_else(|| Error::UnexpectedToken {
+                span: self.cur_token.span.clone(),
+                expected: vec![TokenKind::Number(String::new())],
+                found: self.cur_token.kind.clone(),
+            })?;
         
         let span = token.span.clone();
+        
+        return match (literal.parse::<i64>(), literal.parse::<f64>()) {
+            (Ok(value), _) => Ok(Expression::IntegerLiteral(IntegerLiteral { span, value })),
+            (_, Ok(value)) => Ok(Expression::FloatLiteral(FloatLiteral { span, value })),
+            (Err(_), Err(_)) => Err(
+                Error::InvalidNumber {
+                    span: self.cur_token.span.clone(),
+                    found: self.cur_token.kind.clone(),
+                }
+            ),
+        };
 
-        if let Ok(value) = literal.parse::<i64>() {
-            Ok(Expression::IntegerLiteral(IntegerLiteral { span, value }))
-        } else if let Ok(value) = literal.parse::<f64>() {
-            Ok(Expression::FloatLiteral(FloatLiteral { span, value }))
-        } else {
-            Err(self.error_current(
-                ErrorKind::InvalidNumber,
-                "Invalid number literal".to_string(),
-            ))
-        }
     }
 }

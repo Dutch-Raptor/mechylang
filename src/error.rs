@@ -9,8 +9,40 @@ use color_print::cformat;
 use crate::evaluator::runtime::builtins::BuiltinError;
 use crate::{Span};
 
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Debug, PartialEq)]
-pub struct InterpreterErrors(pub Vec<Error>);
+pub enum Error {
+    LexerError(crate::lexer::Error),
+    ParserError(crate::parser::Error),
+    EvaluatorError(Box<crate::evaluator::Error>),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl From<crate::lexer::Error> for Error {
+    fn from(err: crate::lexer::Error) -> Self {
+        Error::LexerError(err)
+    }
+}
+impl From<crate::parser::Error> for Error {
+    fn from(err: crate::parser::Error) -> Self {
+        Error::ParserError(err)
+    }
+}
+
+impl From<Box<crate::evaluator::Error>> for Error {
+    fn from(err: Box<crate::evaluator::Error>) -> Self {
+        Error::EvaluatorError(err)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct InterpreterErrors(pub Vec<ErrorOld>);
 
 impl Display for InterpreterErrors {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -21,7 +53,7 @@ impl Display for InterpreterErrors {
 impl std::error::Error for InterpreterErrors {}
 
 impl Deref for InterpreterErrors {
-    type Target = Vec<Error>;
+    type Target = Vec<ErrorOld>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -29,8 +61,8 @@ impl Deref for InterpreterErrors {
 }
 
 impl IntoIterator for InterpreterErrors {
-    type Item = Error;
-    type IntoIter = IntoIter<Error>;
+    type Item = ErrorOld;
+    type IntoIter = IntoIter<ErrorOld>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -38,7 +70,7 @@ impl IntoIterator for InterpreterErrors {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Error {
+pub struct ErrorOld {
     pub kind: ErrorKind,
     pub span: Box<Span>,
     pub message: String,
@@ -47,7 +79,7 @@ pub struct Error {
     pub lines: Rc<[String]>,
 }
 
-impl Error {
+impl ErrorOld {
     pub fn new(
         kind: ErrorKind,
         message: impl ToString,
@@ -103,7 +135,7 @@ pub enum ErrorKind {
     AnonFunction,
 }
 
-impl Display for Error {
+impl Display for ErrorOld {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let caret_offset = self.span.start.column.saturating_sub(1);
 

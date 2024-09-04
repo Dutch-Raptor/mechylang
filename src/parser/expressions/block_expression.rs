@@ -2,9 +2,8 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, trace, TokenKind, Span};
-use crate::error::ErrorKind;
-use crate::parser::Parser;
+use crate::{trace, TokenKind, Span};
+use crate::parser::{Error, Parser, Result};
 use crate::parser::statements::Statement;
 
 /// Represents a block of code in Mechylang, which is a sequence of statements enclosed in curly braces.
@@ -101,11 +100,11 @@ impl Parser {
     /// - The current token is not a left curly brace (`{`) at the beginning.
     /// - An unexpected token is encountered while parsing the statements.
     /// - The closing curly brace (`}`) is missing or misplaced.
-    pub(in crate::parser) fn parse_block_expression(&mut self) -> Result<BlockExpression, Error> {
+    pub(in crate::parser) fn parse_block_expression(&mut self) -> Result<BlockExpression> {
         let _trace = trace!("parse_block_expression");
         debug_assert!(self.is_cur_token(TokenKind::LeftSquirly), "Expected current token to be `{{`");
         let start = self.cur_token.span.start.clone();
-        self.next_token();
+        self.next_token()?;
 
         let mut statements = Vec::new();
 
@@ -114,14 +113,15 @@ impl Parser {
         {
             let stmt = self.parse_statement()?;
             statements.push(stmt);
-            self.next_token();
+            self.next_token()?;
         }
 
         if self.cur_token.kind != TokenKind::RightSquirly {
-            return Err(self.error_current(
-                ErrorKind::UnexpectedToken,
-                format!("Expected `}}`, got {:?}", self.cur_token.kind),
-            ));
+            return Err(Error::UnexpectedToken {
+                span: self.cur_token.span.clone(),
+                expected: vec![TokenKind::RightSquirly],
+                found: self.cur_token.kind.clone(),
+            });
         }
 
         Ok(BlockExpression { span: self.span_with_start(start), statements: statements.into() })
@@ -131,12 +131,13 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::error::ErrorKind;
-    use crate::Parser;
+    use crate::parser::Error;
+    use super::*;
     use crate::parser::expressions::block_expression::BlockExpression;
     use crate::parser::statements::{ExpressionStatement, Statement};
-    
-   /// Test parsing a block expression with multiple statements
+    use crate::Position;
+
+    /// Test parsing a block expression with multiple statements
     #[test]
     fn test_parse_block_expression_multiple_statements() {
         let source_code = r#"
@@ -213,7 +214,15 @@ mod tests {
         assert!(result.is_err());
 
         if let Err(error) = result {
-            assert_eq!(error.kind, ErrorKind::UnexpectedToken);
+            match error {
+                Error::UnexpectedToken {
+                    span: _, expected, found
+                } => {
+                    assert_eq!(expected, vec![TokenKind::RightSquirly]);
+                    assert_eq!(found, TokenKind::EOF);
+                }
+                _ => panic!("Expected UnexpectedTokenError but got {:?}", error),
+            }
         } else {
             panic!("Expected error but found {:?}", result);
         }

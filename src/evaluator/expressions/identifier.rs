@@ -1,5 +1,5 @@
-use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::error::ErrorKind;
+use crate::{Environment, Evaluator, Object, trace};
+use crate::evaluator::{Result, Error};
 use crate::evaluator::objects::traits::UnwrapReturnValue;
 use crate::evaluator::runtime::builtins::BuiltinFunction;
 use crate::parser::expressions::Identifier;
@@ -9,7 +9,7 @@ impl Evaluator {
         &mut self,
         ident: &Identifier,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!("eval_identifier({})", ident));
         if let Some(object) = env.get(ident.value.clone()) {
             // If the value is a return value, unwrap it
@@ -19,11 +19,10 @@ impl Evaluator {
         } else if let Ok(builtin) = BuiltinFunction::try_from(ident) {
             Ok(builtin.into())
         } else {
-            Err(self.error(
-                ident.span.clone(),
-                format!("Identifier not found: {}", ident.value).as_str(),
-                ErrorKind::IdentifierNotFound,
-            ))
+            Err(Error::IdentifierNotFound {
+                span: ident.span.clone(),
+                identifier: ident.value.clone(),
+            }.into())
         }
     }
 }

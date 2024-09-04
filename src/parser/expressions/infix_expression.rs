@@ -2,15 +2,16 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Expression, Parser, Span, Token, TokenKind, trace};
-use crate::error::ErrorKind;
+use crate::{Expression, Parser, Span, Token, TokenKind, trace};
 use crate::parser::expressions::ExpressionSpanExt;
+use crate::parser::{Error, Result};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct InfixExpression {
     pub span: Span,
     pub left: Rc<Expression>,
     pub operator: InfixOperator,
+    pub operator_span: Span,
     pub right: Rc<Expression>,
 }
 
@@ -20,7 +21,7 @@ impl Display for InfixExpression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Copy)]
 pub enum InfixOperator {
     Plus,
     Minus,
@@ -178,7 +179,7 @@ impl Parser {
     /// - The `TokenKind` does not have a registered infix function. This could occur if the
     ///   token type is unexpected or unsupported, resulting in an `ErrorKind::MissingInfix`
     ///   error with a descriptive message.
-    pub(super) fn parse_infix(&mut self, left: Expression) -> Result<Expression, Error> {
+    pub(super) fn parse_infix(&mut self, left: Expression) -> Result<Expression> {
         let _trace = trace!("parse_infix");
         match self.cur_token.kind {
             // **** infix operators ****
@@ -209,30 +210,33 @@ impl Parser {
             TokenKind::Dot => Ok(Expression::Member(self.parse_member(left)?)),
             TokenKind::RangeExclusive | TokenKind::RangeInclusive => self.parse_range_infix_expression(left),
 
-            _ => Err(self.error_current(
-                ErrorKind::MissingInfix,
-                format!("No registered infix function for {:?}", self.cur_token.kind),
-            )),
+            _ => Err(Error::InvalidInfix {
+                span: self.cur_token.span.clone(),
+                found: self.cur_token.kind.clone(),
+            }),
         }
     }
 
 
-    pub(super) fn parse_infix_expression(&mut self, left: Expression) -> Result<InfixExpression, Error> {
+    pub(super) fn parse_infix_expression(&mut self, left: Expression) -> Result<InfixExpression> {
         let _trace = trace!("parse_infix_expression");
 
         let operator = Self::parse_infix_operator(&self.cur_token)
-            .ok_or(self.error_current(
-                ErrorKind::MissingInfix,
-                format!("expected infix operator, got {:?}", self.cur_token.kind),
-            ))?;
+            .ok_or(Error::InvalidInfix {
+                span: self.cur_token.span.clone(),
+                found: self.cur_token.kind.clone(),
+            })?;
+        
+        let operator_span = self.cur_token.span.clone();
 
         let precedence = self.cur_precedence();
-        self.next_token();
+        self.next_token()?;
         let right = self.parse_expression(precedence)?;
 
         Ok(InfixExpression {
             span: self.span_with_start(left.span().start.clone()),
             operator,
+            operator_span,
             left: Rc::new(left),
             right: Rc::new(right),
         })

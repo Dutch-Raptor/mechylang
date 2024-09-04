@@ -1,12 +1,13 @@
-use crate::{Evaluator, Environment, Error, Object, trace, Statement};
+use crate::{Evaluator, Environment, Object, trace, Statement};
 use crate::parser::statements::LetStatement;
+use crate::evaluator::{Result, };
 
 impl Evaluator {
     pub(super) fn eval_statement(
         &mut self,
         statement: &Statement,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!("Evaluating statement: {}", statement).to_string());
         match statement {
             Statement::Expression(stmt) => self.eval_expression(&stmt.expression, env),
@@ -55,7 +56,7 @@ impl Evaluator {
         &mut self,
         let_statement: &LetStatement,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!("eval_let_statement: {}", let_statement));
         let val = self.eval_expression(&let_statement.value, env)?;
         env.set(let_statement.name.value.clone(), val);

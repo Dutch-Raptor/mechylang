@@ -64,11 +64,11 @@ impl Repl {
 
 
                     if self.print_tokens {
-                        println!("Tokens: {:?}\n", Lexer::new(line.clone()).map(|token| token.kind).collect::<Vec<TokenKind>>());
+                        println!("Tokens: {:?}\n", Lexer::new(line.clone()).map(|result| result.map(|t| t.kind)).collect::<Vec<mechylang::lexer::Result<TokenKind>>>());
                     }
                     
                     if self.print_tokens_with_span {
-                        println!("Tokens: {:#?}\n", Lexer::new(line.clone()).map(|token| format!("{:>24?} {:?}", token.kind, token.span)).collect::<Vec<String>>());
+                        println!("Tokens: {:#?}\n", Lexer::new(line.clone()).map(|token| token.map(|t| format!("{:>24?} {:?}", t.kind, t.span))).collect::<Vec<mechylang::lexer::Result<String>>>());
                     }
 
                     if self.print_ast {

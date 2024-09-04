@@ -45,9 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let res = eval_file(file);
 
                 if let Err(e) = res {
-                    for e in e {
-                        color_print::cprint!("{}", e);
-                    }
+                    color_print::cprint!("{}", e);
                 }
             }
             Command::Repl { print_tokens, print_ast, print_tokens_with_span } => {

@@ -2,8 +2,8 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Parser, Span};
-use crate::error::ErrorKind;
+use crate::{Parser, Span, TokenKind};
+use crate::parser::{Error, Result};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StringLiteral {
@@ -18,22 +18,22 @@ impl Display for StringLiteral {
 }
 
 impl Parser {
-    pub(super) fn parse_string(&mut self) -> Result<StringLiteral, Error> {
+    pub(super) fn parse_string(&mut self) -> Result<StringLiteral> {
         let start = self.cur_token.span.start.clone();
         
         let value = self.cur_token.kind
             .as_string()
-            .ok_or_else(|| self.error_current(
-                ErrorKind::UnexpectedToken,
-                format!("Expected a string, got {:?}", self.cur_token.kind),
-            ))?;
+            .ok_or_else(|| Error::UnexpectedToken {
+                span: self.cur_token.span.clone(),
+                expected: vec![TokenKind::String(String::new())],
+                found: self.cur_token.kind.clone(),
+            })?;
 
         Ok(StringLiteral { span: self.span_with_start(start), value: value.into() })
     }
 }
 #[cfg(test)]
 mod tests {
-    use crate::TokenKind;
     use crate::parser::expressions::Expression;
     use crate::parser::tests::parse;
     use crate::parser::statements::Statement;

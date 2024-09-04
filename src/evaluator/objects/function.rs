@@ -3,13 +3,12 @@ use std::{
     rc::Rc,
 };
 use std::ops::RangeInclusive;
-use crate::{
-    parser::{expressions::{BlockExpression, Identifier}},
-    Environment, EvalConfig, Evaluator, Object,
-};
+use crate::{parser::{expressions::{BlockExpression, Identifier}}, Environment, EvalConfig, Evaluator, Object, Span};
+use crate::evaluator::objects::{Argument, ArgumentList, ArgumentType, ObjectTy};
 
 #[derive(Clone)]
 pub struct Function {
+    pub span: Span,
     pub params: Rc<[Identifier]>,
     pub body: BlockExpression,
     pub env: Environment,
@@ -18,23 +17,37 @@ pub struct Function {
 impl Callable for Function {
     fn call(
         &self,
-        args: Vec<Object>,
-        env: Option<Environment>,
+        _obj: Option<Object>,
+        args: Vec<Argument>,
+        _env: &mut Environment,
         config: Rc<EvalConfig>,
-    ) -> Result<Object, String> {
-        Evaluator::eval_function(self.clone(), args, env, config, self.body.span.clone())
+    ) -> Result<Object, Box<crate::evaluator::Error>> {
+        Evaluator::eval_function(self.clone(), args, config, self.body.span.clone())
     }
 
     fn args_len(&self) -> RangeInclusive<usize> {
         self.params.len()..=self.params.len()
     }
+
+    fn argument_list(&self) -> Option<ArgumentList> {
+        Some(ArgumentList::new_exactly(self.params.iter().map(|param| ArgumentType { name: param.value.as_ref().into(), ty: ObjectTy::Any }).collect()))
+    }
 }
 
 pub trait Callable {
-    fn call(&self, args: Vec<Object>, env: Option<Environment>, config: Rc<EvalConfig>) -> Result<Object, String>;
-
+    fn call(&self, 
+            obj: Option<Object>,
+            args: Vec<Argument>, env: &mut Environment, config: Rc<EvalConfig>) -> Result<Object, Box<crate::evaluator::Error>>;
+    
+    /// Returns the number of arguments the function takes
+    /// Returns `None` if the amount of arguments is unknown
     fn args_len(&self) -> RangeInclusive<usize>;
+    
+    /// Returns the types of the arguments the function takes
+    /// Returns `None` if the types of arguments are unknown
+    fn argument_list(&self) -> Option<ArgumentList>;
 }
+
 
 impl PartialEq for Function {
     fn eq(&self, other: &Self) -> bool {

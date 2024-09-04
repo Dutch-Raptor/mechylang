@@ -3,9 +3,10 @@ use std::fmt::{Display, Formatter};
 use color_print::cformat;
 use serde::Serialize;
 use crate::parser::Parser;
-use crate::{Error, trace, TokenKind, Span};
+use crate::{trace, TokenKind, Span};
 use crate::error::ErrorKind;
 use crate::parser::expressions::{Expression, Precedence};
+use crate::parser::{Error, Result};
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct ReturnStatement {
@@ -40,11 +41,11 @@ impl Parser {
     /// This function returns an error if:
     /// - Neither an expression nor a semicolon followed the `return` keyword.
     /// - An error occurs while parsing the expression.
-    pub(super) fn parse_return_statement(&mut self) -> Result<ReturnStatement, Error> {
+    pub(super) fn parse_return_statement(&mut self) -> Result<ReturnStatement> {
         let _trace = trace!("parse_return_statement");
         debug_assert!(self.is_cur_token(TokenKind::Return), "Expected current token to be `Return`");
         let start = self.cur_token.span.start.clone();
-        self.next_token();
+        self.next_token()?;
 
         if let TokenKind::Semicolon = self.cur_token.kind {
              return Ok(ReturnStatement {
@@ -57,18 +58,11 @@ impl Parser {
             Ok(expression) => expression,
             // If there is no expression, let the user know that they need to return something or
             // use a semicolon
-            Err(Error {
-                    kind: ErrorKind::MissingPrefix, ..
-                }) => {
-                return Err(self.error(
-                    ErrorKind::UnexpectedToken,
-                    cformat!(
-                        "Expected an expression or semicolon after <i>`return`</i>, got <i>{:?}</i> instead",
-                        self.cur_token.kind
-                    ),
-                    self.cur_token.span.clone(),
-                    None,
-                ));
+            Err(Error::InvalidPrefix { found, .. }) => {
+                return Err(Error::ReturnWithoutExpressionOrSemicolon {
+                    span: self.cur_token.span.clone(),
+                    found: found.clone(),
+                });
             }
             Err(err) => return Err(err),
         };
