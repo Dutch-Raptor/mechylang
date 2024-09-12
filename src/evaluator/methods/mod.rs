@@ -372,6 +372,24 @@ lazy_static! {
                     expected: vec![ObjectTy::Integer],
                     found: args.args[0].get_type(),
                 })?;
+                
+                if let Some(ident) = args.obj_identifier {
+                    let mutated = args.env.mutate(ident.clone(), |iter| {
+                        if let Object::Iterator(iterator_ref) = iter {
+                            Ok(Object::Iterator(IteratorObject {
+                                iterator: Box::new(iterator_ref.take(take as usize).collect::<Vec<_>>().into_iter()),
+                            }))
+                        } else {
+                            Err(Error::MutateError {
+                                span: args.obj_span, name: ident,
+                            }.into())
+                        }
+                    });
+                    
+                    if let Ok(iterator) = mutated {
+                        return Ok(iterator);
+                    }
+                }
 
                 Ok(Object::Iterator(IteratorObject {
                     iterator: Box::new(iterator.take(take as usize)),
