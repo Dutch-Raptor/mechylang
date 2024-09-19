@@ -3,7 +3,6 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
 use crate::{Expression, Parser, Span, Token, TokenKind};
-use crate::error::ErrorKind;
 use crate::parser::expressions::Precedence;
 use crate::parser::{Error, Result};
 
@@ -68,9 +67,9 @@ impl Display for RangeFullExpression {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     pub(super) fn parse_range_infix_expression(&mut self, left: Expression) -> Result<Expression> {
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
         let precedence = self.cur_precedence();
         let inclusive = Self::range_is_inclusive(&self.cur_token)?;
@@ -106,7 +105,7 @@ impl Parser {
     /// Parses a RangeTo expression
     /// e.g. `..5` or `..=5`
     pub(super) fn parse_range_prefix_expression(&mut self) -> Result<Expression> {
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
         let range_token = self.cur_token.clone();
 
         // check if we are dealing with a FullRange expression

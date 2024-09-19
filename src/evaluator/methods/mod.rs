@@ -61,7 +61,6 @@ impl Callable for Method {
         let mut evaluator = Evaluator {
             globals: HashMap::new(),
             current_span: self.method_span.clone(),
-            lines: vec![].into(),
             eval_config: config,
         };
 
@@ -276,7 +275,7 @@ lazy_static! {
                                 iterator.iterator.next().unwrap_or(Object::Unit)
                             } else {
                                 Object::Unit
-                            }.into())
+                            })
                         }).map_err(|_| Error::MutateError {
                             span: args.obj_span.clone(),
                             name: ident.clone(),
@@ -434,7 +433,7 @@ lazy_static! {
                 };
 
                 let predicate = predicate.value.clone().to_callable()
-                    .map_err(|e| invalid_predicate_type())?;
+                    .map_err(|_| invalid_predicate_type())?;
 
                 let args_len = predicate.args_len();
 
@@ -495,7 +494,7 @@ lazy_static! {
                     found: transform.get_type(),
                 });
 
-                let function = transform.value.clone().to_callable().map_err(|e| invalid_transform_type())?;
+                let function = transform.value.clone().to_callable().map_err(|_| invalid_transform_type())?;
                 let args_len = function.args_len();
 
                 if !args_len.contains(&1usize) {
@@ -556,7 +555,7 @@ lazy_static! {
                     expected_return_type: None,
                 },
             },
-            function: |mut args| {
+            function: |args| {
                 if let Object::Iterator(iterator) = args.obj {
                     let expected_type = ObjectTy::Function {
                         function_ty: FunctionTy {

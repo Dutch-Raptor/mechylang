@@ -35,7 +35,7 @@ impl Display for ForExpression {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
 
     /// Parses a for expression
     ///
@@ -46,7 +46,7 @@ impl Parser {
     /// ```
     pub(super) fn parse_for_expression(&mut self) -> Result<ForExpression> {
         let _trace = trace!("parse_for_expression");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
         self.next_token()?;
 

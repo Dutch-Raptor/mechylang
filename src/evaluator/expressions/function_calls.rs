@@ -42,10 +42,10 @@ impl Evaluator {
             return self.apply_function(function, arguments);
         }
 
-        return Err(Error::CannotCall {
+        Err(Error::CannotCall {
             function,
             span: call.function.span().clone(),
-        }.into());
+        }.into())
     }
 
 
@@ -65,7 +65,7 @@ impl Evaluator {
         (function.function)(&arguments, env, &self.eval_config)
     }
 
-    fn validate_argument_length(&mut self, function: &dyn Callable, arguments: &Vec<Argument>) -> Result<()> {
+    fn validate_argument_length(&mut self, function: &dyn Callable, arguments: &[Argument]) -> Result<()> {
         if !function.args_len().contains(&arguments.len()) {
             return Err(Error::WrongNumberOfArguments {
                 span: self.current_span.clone(),
@@ -161,7 +161,6 @@ impl Evaluator {
         let mut evaluator = Evaluator {
             globals: HashMap::new(),
             current_span: span,
-            lines: vec![].into(),
             eval_config: config,
         };
 

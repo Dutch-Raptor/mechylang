@@ -63,13 +63,13 @@ impl Evaluator {
         &self,
         right: Rc<Expression>,
         _env: &mut Environment,
-        span: Span,
+        _span: Span,
     ) -> Result<Object> {
         let _trace = trace!(&format!("eval_reference_operator_expression: {}", right));
         todo!()
     }
 
-    fn eval_dereference_operator_expression(&self, right: Object, span: Span) -> Result<Object> {
+    fn eval_dereference_operator_expression(&self, right: Object, _span: Span) -> Result<Object> {
         let _trace = trace!(&format!(
             "eval_dereference_operator_expression: {:?}",
             right

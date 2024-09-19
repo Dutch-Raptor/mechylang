@@ -1,8 +1,10 @@
-use crate::Position;
+use crate::{Span};
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    UnterminatedString { string_start_position: Position},
+    UnterminatedString { span: Span },
+    UnsupportedEscapeSequence { span: Span },
+    IllegalCharacter { span: Span, char: char },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

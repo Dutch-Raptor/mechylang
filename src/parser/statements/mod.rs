@@ -9,7 +9,7 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use crate::{Token, trace, TokenKind, Parser};
-use crate::parser::{Error, Result};
+use crate::parser::{Result};
 
 pub use function_statement::FunctionStatement;
 pub use let_statement::LetStatement;
@@ -115,7 +115,7 @@ impl Display for Statement {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses a single statement in Mechylang.
     ///
     /// This function handles the parsing of various types of statements, including `let`, `return`,
@@ -150,8 +150,9 @@ impl Parser {
         };
 
 
-        if !Parser::is_statement_terminator(&self.peek_token, &self.cur_token) {
-            return Err(Error::UnterminatedStatement { span: self.cur_token.span.clone() });
+        if !Parser::is_statement_terminator(&self.peek_token) {
+            // Skip unterminated statement error for now
+            // return Err(Error::UnterminatedStatement { span: self.cur_token.span.clone() });
         }
 
         if self.peek_token.kind == TokenKind::Semicolon {
@@ -178,7 +179,7 @@ impl Parser {
     ///
     /// * `true` if the current token is a statement terminator.
     /// * `false` otherwise. 
-    fn is_statement_terminator(current_token: &Token, previous_token: &Token) -> bool {
+    fn is_statement_terminator(current_token: &Token) -> bool {
         if current_token.kind == TokenKind::Semicolon
             || current_token.kind == TokenKind::RightSquirly
             || current_token.kind == TokenKind::EOF
@@ -186,11 +187,6 @@ impl Parser {
             || current_token.kind == TokenKind::RightSquare
             || current_token.kind == TokenKind::Else
         {
-            return true;
-        }
-       
-        // if previous token was on a different line
-        if current_token.span.start.line != previous_token.span.start.line {
             return true;
         }
 

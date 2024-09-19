@@ -1,4 +1,3 @@
-use crate::error::ErrorKind;
 use crate::Lexer;
 
 /// Runs the passed in `Mechylang` code and panics if it fails.
@@ -83,7 +82,7 @@ pub fn test_parse_ok(code :&str) {
 /// - The code does not produce any errors (i.e., evaluation succeeds).
 /// - The number of errors produced does not match the number of expected error kinds.
 /// - The kinds of errors produced do not match the expected kinds.
-pub fn test_eval_err(code: &str, _error_kinds: &[ErrorKind]) {
+pub fn test_eval_err(code: &str) {
     let result = crate::Evaluator::eval(code, &mut Default::default(), Default::default());
 
     if result.is_ok() {
@@ -92,6 +91,5 @@ pub fn test_eval_err(code: &str, _error_kinds: &[ErrorKind]) {
 
     if let Err(ref e) = result {
         println!("{}", e);
-        
     }
 }

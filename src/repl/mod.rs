@@ -62,17 +62,16 @@ impl Repl {
 
                     rl.add_history_entry(line.as_str())?;
 
-
                     if self.print_tokens {
-                        println!("Tokens: {:?}\n", Lexer::new(line.clone()).map(|result| result.map(|t| t.kind)).collect::<Vec<mechylang::lexer::Result<TokenKind>>>());
+                        println!("Tokens: {:?}\n", Lexer::new(&line).map(|result| result.map(|t| t.kind)).collect::<Vec<mechylang::lexer::Result<TokenKind>>>());
                     }
                     
                     if self.print_tokens_with_span {
-                        println!("Tokens: {:#?}\n", Lexer::new(line.clone()).map(|token| token.map(|t| format!("{:>24?} {:?}", t.kind, t.span))).collect::<Vec<mechylang::lexer::Result<String>>>());
+                        println!("Tokens: {:#?}\n", Lexer::new(&line).map(|token| token.map(|t| format!("{:>24?} {:?}", t.kind, t.span))).collect::<Vec<mechylang::lexer::Result<String>>>());
                     }
 
                     if self.print_ast {
-                        if let Ok(parsed) = Parser::from_source(line.clone()).parse() {
+                        if let Ok(parsed) = Parser::from_source(&line).parse() {
                             println!("Parsed: {}\n", parsed.statements.iter().map(|s| s.to_string()).collect::<Vec<String>>().join("\n"));
                             println!("AST: {:#?}\n", parsed.statements);
                         }
@@ -80,7 +79,7 @@ impl Repl {
                     
                     
                     let evaluated = Evaluator::eval(
-                        line, &mut env,
+                        &line, &mut env,
                         EvalConfig::default()
                     );
                     match evaluated {

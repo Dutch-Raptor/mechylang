@@ -345,7 +345,7 @@ impl Display for Expression {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses an expression in Mechylang with the given precedence.
     ///
     /// This method parses an expression from the current token, handling different levels of precedence. It supports

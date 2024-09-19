@@ -130,7 +130,6 @@ impl PrecedenceTrait for TokenKind {
             TokenKind::Colon => Precedence::Lowest,
             TokenKind::Semicolon => Precedence::Lowest,
             TokenKind::BitwiseNot => Precedence::Lowest,
-            TokenKind::Illegal(_) => Precedence::Lowest,
             TokenKind::Ellipsis => Precedence::Lowest,
         };
 
@@ -144,11 +143,9 @@ impl PrecedenceTrait for Token {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     pub(super) fn peek_precedence(&mut self) -> Precedence {
-        self.peek_token.precedence().unwrap_or_else(|| {
-            Precedence::Lowest
-        })
+        self.peek_token.precedence().unwrap_or(Precedence::Lowest)
     }
     
     pub(super) fn cur_precedence(&self) -> Precedence {

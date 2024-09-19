@@ -1,10 +1,8 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use color_print::cformat;
 use serde::Serialize;
 use crate::parser::Parser;
 use crate::{trace, TokenKind, Span};
-use crate::error::ErrorKind;
 use crate::parser::expressions::{Expression, Precedence};
 use crate::parser::{Error, Result};
 
@@ -23,7 +21,7 @@ impl Display for ReturnStatement {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses a `return` statement in Mechylang.
     ///
     /// This function handles the parsing of a `return` statement, which is used to return a value
@@ -44,7 +42,7 @@ impl Parser {
     pub(super) fn parse_return_statement(&mut self) -> Result<ReturnStatement> {
         let _trace = trace!("parse_return_statement");
         debug_assert!(self.is_cur_token(TokenKind::Return), "Expected current token to be `Return`");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
         self.next_token()?;
 
         if let TokenKind::Semicolon = self.cur_token.kind {

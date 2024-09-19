@@ -1,6 +1,6 @@
 //! # Methods for the `Object::Array` type
 //!
-//! For info on the `Object::Array` type, see [the documentation for the `Object` enum](crate::Object#variant.Array).
+//! For info on the `Object::Array` type, see [the documentation for the `Object` enum](Object#variant.Array).
 
 use std::sync::Arc;
 use lazy_static::lazy_static;
@@ -158,7 +158,7 @@ lazy_static! {
             })?;
 
             if let Some(ident) = args.obj_identifier {
-                return args.env.mutate(ident.to_string(), move |arr| {
+                args.env.mutate(ident.to_string(), move |arr| {
                     if let Object::Array(ref mut arr) = arr {
                         Ok(arr.remove(index as usize))
                     } else {
@@ -168,7 +168,7 @@ lazy_static! {
                             found: arr.get_type(),
                         }.into())
                     }
-                });
+                })
             } else {
                 match args.obj {
                     Object::Array(ref arr) => Ok(arr.get(index as usize).cloned().unwrap_or(Object::Unit)),

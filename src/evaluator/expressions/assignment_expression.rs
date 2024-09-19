@@ -1,5 +1,4 @@
 use crate::{Environment, Evaluator, Object, trace};
-use crate::error::ErrorKind;
 use crate::parser::expressions::{Expression, ExpressionSpanExt, Identifier, IndexExpression, InfixExpression, InfixOperator, PrefixExpression, PrefixOperator};
 use crate::evaluator::{Result, Error};
 use crate::evaluator::objects::ObjectTy;
@@ -35,8 +34,8 @@ impl Evaluator {
         self.current_span = infix.left.span().clone();
 
         match infix.left.as_ref() {
-            Expression::Identifier(ident) => Self::UpdateIdentifier(infix, env, new_value, ident)?,
-            Expression::Index(index_expr) => self.AssignIndexExpression(infix, env, new_value, &index_expr)?,
+            Expression::Identifier(ident) => Self::update_identifier(infix, env, new_value, ident)?,
+            Expression::Index(index_expr) => self.assign_index_expression(infix, env, new_value, &index_expr)?,
             Expression::Prefix(PrefixExpression {
                                    span: _,
                                    operator: PrefixOperator::Asterisk,
@@ -51,7 +50,7 @@ impl Evaluator {
         Ok(Object::Unit)
     }
 
-    fn AssignIndexExpression(&mut self, infix: &InfixExpression, env: &mut Environment, new_value: Object, index_expr: &&IndexExpression) -> Result<()> {
+    fn assign_index_expression(&mut self, infix: &InfixExpression, env: &mut Environment, new_value: Object, index_expr: &&IndexExpression) -> Result<()> {
         let index = self.eval_expression(&index_expr.index, env)?;
 
         match index_expr.left.as_ref() {
@@ -96,7 +95,7 @@ impl Evaluator {
         Ok(())
     }
 
-    fn UpdateIdentifier(infix: &InfixExpression, env: &mut Environment, new_value: Object, ident: &Identifier) -> Result<()> {
+    fn update_identifier(infix: &InfixExpression, env: &mut Environment, new_value: Object, ident: &Identifier) -> Result<()> {
         env.update(ident.value.clone(), new_value).map_err(|_| {
             Error::IdentifierNotFound {
                 span: infix.left.span().clone(),

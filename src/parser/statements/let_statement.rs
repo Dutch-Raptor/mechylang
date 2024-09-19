@@ -54,7 +54,7 @@ impl Display for LetStatement {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses a `let` statement in Mechylang.
     ///
     /// This function handles the parsing of a `let` statement, which is used to declare variables.
@@ -76,7 +76,7 @@ impl Parser {
     pub(super) fn parse_let_statement(&mut self) -> Result<LetStatement> {
         let _trace = trace!("parse_let_statement");
         debug_assert!(self.is_cur_token(TokenKind::Let), "Expected current token to be `Let`");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
         let name = match self.peek_token.kind {
             TokenKind::Identifier(ref name) => name.clone(),
@@ -114,7 +114,6 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::error::ErrorKind;
     use crate::{Parser, TokenKind};
     use crate::parser::Error;
     use crate::parser::expressions::Expression;

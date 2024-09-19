@@ -22,11 +22,10 @@ use crate::{Lexer, Parser, Program, Span, Statement, trace};
 pub fn eval_file(file: &str) -> crate::Result<Object> {
     let input = std::fs::read_to_string(file).unwrap();
     let mut env = Environment::new();
-    Evaluator::eval(input, &mut env, EvalConfig::default())
+    Evaluator::eval(&input, &mut env, EvalConfig::default())
 }
 
 pub struct Evaluator {
-    lines: Rc<[String]>,
     current_span: Span,
     globals: HashMap<Rc<str>, Object>,
     eval_config: Rc<EvalConfig>,
@@ -34,22 +33,17 @@ pub struct Evaluator {
 
 impl Evaluator {
     pub fn eval(
-        input: impl Into<Rc<str>>,
+        input: &str,
         env: &mut Environment,
         config: EvalConfig,
     ) -> crate::Result<Object> {
-        let input: Rc<str> = input.into();
-
-        
         let lexer = Lexer::new(input);
-        let lines = lexer.lines();
+        // println!("{:?}", Lexer::new(input).collect::<std::result::Result<Vec<Token>, crate::lexer::Error>>());
         let mut parser = Parser::new(lexer);
-        
 
         let Program { statements } = parser.parse()?;
 
         let evaluator = Evaluator {
-            lines,
             current_span: Span::default(),
             globals: HashMap::new(),
             eval_config: config.into(),

@@ -1,12 +1,10 @@
-use color_print::cformat;
-use crate::error::ErrorKind;
 use crate::parser::Parser;
 use crate::{Token, TokenKind};
-use crate::lexer::{Position, Span};
+use crate::lexer::{Span};
 
 use crate::parser::{Error, Result};
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Advances the parser to the next token in the input stream.
     ///
     /// This method retrieves the next token from the lexer and updates the
@@ -19,20 +17,15 @@ impl Parser {
         let next = match token {
             Some(Ok(token)) => token,
             Some(Err(err)) => return Err(Error::LexerError(err)),
-            None => Token {
-                kind: TokenKind::EOF,
-                span: Span {
-                    start: Position {
-                        line: self.peek_token.span.start.line,
-                        column: self.peek_token.span.end.column + 1,
-                        file: self.peek_token.span.start.file.clone(),
+            None => {
+                let peek_token_end_byte = self.peek_token.span.bytes.end;
+                Token {
+                    kind: TokenKind::EOF,
+                    span: Span {
+                        bytes: peek_token_end_byte..peek_token_end_byte + 1,
+                        file: self.peek_token.span.file.clone(),
                     },
-                    end: Position {
-                        line: self.peek_token.span.start.line,
-                        column: self.peek_token.span.end.column + 1,
-                        file: self.peek_token.span.start.file.clone(),
-                    },
-                },
+                }
             },
         };
 
@@ -129,10 +122,10 @@ impl Parser {
     ///
     /// # Returns
     /// A new `Span` with the given start position and the end position set to the current token's end position.
-    pub(super) fn span_with_start(&self, start: Position) -> Span {
+    pub(super) fn span_with_start(&self, start: Span) -> Span {
         Span {
-            start,
-            end: self.cur_token.span.end.clone(),
+            bytes: start.bytes.start..self.cur_token.span.bytes.end,
+            file: self.cur_token.span.file.clone(),
         }
     }
 }

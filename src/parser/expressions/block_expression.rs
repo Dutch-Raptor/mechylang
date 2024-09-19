@@ -81,7 +81,7 @@ impl Display for BlockExpression {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses a block expression in Mechylang.
     ///
     /// This function handles the parsing of a block expression, which is a sequence of statements enclosed
@@ -103,7 +103,7 @@ impl Parser {
     pub(in crate::parser) fn parse_block_expression(&mut self) -> Result<BlockExpression> {
         let _trace = trace!("parse_block_expression");
         debug_assert!(self.is_cur_token(TokenKind::LeftSquirly), "Expected current token to be `{{`");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
         self.next_token()?;
 
         let mut statements = Vec::new();
@@ -135,7 +135,6 @@ mod tests {
     use super::*;
     use crate::parser::expressions::block_expression::BlockExpression;
     use crate::parser::statements::{ExpressionStatement, Statement};
-    use crate::Position;
 
     /// Test parsing a block expression with multiple statements
     #[test]

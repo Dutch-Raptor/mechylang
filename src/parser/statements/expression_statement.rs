@@ -40,7 +40,7 @@ impl Display for ExpressionStatement {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses an expression statement in Mechylang.
     ///
     /// This function handles the parsing of an expression statement, which consists of an expression
@@ -59,7 +59,7 @@ impl Parser {
     pub(super) fn parse_expression_statement(&mut self) -> Result<ExpressionStatement> {
         let _trace = trace!("parse_expression_statement");
         
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
         
         let expression = self.parse_expression(Precedence::Lowest)?;
         

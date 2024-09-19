@@ -17,9 +17,9 @@ impl Display for StringLiteral {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     pub(super) fn parse_string(&mut self) -> Result<StringLiteral> {
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
         
         let value = self.cur_token.kind
             .as_string()

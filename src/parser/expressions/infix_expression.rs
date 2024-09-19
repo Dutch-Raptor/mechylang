@@ -119,7 +119,7 @@ impl Display for InfixOperator {
 }
 
 
-impl Parser {
+impl<'a> Parser<'a> {
     pub(super) fn has_infix(&self, token: &TokenKind) -> bool {
         match token {
             TokenKind::Plus | TokenKind::Minus | TokenKind::Divide
@@ -234,7 +234,7 @@ impl Parser {
         let right = self.parse_expression(precedence)?;
 
         Ok(InfixExpression {
-            span: self.span_with_start(left.span().start.clone()),
+            span: self.span_with_start(left.span().clone()),
             operator,
             operator_span,
             left: Rc::new(left),

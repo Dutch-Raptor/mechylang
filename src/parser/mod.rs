@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use crate::{Lexer, Token, TokenKind};
 use crate::tracer::reset_trace;
 
@@ -17,19 +16,16 @@ pub use program::Program;
 /// The `Parser` struct is responsible for parsing the source code into an abstract syntax tree (AST).
 /// It uses a lexer to tokenize the input and processes these tokens to produce the AST.
 #[derive(Debug)]
-pub struct Parser {
+pub struct Parser<'a> {
     /// The lexer used to tokenize the source code.
-    lexer: Lexer,
+    lexer: Lexer<'a>,
     /// The current token being processed.
     pub cur_token: Token,
     /// The next token to be processed.
     pub peek_token: Token,
-    /// A list of errors encountered during parsing.
-    /// The lines of source code being parsed, used for error reporting.
-    lines: Rc<[String]>,
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Creates a new `Parser` instance.
     ///
     /// This method initializes a new `Parser` with the given `Lexer`. It reads two tokens initially
@@ -52,9 +48,8 @@ impl Parser {
     /// let mut parser = Parser::new(lexer);
     /// let program = parser.parse().unwrap();
     /// ```
-    pub fn new(lexer: Lexer) -> Self {
+    pub fn new(lexer: Lexer<'a>) -> Self {
         let mut parser = Self {
-            lines: lexer.lines(),
             lexer,
             cur_token: Token::default(),
             peek_token: Token::default(),
@@ -88,7 +83,7 @@ impl Parser {
     /// let mut parser = Parser::from_source(source_code);
     /// let program = parser.parse().unwrap();
     /// ```
-    pub fn from_source(src: impl AsRef<str>) -> Self {
+    pub fn from_source(src: &'a str) -> Self {
         Parser::new(Lexer::new(src))
     }
     

@@ -26,12 +26,12 @@ impl Display for CallExpression {
         write!(f, "{}({})", self.function, args)
     }
 }
-impl Parser {
+impl<'a> Parser<'a> {
     pub(super) fn parse_call_expression(&mut self, left: Expression) -> Result<CallExpression> {
         let arguments = self.parse_expression_list(TokenKind::RightParen)?;
 
         Ok(CallExpression {
-            span: self.span_with_start(left.span().start.clone()),
+            span: self.span_with_start(left.span().clone()),
             function: Rc::new(left),
             arguments: arguments.into(),
         })
@@ -41,12 +41,9 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::Lexer;
-    use crate::TokenKind;
     use crate::parser::expressions::Expression;
     use crate::parser::Parser;
     use crate::parser::statements::Statement;
-
-
 
     #[test]
     fn test_call_expression_parsing() {

@@ -1,6 +1,4 @@
-use crate::{Span, TokenKind, trace};
-use crate::error::ErrorKind;
-use crate::parser::Parser;
+use crate::{Span, TokenKind};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

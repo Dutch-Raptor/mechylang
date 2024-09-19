@@ -25,11 +25,11 @@ impl Display for ArrayLiteral {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
 
     pub(super) fn parse_array_expression(&mut self) -> Result<ArrayLiteral> {
         debug_assert!(self.is_cur_token(TokenKind::LeftSquare), "Expected current token to be `[`");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
         let elements = self.parse_expression_list(TokenKind::RightSquare)?;
         
         debug_assert!(self.is_cur_token(TokenKind::RightSquare), "Expected current token to be `]`");

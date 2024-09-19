@@ -1,7 +1,6 @@
 use crate::{Environment,  Evaluator, Object, trace};
-use crate::error::ErrorKind;
-use crate::parser::expressions::{Expression, ExpressionSpanExt};
-use crate::evaluator::{Result, Error};
+use crate::parser::expressions::{Expression};
+use crate::evaluator::{Result};
 
 impl Evaluator {
     pub(super) fn eval_range_expression(

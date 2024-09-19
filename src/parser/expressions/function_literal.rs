@@ -27,11 +27,11 @@ impl Display for FunctionLiteral {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
 
     pub(super) fn parse_function_literal(&mut self) -> Result<FunctionLiteral> {
         let _trace = trace!("parse_function_literal");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
         self.expect_peek(TokenKind::LeftParen)?;
 

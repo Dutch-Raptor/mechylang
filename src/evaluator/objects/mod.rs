@@ -141,7 +141,10 @@ impl Display for ObjectTy {
         match self {
             ObjectTy::Any => write!(f, "any"),
             ObjectTy::AnyOf { types } => {
-                types.iter().map(ToString::to_string).intersperse(" | ".to_string()).map(|s| write!(f, "{s}")).collect()
+                Itertools::intersperse(
+                    types.iter().map(ToString::to_string),
+                    " | ".to_string(),
+                ).try_for_each(|s| write!(f, "{s}"))
             }
             ObjectTy::Unit => write!(f, "()"),
             ObjectTy::Integer => write!(f, "int"),
@@ -158,7 +161,7 @@ impl Display for ObjectTy {
             ObjectTy::Iterator { item } => write!(f, "Iter(item: {item})"),
             ObjectTy::Function { function_ty } => write!(f, "{function_ty}"),
             ObjectTy::Method { method_ty } => write!(f, "{method_ty}"),
-            ObjectTy::Struct { expected_field_type } => write!(f, "{{{}}}", expected_field_type.as_deref().unwrap_or(&ObjectTy::Unknown).to_string()),
+            ObjectTy::Struct { expected_field_type } => write!(f, "{{{}}}", expected_field_type.as_deref().unwrap_or(&ObjectTy::Unknown)),
             ObjectTy::Reference => write!(f, "&any"),
             ObjectTy::Unknown => write!(f, "unknown"),
         }
@@ -426,7 +429,7 @@ impl Object {
             _ => None,
         }
     }
-    
+
     pub fn as_range_to_inclusive(&self) -> Option<&Object> {
         match self {
             Object::RangeToInclusive(to) => Some(to),

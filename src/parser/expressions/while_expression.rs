@@ -20,7 +20,7 @@ impl Display for WhileExpression {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
 
     /// Parses a while expression
     ///
@@ -29,7 +29,7 @@ impl Parser {
     /// ```text
     /// while <condition> { <body> }
     pub(super) fn parse_while_expression(&mut self) -> Result<WhileExpression> {
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
         self.next_token()?;
 

@@ -1,29 +1,18 @@
 use std::fmt::{self, Display, Formatter};
+use std::ops::Range;
 use std::sync::Arc;
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, Clone, Default, Serialize)]
-pub struct Position {
-    /// The line number, starting at 1.
-    pub line: usize,
-    /// The column number, starting at 1.
-    pub column: usize,
-    /// The file name.
-    /// This is `None` if the token is not associated with a file.
-    pub file: Option<Arc<str>>,
-}
-
-#[derive(Debug, PartialEq, Clone, Default, Serialize)]
 pub struct Span {
-    /// The start position of the span (inclusive)
-    pub start: Position,
-    /// The end position of the span (exclusive)
-    pub end: Position, 
+    /// The range of bytes in the source file
+    pub bytes: Range<usize>,
+    pub file: Option<Arc<str>>,
 }
 
 impl Span {
     pub fn length(&self) -> usize {
-        self.end.column - self.start.column
+        self.bytes.end - self.bytes.start
     }
 }
 
@@ -135,7 +124,6 @@ pub enum TokenKind {
     // Other
     Identifier(String),
     EOF,
-    Illegal(String),
     Ellipsis,
 }
 
@@ -258,8 +246,78 @@ impl TokenKind {
             TokenKind::RangeInclusive => "..=",
             TokenKind::Identifier(_) => "identifier",
             TokenKind::EOF => "EOF",
-            TokenKind::Illegal(_) => "illegal",
             TokenKind::Ellipsis => "ellipsis",
+        }
+    }
+    
+    pub const fn length_bytes(&self) -> Option<usize> {
+        match self {
+            TokenKind::Let => Some(3),
+            TokenKind::If => Some(3),
+            TokenKind::Else => Some(3),
+            TokenKind::While => Some(3),
+            TokenKind::For => Some(3),
+            TokenKind::In => Some(3),
+            TokenKind::Return => Some(3),
+            TokenKind::Break => Some(3),
+            TokenKind::Continue => Some(3),
+            TokenKind::Fn => Some(3),
+            TokenKind::Struct => Some(3),
+            TokenKind::Enum => Some(3),
+            TokenKind::Match => Some(3),
+            TokenKind::As => Some(3),
+            TokenKind::Use => Some(3),
+            TokenKind::True => Some(3),
+            TokenKind::False => Some(3),
+            TokenKind::Number(_) => None,
+            TokenKind::String(_) => None,
+            TokenKind::Char(c) => Some(c.len_utf8()),
+            TokenKind::Unit => Some(2),
+            TokenKind::Plus => Some(1),
+            TokenKind::Minus => Some(1),
+            TokenKind::Multiply => Some(1),
+            TokenKind::Divide => Some(1),
+            TokenKind::Modulo => Some(1),
+            TokenKind::Bang => Some(1),
+            TokenKind::Question => Some(1),
+            TokenKind::Dot => Some(1),
+            TokenKind::Colon => Some(1),
+            TokenKind::Semicolon => Some(1),
+            TokenKind::Comma => Some(1),
+            TokenKind::LogicalAnd => Some(2),
+            TokenKind::LogicalOr => Some(2),
+            TokenKind::Ampersand => Some(1),
+            TokenKind::BitwiseOr => Some(1),
+            TokenKind::BitwiseXor => Some(1),
+            TokenKind::BitwiseNot => Some(1),
+            TokenKind::BitwiseRightShift => Some(2),
+            TokenKind::BitwiseLeftShift => Some(2),
+            TokenKind::AssignEqual => Some(1),
+            TokenKind::AssignPlus => Some(2),
+            TokenKind::AssignMinus => Some(2),
+            TokenKind::AssignMultiply => Some(2),
+            TokenKind::AssignDivide => Some(2),
+            TokenKind::AssignModulo => Some(2),
+            TokenKind::AssignBitwiseXor => Some(2),
+            TokenKind::AssignBitwiseAnd => Some(2),
+            TokenKind::AssignBitwiseOr => Some(2),
+            TokenKind::CompareEqual => Some(2),
+            TokenKind::CompareNotEqual => Some(2),
+            TokenKind::CompareLess => Some(1),
+            TokenKind::CompareLessEqual => Some(2),
+            TokenKind::CompareGreater => Some(1),
+            TokenKind::CompareGreaterEqual => Some(2),
+            TokenKind::LeftParen => Some(1),
+            TokenKind::RightParen => Some(1),
+            TokenKind::LeftSquirly => Some(1),
+            TokenKind::RightSquirly => Some(1),
+            TokenKind::LeftSquare => Some(1),
+            TokenKind::RightSquare => Some(1),
+            TokenKind::RangeExclusive => Some(2),
+            TokenKind::RangeInclusive => Some(3),
+            TokenKind::Identifier(_) => None,
+            TokenKind::EOF => None,
+            TokenKind::Ellipsis => Some(3),
         }
     }
 }
@@ -352,7 +410,6 @@ impl Display for TokenKind {
             // Other
             Identifier(name) => write!(f, "Identifier({})", name),
             EOF => write!(f, "EOF"),
-            Illegal(msg) => write!(f, "Illegal({})", msg),
             Ellipsis => write!(f, "Ellipsis"),
         }
     }

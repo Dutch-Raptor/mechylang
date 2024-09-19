@@ -1,14 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
     use crate::{Object};
-    use crate::{error::ErrorKind, test_utils::test_eval_ok};
+    use crate::{test_utils::test_eval_ok};
     use crate::evaluator::Error;
     use crate::evaluator::objects::ObjectTy;
-    use crate::evaluator::runtime::builtins::BuiltinError;
     use crate::evaluator::tests::test_eval;
     use crate::parser::expressions::{InfixOperator, PrefixOperator};
-    use crate::test_utils::test_eval_err;
 
 
     #[test]
@@ -34,14 +31,14 @@ mod tests {
                 "if (10 < 1) { if (10 < 1) { return 10; }; return 1; }; return 9;",
                 Object::Integer(9),
             ),
-            // (
-            //     "let f = fn(x) { return x; x + 10; }; f(10);",
-            //     Object::Integer(10),
-            // ),
-            // (
-            //     "let f = fn(x) { let result = x + 10; return result; return 10; }; f(10);",
-            //     Object::Integer(20),
-            // ),
+            (
+                "let f = fn(x) { return x; x + 10; }; f(10);",
+                Object::Integer(10),
+            ),
+            (
+                "let f = fn(x) { let result = x + 10; return result; return 10; }; f(10);",
+                Object::Integer(20),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -115,46 +112,49 @@ mod tests {
         }
     }
 
+    fn test_function_wrong_number_arguments() {
+        let err = test_eval(r#"
+        len("one", "two")
+        "#).unwrap_err();
+
+        match err.as_ref() {
+            Error::WrongNumberOfArguments {
+                span: _, expected, found
+            } => {
+                assert_eq!(expected, &(1..=1));
+                assert_eq!(*found, 2);
+            }
+            _ => panic!("Expected WrongNumberOfArguments, got: {err:?}"),
+        }
+    }
 
     fn dummy() {
         let tests = vec![
             (
-                "len(1)",
-                "Argument to `len` not supported, got Integer(1)",
-                ErrorKind::BuiltInError(BuiltinError::WrongArgumentType),
-                "len(1)",
-                1,
-            ),
-            (
                 "len(\"one\", \"two\")",
                 "Wrong number of arguments. Expected 1 argument(s), got 2",
-                ErrorKind::WrongNumberOfArguments,
                 "len(\"one\", \"two\")",
                 1,
             ),
             (
                 "[1, 2, 3][\"hi\"]",
                 "Index operator not supported for Array([Integer(1), Integer(2), Integer(3)])[String(\"hi\")]",
-                ErrorKind::IndexOperatorNotSupported,
                 "[1, 2, 3][\"hi\"]",
                 1,
             ),
             (
                 "[1, 2, 3][-1]",
                 "Index out of bounds: -1, [1, 2, 3] has len(3)",
-                ErrorKind::IndexOutOfBounds,
                 "[1, 2, 3][-1]",
                 1,
             ),
             (
                 "fn(x) { x + 1; }(1, 2)",
                 "Wrong number of arguments: expected 1, got 2",
-                ErrorKind::WrongNumberOfArguments,
                 "fn(x) { x + 1; }(1, 2)",
                 1,
             ),
         ];
-
     }
 
     #[test]
@@ -963,8 +963,7 @@ mod tests {
             "#,
         );
 
-        // cannot access function outside of block as it does not exist
-        test_eval_err(
+        let err = test_eval(
             r#"
                 let a = {
                     fn add(a, b) {
@@ -974,8 +973,17 @@ mod tests {
 
                 assert_eq(a(1, 2), 3);
             "#,
-            &[ErrorKind::TypeError],
-        );
+        ).unwrap_err();
+
+        match err.as_ref() {
+            Error::CannotCall {
+                function,
+                span: _,
+            } => {
+                assert_eq!(function, &Object::Unit);
+            }
+            _ => panic!("Expected CannotCall, got {:?}", err),
+        }
     }
 
     #[test]

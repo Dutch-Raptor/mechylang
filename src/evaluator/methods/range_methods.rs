@@ -51,7 +51,7 @@ lazy_static! {
                 let (start, end) = args.obj.as_range().expect("Expected range method to be called on a range");
 
                 let value = &args.args[0];
-                match contains(&value.value, Some(&start), Some(&end), false) {
+                match contains(&value.value, Some(start), Some(end), false) {
                     Some(result) => Ok(result.into()),
                     None => Err(Error::BuiltInError {
                         span: args.method_span.clone(),
@@ -97,7 +97,7 @@ lazy_static! {
 
                 let value = &args.args[0];
 
-                match contains(&value.value, Some(&start), Some(&end), true) {
+                match contains(&value.value, Some(start), Some(end), true) {
                     Some(result) => Ok(result.into()),
                     None => Err(Error::BuiltInError {
                         span: args.method_span.clone(),
@@ -130,7 +130,7 @@ lazy_static! {
                 let end = args.obj.as_range_to().expect("Expected range-to method to be called on a range-to");
 
                 let value = &args.args[0];
-                match contains(value, None, Some(&end), false) {
+                match contains(value, None, Some(end), false) {
                     Some(result) => Ok(result.into()),
                     None => Err(Error::BuiltInError {
                         span: args.method_span.clone(),
@@ -163,7 +163,7 @@ lazy_static! {
                 let end = args.obj.as_range_to_inclusive().expect("Expected range-to-inclusive method to be called on a range-to-inclusive");
                 
                 let value = &args.args[0];
-                match contains(value, None, Some(&end), true) {
+                match contains(value, None, Some(end), true) {
                     Some(result) => Ok(result.into()),
                     None => Err(Error::BuiltInError {
                         span: args.method_span.clone(),
@@ -192,7 +192,7 @@ lazy_static! {
                 let start = args.obj.as_range_from().expect("Expected range-from method to be called on a range-from");
                 
                 let value = &args.args[0];
-                match contains(value, Some(&start), None, false) {
+                match contains(value, Some(start), None, false) {
                     Some(result) => Ok(result.into()),
                     None => Err(Error::BuiltInError {
                         span: args.method_span.clone(),

@@ -50,11 +50,12 @@ pub enum Error {
 
 #[derive(Debug)]
 pub struct IOError {
+    #[allow(unused)]
     cause: std::io::Error,
 }
 
 impl PartialEq for IOError {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, _other: &Self) -> bool {
         true
     }
 }

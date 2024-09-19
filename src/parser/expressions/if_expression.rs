@@ -24,12 +24,12 @@ impl Display for IfExpression {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
 
     pub(super) fn parse_if_expression(&mut self) -> Result<IfExpression> {
         let _trace = trace!("parse_if_expression");
         debug_assert!(self.is_cur_token(TokenKind::If), "Expected current token to be `if`");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
         self.next_token()?;
         let condition = self.parse_expression(Precedence::Lowest)?;

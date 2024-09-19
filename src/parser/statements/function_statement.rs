@@ -26,7 +26,7 @@ impl Display for FunctionStatement {
         )
     }
 }
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses a function statement in Mechylang.
     ///
     /// This method handles the parsing of function declarations and anonymous functions in the source code.
@@ -47,7 +47,7 @@ impl Parser {
         let _trace = trace!("parse_function_statement");
         debug_assert!(self.is_cur_token(TokenKind::Fn), "Expected current token to be `Fn`");
 
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
         let name = match self.peek_token.kind {
             TokenKind::Identifier(ref name) => Identifier {

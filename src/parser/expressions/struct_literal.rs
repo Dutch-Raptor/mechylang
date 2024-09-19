@@ -22,7 +22,7 @@ impl Display for StructLiteral {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses a struct literal
     ///
     /// valid syntax is:
@@ -36,7 +36,7 @@ impl Parser {
     /// Trailing commas are optional
     pub(super) fn parse_struct_literal(&mut self) -> Result<StructLiteral> {
         debug_assert!(self.is_cur_token(TokenKind::Struct), "Expected current token to be `struct`");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
         self.expect_peek(TokenKind::LeftSquirly)?;
 

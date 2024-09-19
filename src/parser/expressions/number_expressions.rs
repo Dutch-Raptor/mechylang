@@ -26,7 +26,7 @@ impl Display for IntegerLiteral {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     pub(super) fn parse_number(&mut self) -> Result<Expression> {
         let _trace = trace!("parse_number");
         let token = &self.cur_token;
@@ -42,7 +42,7 @@ impl Parser {
         
         let span = token.span.clone();
         
-        return match (literal.parse::<i64>(), literal.parse::<f64>()) {
+        match (literal.parse::<i64>(), literal.parse::<f64>()) {
             (Ok(value), _) => Ok(Expression::IntegerLiteral(IntegerLiteral { span, value })),
             (_, Ok(value)) => Ok(Expression::FloatLiteral(FloatLiteral { span, value })),
             (Err(_), Err(_)) => Err(
@@ -51,7 +51,7 @@ impl Parser {
                     found: self.cur_token.kind.clone(),
                 }
             ),
-        };
+        }
 
     }
 }

@@ -22,7 +22,7 @@ impl From<Identifier> for Rc<str> {
         ident.value
     }
 }
- impl Parser {
+impl<'a> Parser<'a> {
 
      pub(super) fn parse_identifier(&mut self) -> Result<Identifier> {
          let _trace = trace!("parse_identifier");

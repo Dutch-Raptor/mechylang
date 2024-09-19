@@ -115,7 +115,6 @@ pub struct SummingPrimes;
 ///     "Fizz", 97, 98, "Fizz", "Buzz"
 ///     ]
 /// );
-///
-/// "#);
+/// # "#);
 /// ```
 pub struct FizzBuzz;
