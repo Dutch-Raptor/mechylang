@@ -150,9 +150,10 @@ use std::{
     sync::RwLock,
 };
 
+use crate::evaluator::{Error, Result};
+
 use uuid::Uuid;
 
-#[derive(Debug, Default)]
 /// An environment is a representation of a scope, which also has access to any outer scopes.
 ///
 /// # Usage
@@ -165,7 +166,7 @@ use uuid::Uuid;
 /// env.set("x", Object::Integer(1));
 /// assert_eq!(env.get("x"), Some(Object::Integer(1)));
 /// ```
-
+#[derive(Debug, Default)]
 pub struct Environment {
     pub inner: Rc<RwLock<InnerEnvironment>>,
 }
@@ -353,7 +354,7 @@ impl Environment {
     ///
     /// For more info on [Environment::set](Environment::set) and [Environment::get](Environment::get)
     /// see their respective documentation
-    pub fn update(&mut self, name: impl Into<Rc<str>>, val: Object) -> Result<(), String> {
+    pub fn update(&mut self, name: impl Into<Rc<str>>, val: Object) -> Result<()> {
         let mut env = self.inner.write().expect("environment to be able to update");
         env.update(name, val)
     }
@@ -361,8 +362,8 @@ impl Environment {
     pub fn mutate(
         &mut self,
         name: impl Into<Rc<str>>,
-        func: impl FnOnce(&mut Object) -> Result<Object, String>,
-    ) -> Result<Object, String> {
+        func: impl FnOnce(&mut Object) -> Result<Object>,
+    ) -> Result<Object> {
         let mut env = self.inner.write().expect("environment to be able to mutate");
         env.mutate(name, func)
     }
@@ -446,7 +447,7 @@ impl InnerEnvironment {
         self.set_object(name, val);
     }
 
-    pub fn update(&mut self, name: impl Into<Rc<str>>, val: Object) -> Result<(), String> {
+    pub fn update(&mut self, name: impl Into<Rc<str>>, val: Object) -> Result<()> {
         let name = name.into();
         match self.variables.get_mut(&name) {
             Some(id) => {
@@ -460,7 +461,9 @@ impl InnerEnvironment {
                         let mut outer_env = outer.write().unwrap();
                         outer_env.update(name, val)
                     }
-                    None => Err("Cannot mutate variable that does not exist".to_string()),
+                    None => Err(Error::MutateNonExistentVariable {
+                        name: name.clone(),
+                    }.into()),
                 }
             }
         };
@@ -475,8 +478,8 @@ impl InnerEnvironment {
     pub fn mutate(
         &mut self,
         name: impl Into<Rc<str>>,
-        func: impl FnOnce(&mut Object) -> Result<Object, String>,
-    ) -> Result<Object, String> {
+        func: impl FnOnce(&mut Object) -> Result<Object>,
+    ) -> Result<Object> {
         let name = name.into();
         if let Some(id) = self.variables.get_mut(&name) {
             if let Some(HeapObject { ref mut obj, .. }) = self.heap.write().unwrap().get_mut(id) {
@@ -484,12 +487,16 @@ impl InnerEnvironment {
             }
             // If the object is not in the heap, return an error
             else {
-                Err("Cannot mutate variable that does not exist".to_string())
+                Err(Error::MutateNonExistentVariable {
+                    name: name.clone(),
+                }.into())
             }
         } else if let Some(outer) = &self.outer {
                 outer.write().unwrap().mutate(name, func)
         } else {
-            Err("Cannot mutate variable that does not exist".to_string())
+            Err(Error::MutateNonExistentVariable {
+                name: name.clone(),
+            }.into())
         }
     }
 

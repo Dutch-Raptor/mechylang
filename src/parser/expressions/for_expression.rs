@@ -6,8 +6,9 @@ use crate::parser::expressions::Expression;
 use crate::parser::expressions::identifier::Identifier;
 use crate::parser::expressions::precedence::Precedence;
 use crate::parser::Parser;
-use crate::{Error, Span, TokenKind, trace};
+use crate::{Span, TokenKind, trace};
 use crate::parser::expressions::block_expression::BlockExpression;
+use crate::parser::{Result};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct ForExpression {
@@ -34,7 +35,7 @@ impl Display for ForExpression {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
 
     /// Parses a for expression
     ///
@@ -43,20 +44,20 @@ impl Parser {
     /// for <iterator> in <iterable> { <body> }
     /// for (<index>, <iterator>) in <iterable> { <body> }
     /// ```
-    pub(super) fn parse_for_expression(&mut self) -> Result<ForExpression, Error> {
+    pub(super) fn parse_for_expression(&mut self) -> Result<ForExpression> {
         let _trace = trace!("parse_for_expression");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
-        self.next_token();
+        self.next_token()?;
 
         // check if we have a for expression with an index
         let index = match self.cur_token.kind {
             TokenKind::LeftParen => {
-                self.next_token();
+                self.next_token()?;
                 let index_ident = self.parse_identifier()?;
                 
                 self.expect_peek(TokenKind::Comma)?;
-                self.next_token();
+                self.next_token()?;
                 Some(index_ident)
             }
             _ => None,
@@ -69,12 +70,12 @@ impl Parser {
         }
 
         self.expect_peek(TokenKind::In)?;
-        self.next_token();
+        self.next_token()?;
 
         let iterable = self.parse_expression(Precedence::Lowest)?;
 
         // set current token to the '{' token
-        self.next_token();
+        self.next_token()?;
 
         let body = self.parse_block_expression()?;
 

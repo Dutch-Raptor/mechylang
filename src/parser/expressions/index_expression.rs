@@ -3,8 +3,9 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
 use crate::parser::Parser;
-use crate::{Error, Expression, Span, TokenKind};
+use crate::{Expression, Span, TokenKind};
 use crate::parser::expressions::Precedence;
+use crate::parser::{Result};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct IndexExpression {
@@ -18,12 +19,12 @@ impl Display for IndexExpression {
         write!(f, "({}[{}])", self.left, self.index)
     }
 }
-impl Parser {
-    pub(super) fn parse_index_expression(&mut self, left: Expression) -> Result<IndexExpression, Error> {
-        let start = self.cur_token.span.start.clone();
+impl<'a> Parser<'a> {
+    pub(super) fn parse_index_expression(&mut self, left: Expression) -> Result<IndexExpression> {
+        let start = self.cur_token.span.clone();
         debug_assert!(self.is_cur_token(TokenKind::LeftSquare), "Expected current token to be `[`");
 
-        self.next_token();
+        self.next_token()?;
 
         let index = self.parse_expression(Precedence::Lowest)?;
 

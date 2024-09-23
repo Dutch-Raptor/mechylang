@@ -1,17 +1,18 @@
-use crate::{Environment, Error, Evaluator, Object};
-use crate::error::ErrorKind;
+use crate::{Environment, Evaluator, Object};
 use crate::parser::expressions::{ArrayLiteral, ExpressionSpanExt, IndexExpression};
+use crate::evaluator::{Result, Error};
+use crate::evaluator::objects::ObjectTy;
 
 impl Evaluator {
     pub(super) fn eval_array_expression(
         &mut self,
         array: &ArrayLiteral,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let elements = array.elements
             .iter()
             .map(|element| self.eval_expression(element, env))
-            .collect::<Result<Vec<Object>, Error>>()?;
+            .collect::<Result<Vec<Object>>>()?;
 
         Ok(Object::Array(elements))
     }
@@ -21,48 +22,29 @@ impl Evaluator {
         &mut self,
         index: &IndexExpression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let left = self.eval_expression(&index.left, env)?;
-
-        let array = match left {
-            Object::Array(ref arr) => arr,
-            _ => {
-                return Err(self.error(
-                    index.left.span().clone(),
-                    &format!("Expected an array. Got {:?}", left).to_string(),
-                    ErrorKind::TypeError,
-                ))
-            }
-        };
+        let array = left.as_array().ok_or_else(|| Error::TypeError {
+            span: index.span.clone(),
+            expected: vec![ObjectTy::Array { expected_item_types: None }],
+            found: left.get_type(),
+        })?;
 
         let evaluated_index = self.eval_expression(&index.index, env)?;
-
-        match evaluated_index {
-            Object::Integer(i) => match array.get(i as usize) {
-                Some(item) => Ok(item.clone()),
-                None => Err(self.error(
-                    index.index.span().clone(),
-                    &format!(
-                        "Index out of bounds: {}, {} has len({})",
-                        i,
-                        left,
-                        array.len()
-                    )
-                        .to_string(),
-                    ErrorKind::IndexOutOfBounds,
-                )),
-            },
-            _ => {
-                return Err(self.error(
-                    index.index.span().clone(),
-                    &format!(
-                        "Index operator not supported for {:?}[{:?}]",
-                        left, evaluated_index
-                    )
-                        .to_string(),
-                    ErrorKind::IndexOperatorNotSupported,
-                ))
-            }
+        let evaluated_index = evaluated_index.as_integer().ok_or_else(|| Error::TypeError {
+            span: index.span.clone(),
+            expected: vec![ObjectTy::Integer],
+            found: evaluated_index.get_type(),
+        })? as usize;
+        
+        match array.get(evaluated_index) {
+            Some(item) => Ok(item.clone()),
+            None => Err(Error::IndexOutOfBounds {
+                array_span: index.left.span().clone(),
+                index_span: index.index.span().clone(),
+                index: evaluated_index,
+                length: array.len(),
+            }.into()),
         }
     }
 }

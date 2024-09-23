@@ -68,8 +68,14 @@ impl DerefMut for IteratorObject {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum IntoIteratorError {
+    InvalidRange { start: Object, end: Option<Object> },
+    NotAnIterable { object: Object },
+}
+
 impl TryFrom<Object> for IteratorObject {
-    type Error = String;
+    type Error = IntoIteratorError;
 
     fn try_from(obj: Object) -> Result<Self, Self::Error> {
         match obj {
@@ -98,7 +104,10 @@ impl TryFrom<Object> for IteratorObject {
                         iterator: Box::new((*start..*end).map(|i| i.into())),
                     })
                 } else {
-                    Err(format!("Expected integer range, got {}..{}", start, end))
+                    Err(IntoIteratorError::InvalidRange {
+                        start: start.as_ref().clone(),
+                        end: Some(end.as_ref().clone()),
+                    })
                 }
             }
             Object::RangeInclusive(start, end) => {
@@ -109,10 +118,10 @@ impl TryFrom<Object> for IteratorObject {
                         iterator: Box::new((*start..=*end).map(|i| i.into())),
                     })
                 } else {
-                    Err(format!(
-                        "Expected integer inclusive range, got {}..={}",
-                        start, end
-                    ))
+                    Err(IntoIteratorError::InvalidRange {
+                        start: start.as_ref().clone(),
+                        end: Some(end.as_ref().clone()),
+                    })
                 }
             }
             Object::RangeFrom(start) => {
@@ -121,11 +130,16 @@ impl TryFrom<Object> for IteratorObject {
                         iterator: Box::new((*start..).map(|i| i.into())),
                     })
                 } else {
-                    Err(format!("Expected integer range, got {}..", start))
+                    Err(IntoIteratorError::InvalidRange {
+                        start: start.as_ref().clone(),
+                        end: None,
+                    })
                 }
             }
 
-            _ => Err(format!("Expected Iterator, got {}", obj)),
+            _ => Err(IntoIteratorError::NotAnIterable {
+                object: obj.clone(),
+            }),
         }
     }
 }

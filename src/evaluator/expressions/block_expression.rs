@@ -1,18 +1,19 @@
-use crate::{Environment, Error, Evaluator, Object};
+use crate::{Environment, Evaluator, Object};
 use crate::parser::expressions::BlockExpression;
+use crate::evaluator::{Result};
 
 impl Evaluator {
     pub(super) fn eval_scoped_block_expression(
         &mut self,
         block: &BlockExpression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         // new scope, so create a new environment with the current environment as its parent
         let env = &mut Environment::new_enclosed(env);
 
         // evaluate the initial pass of the block
         self.eval_initial_pass(&block.statements, env);
-        
+
         self.eval_block_statements(block, env)
     }
 
@@ -20,14 +21,14 @@ impl Evaluator {
         &mut self,
         block: &BlockExpression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         // evaluate the initial pass of the block
         self.eval_initial_pass(&block.statements, env);
 
         self.eval_block_statements(block, env)
     }
 
-    pub(super) fn eval_block_statements(&mut self, block: &BlockExpression, env: &mut Environment) ->  Result<Object, Error> {
+    pub(super) fn eval_block_statements(&mut self, block: &BlockExpression, env: &mut Environment) -> Result<Object> {
         let mut result = Object::Unit;
 
         for statement in block.statements.iter() {

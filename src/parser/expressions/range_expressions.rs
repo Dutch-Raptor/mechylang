@@ -2,9 +2,9 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Expression, Parser, Span, Token, TokenKind};
-use crate::error::ErrorKind;
+use crate::{Expression, Parser, Span, Token, TokenKind};
 use crate::parser::expressions::Precedence;
+use crate::parser::{Error, Result};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RangeExpression {
@@ -67,15 +67,12 @@ impl Display for RangeFullExpression {
     }
 }
 
-impl Parser {
-    pub(super) fn parse_range_infix_expression(&mut self, left: Expression) -> Result<Expression, Error> {
-        let start = self.cur_token.span.start.clone();
+impl<'a> Parser<'a> {
+    pub(super) fn parse_range_infix_expression(&mut self, left: Expression) -> Result<Expression> {
+        let start = self.cur_token.span.clone();
 
         let precedence = self.cur_precedence();
-        let inclusive = Self::range_is_inclusive(&self.cur_token).ok_or_else(|| self.error_current(
-            ErrorKind::UnexpectedToken,
-            format!("Expected a range operator, got {:?}", self.cur_token),
-        ))?;
+        let inclusive = Self::range_is_inclusive(&self.cur_token)?;
         
         // check if we have a RangeFrom expression
         // RangeFrom expressions are bounded by either square brackets or a parenthesis
@@ -91,7 +88,7 @@ impl Parser {
             }));
         }
 
-        self.next_token();
+        self.next_token()?;
 
         // if the next token is not a closing parenthesis or square bracket, we assume that we have a Range expression
         let right = self.parse_expression(precedence)?;
@@ -107,8 +104,8 @@ impl Parser {
 
     /// Parses a RangeTo expression
     /// e.g. `..5` or `..=5`
-    pub(super) fn parse_range_prefix_expression(&mut self) -> Result<Expression, Error> {
-        let start = self.cur_token.span.start.clone();
+    pub(super) fn parse_range_prefix_expression(&mut self) -> Result<Expression> {
+        let start = self.cur_token.span.clone();
         let range_token = self.cur_token.clone();
 
         // check if we are dealing with a FullRange expression
@@ -118,15 +115,12 @@ impl Parser {
             return Ok(Expression::RangeFull(RangeFullExpression { span: self.span_with_start(start) }));
         }
 
-        self.next_token();
+        self.next_token()?;
 
 
         let right = self.parse_expression(Precedence::Prefix)?;
 
-        let inclusive = Self::range_is_inclusive(&range_token).ok_or_else(|| self.error_current(
-            ErrorKind::UnexpectedToken,
-            format!("Expected a range operator, got {:?}", self.cur_token),
-        ))?;
+        let inclusive = Self::range_is_inclusive(&range_token)?;
 
         Ok(Expression::RangeTo(RangeToExpression {
             span: self.span_with_start(start),
@@ -135,11 +129,15 @@ impl Parser {
         }))
     }
     
-    fn range_is_inclusive(token: &Token) -> Option<bool> {
+    fn range_is_inclusive(token: &Token) -> Result<bool> {
         match token.kind {
-            TokenKind::RangeInclusive => Some(true),
-            TokenKind::RangeExclusive => Some(false),
-            _ => None,
+            TokenKind::RangeInclusive => Ok(true),
+            TokenKind::RangeExclusive => Ok(false),
+            _ => Err(Error::UnexpectedToken {
+                span: token.span.clone(),
+                expected: vec![TokenKind::RangeInclusive, TokenKind::RangeExclusive],
+                found: token.kind.clone(),
+            }),
         }
     }
 }

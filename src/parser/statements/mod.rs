@@ -7,9 +7,9 @@ mod continue_statement;
 
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use color_print::cformat;
 use serde::Serialize;
-use crate::{Error, Token, trace, TokenKind, Parser};
+use crate::{Token, trace, TokenKind, Parser};
+use crate::parser::{Result};
 
 pub use function_statement::FunctionStatement;
 pub use let_statement::LetStatement;
@@ -17,7 +17,6 @@ pub use return_statement::ReturnStatement;
 pub use expression_statement::ExpressionStatement;
 pub use break_statement::BreakStatement;
 pub use continue_statement::ContinueStatement;
-use crate::error::ErrorKind;
 
 /// Represents the various types of statements in Mechylang.
 ///
@@ -116,7 +115,7 @@ impl Display for Statement {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses a single statement in Mechylang.
     ///
     /// This function handles the parsing of various types of statements, including `let`, `return`,
@@ -134,14 +133,14 @@ impl Parser {
     /// This function returns an error if:
     /// - An error occurs while parsing an expression or any other statement type.
     /// - After parsing a statement, the next token is not a statement terminator.
-    pub(crate) fn parse_statement(&mut self) -> Result<Statement, Error> {
+    pub(crate) fn parse_statement(&mut self) -> Result<Statement> {
         let _trace = trace!("parse_statement");
 
         let statement = match self.cur_token.kind {
             TokenKind::Let => Statement::Let(self.parse_let_statement()?),
             TokenKind::Return => Statement::Return(self.parse_return_statement()?),
             TokenKind::Semicolon => {
-                self.next_token();
+                self.next_token()?;
                 self.parse_statement()?
             }
             TokenKind::Break => Statement::Break(self.parse_break_statement()?),
@@ -151,18 +150,13 @@ impl Parser {
         };
 
 
-        if !Parser::is_statement_terminator(&self.peek_token, &self.cur_token) {
-            return Err(self.error_peek(
-                ErrorKind::UnexpectedToken,
-                cformat!(
-                "Expected end of statement, got <i>{:?}</i> instead",
-                self.peek_token.kind
-                ),
-            ));
+        if !Parser::is_statement_terminator(&self.peek_token) {
+            // Skip unterminated statement error for now
+            // return Err(Error::UnterminatedStatement { span: self.cur_token.span.clone() });
         }
 
         if self.peek_token.kind == TokenKind::Semicolon {
-            self.next_token();
+            self.next_token()?;
         }
         Ok(statement)
     }
@@ -185,7 +179,7 @@ impl Parser {
     ///
     /// * `true` if the current token is a statement terminator.
     /// * `false` otherwise. 
-    fn is_statement_terminator(current_token: &Token, previous_token: &Token) -> bool {
+    fn is_statement_terminator(current_token: &Token) -> bool {
         if current_token.kind == TokenKind::Semicolon
             || current_token.kind == TokenKind::RightSquirly
             || current_token.kind == TokenKind::EOF
@@ -193,11 +187,6 @@ impl Parser {
             || current_token.kind == TokenKind::RightSquare
             || current_token.kind == TokenKind::Else
         {
-            return true;
-        }
-       
-        // if previous token was on a different line
-        if current_token.span.start.line != previous_token.span.start.line {
             return true;
         }
 

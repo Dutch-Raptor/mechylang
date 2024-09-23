@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use serde::Serialize;
-use crate::{Error, Expression, Parser, Span, TokenKind};
-use crate::error::ErrorKind;
+use crate::{Expression, Parser, Span, TokenKind};
 use crate::parser::expressions::Precedence;
+use crate::parser::{Error, Result};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StructLiteral {
@@ -22,7 +22,7 @@ impl Display for StructLiteral {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses a struct literal
     ///
     /// valid syntax is:
@@ -34,40 +34,47 @@ impl Parser {
     /// ```
     ///
     /// Trailing commas are optional
-    pub(super) fn parse_struct_literal(&mut self) -> Result<StructLiteral, Error> {
+    pub(super) fn parse_struct_literal(&mut self) -> Result<StructLiteral> {
         debug_assert!(self.is_cur_token(TokenKind::Struct), "Expected current token to be `struct`");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
         self.expect_peek(TokenKind::LeftSquirly)?;
 
         // move past the opening brace
-        self.next_token();
+        self.next_token()?;
 
         let mut entries = HashMap::new();
 
         while self.cur_token.kind != TokenKind::RightSquirly {
             let key = self.cur_token.kind
                 .as_identifier()
-                .ok_or_else(|| self.error_current(ErrorKind::TypeError, "Struct keys must be identifiers."))?
+                .ok_or(Error::InvalidStructKey {
+                    span: self.cur_token.span.clone(),
+                    found: self.cur_token.kind.clone(),
+                })?
                 .to_string();
 
             // ensure key is followed by a colon
             self.expect_peek(TokenKind::Colon)?;
             // move past the colon
-            self.next_token();
+            self.next_token()?;
 
             let value = self.parse_expression(Precedence::Lowest)?;
             entries.insert(key, value);
 
             // move past the value
-            self.next_token();
+            self.next_token()?;
 
             if self.cur_token.kind != TokenKind::Comma && self.cur_token.kind != TokenKind::RightSquirly {
-                return Err(self.error_current(ErrorKind::UnexpectedToken, "Expected a `,` or `}`".to_string()));
+                return Err(Error::UnexpectedToken {
+                    span: self.cur_token.span.clone(),
+                    expected: vec![TokenKind::Comma, TokenKind::RightSquirly],
+                    found: self.cur_token.kind.clone(),
+                });
             }
 
             if self.cur_token.kind == TokenKind::Comma {
-                self.next_token();
+                self.next_token()?;
             }
         }
 

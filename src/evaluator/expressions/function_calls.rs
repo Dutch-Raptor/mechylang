@@ -1,29 +1,34 @@
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::{Environment, Error, EvalConfig, Evaluator, Object, Span, trace};
-use crate::error::ErrorKind;
-use crate::evaluator::methods::Method;
-use crate::evaluator::objects::function::Function;
+use crate::{Environment, EvalConfig, Evaluator, Object, Span, trace};
+use crate::evaluator::methods::{Method, MethodArgs};
+use crate::evaluator::objects::function::{Callable, Function};
 use crate::evaluator::objects::traits::UnwrapReturnValue;
 use crate::evaluator::runtime::builtins::BuiltinFunction;
+use crate::evaluator::{Error, Result};
+use crate::evaluator::objects::Argument;
 use crate::parser::expressions::{CallExpression, ExpressionSpanExt};
+
 
 impl Evaluator {
     pub(super) fn eval_call_expression(
         &mut self,
         call: &CallExpression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!("eval_call_expression({})", call));
         let function = self.eval_expression(&call.function, env)?;
 
         // set current token so error messages are more helpful
         self.current_span = call.function.span().clone();
-        
+
         let arguments = call.arguments
             .iter()
-            .map(|arg| self.eval_expression(arg, env))
-            .collect::<Result<Vec<Object>, Error>>()?;
+            .map(|arg| Ok(Argument {
+                span: Some(arg.span().clone()),
+                value: self.eval_expression(arg, env)?,
+            }))
+            .collect::<Result<Vec<Argument>>>()?;
 
         if let Object::BuiltinFunction(builtin) = function {
             return self.apply_builtin_function(&builtin, arguments, env);
@@ -32,116 +37,76 @@ impl Evaluator {
         if let Object::Method(method) = function {
             return self.apply_method(method, arguments, env);
         }
-        
+
         if let Object::Function(function) = function {
-            return self.apply_function(function, arguments, None)
+            return self.apply_function(function, arguments);
         }
-        
-        return Err(self.error(
-            call.function.span().clone(),
-            format!("Cannot call {}", function).as_str(),
-            ErrorKind::TypeError,
-        ))
+
+        Err(Error::CannotCall {
+            function,
+            span: call.function.span().clone(),
+        }.into())
     }
 
 
     fn apply_builtin_function(
         &mut self,
         function: &BuiltinFunction,
-        arguments: Vec<Object>,
+        arguments: Vec<Argument>,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!(
             "apply_builtin_function({}, {:?})",
-            function.name, arguments
+            function.ty.name, arguments
         ));
 
-        if !function.args_len.contains(&arguments.len()) {
-            return Err(self.error(
-                self.current_span.clone(),
-                format!(
-                    "Wrong number of arguments. Expected {}, got {}",
-                    match function.args_len.start() - function.args_len.end() {
-                        0 => format!("{} argument(s)", function.args_len.start()),
-                        _ => format!(
-                            "{} to {} arguments",
-                            function.args_len.start(),
-                            function.args_len.end()
-                        ),
-                    },
-                    arguments.len()
-                )
-                    .as_str(),
-                ErrorKind::WrongNumberOfArguments,
-            ));
-        };
+        self.validate_argument_length(function, &arguments)?;
 
-        (function.function)(&arguments, env, &self.eval_config).map_err(|(msg, err_type)| {
-            self.error(
-                self.current_span.clone(),
-                msg.as_str(),
-                ErrorKind::BuiltInError(err_type),
-            )
-        })
+        (function.function)(&arguments, env, &self.eval_config)
     }
 
-    fn apply_method(
+    fn validate_argument_length(&mut self, function: &dyn Callable, arguments: &[Argument]) -> Result<()> {
+        if !function.args_len().contains(&arguments.len()) {
+            return Err(Error::WrongNumberOfArguments {
+                span: self.current_span.clone(),
+                expected: function.args_len(),
+                found: arguments.len(),
+            }.into());
+        };
+        Ok(())
+    }
+
+    pub(in crate::evaluator) fn apply_method(
         &mut self,
         method: Method,
-        arguments: Vec<Object>,
+        arguments: Vec<Argument>,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
-        if !method.args_len.contains(&arguments.len()) {
-            return Err(self.error(
-                self.current_span.clone(),
-                &format!(
-                    "Wrong number of arguments: expected {}, got {}",
-                    match method.args_len.start() - method.args_len.end() {
-                        0 => format!(
-                            "{} argument{}",
-                            method.args_len.start(),
-                            match method.args_len.start() {
-                                1 => "",
-                                _ => "s",
-                            }
-                        ),
-                        _ => format!(
-                            "{} to {} arguments",
-                            method.args_len.start(),
-                            method.args_len.end()
-                        ),
-                    },
-                    arguments.len()
-                ),
-                ErrorKind::WrongNumberOfArguments,
-            ));
-        };
+    ) -> Result<Object> {
+        self.validate_argument_length(&method, &arguments)?;
 
         (method.function)(
-            *method.obj,
-            method.ident.as_deref(),
-            arguments,
-            env,
-            self.eval_config.clone(),
+            MethodArgs {
+                obj_span: method.obj_span.clone(),
+                method_span: method.method_span.clone(),
+                obj: *method.obj,
+                obj_identifier: method.ident,
+                args: arguments,
+                env,
+                config: self.eval_config.clone(),
+            }
         )
-            .map_err(|err| {
-                self.error(
-                    self.current_span.clone(),
-                    &format!("Error evaluating method: {}", err),
-                    ErrorKind::MethodError,
-                )
-            })
     }
 
     fn apply_function(
         &mut self,
         function: Function,
-        arguments: Vec<Object>,
-        _extra_env: Option<Environment>,
-    ) -> Result<Object, Error> {
+        arguments: Vec<Argument>,
+    ) -> Result<Object> {
         let _trace = trace!(&format!("apply_function({}, {:?})", function, arguments));
 
-        let mut extended_env = self.extend_function_env(&function, arguments)?;
+        let mut extended_env = self.extend_function_env(
+            &function,
+            arguments.into_iter().map(|arg| arg.value).collect::<Vec<Object>>())?;
 
         // TODO: figure out if this is actually needed
         // // if any external environment was passed, extend the function environment with it
@@ -162,7 +127,7 @@ impl Evaluator {
         &mut self,
         function: &Function,
         arguments: Vec<Object>,
-    ) -> Result<Environment, Error> {
+    ) -> Result<Environment> {
         let _trace = trace!(&format!(
             "extend_function_env({}, {:?})",
             function, arguments
@@ -170,16 +135,13 @@ impl Evaluator {
         let mut env = Environment::new_enclosed(&function.env);
 
         if function.params.len() != arguments.len() {
-            return Err(self.error(
-                self.current_span.clone(),
-                format!(
-                    "Wrong number of arguments: expected {}, got {}",
-                    function.params.len(),
-                    arguments.len()
-                )
-                    .as_str(),
-                ErrorKind::WrongNumberOfArguments,
-            ));
+            return Err(
+                Error::WrongNumberOfArguments {
+                    span: function.span.clone(),
+                    expected: function.args_len(),
+                    found: arguments.len(),
+                }.into()
+            );
         }
 
         for (parameter, argument) in function.params.iter().zip(arguments) {
@@ -192,21 +154,18 @@ impl Evaluator {
 
     pub(in crate::evaluator) fn eval_function(
         function: Function,
-        arguments: Vec<Object>,
-        env: Option<Environment>,
+        arguments: Vec<Argument>,
         config: Rc<EvalConfig>,
         span: Span,
-    ) -> Result<Object, String> {
+    ) -> Result<Object> {
         let mut evaluator = Evaluator {
             globals: HashMap::new(),
             current_span: span,
-            lines: vec![].into(),
             eval_config: config,
         };
 
         evaluator
-            .apply_function(function, arguments, env)
+            .apply_function(function, arguments)
             .map(|object| object.unwrap_return_value())
-            .map_err(|err| err.message)
     }
 }

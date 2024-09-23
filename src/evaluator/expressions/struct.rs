@@ -1,13 +1,14 @@
 use std::collections::HashMap;
-use crate::{Environment, Error, Evaluator, Object, trace};
+use crate::{Environment,  Evaluator, Object, trace};
 use crate::parser::expressions::StructLiteral;
+use crate::evaluator::Result;
 
 impl Evaluator {
     pub(super) fn eval_struct_expression(
         &mut self,
         lit: &StructLiteral,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!("Eval struct expression");
         let mut map = HashMap::new();
 

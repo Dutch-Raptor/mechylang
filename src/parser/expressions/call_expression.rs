@@ -4,7 +4,8 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::parser::expressions::{Expression, ExpressionSpanExt};
 use crate::parser::Parser;
-use crate::{Error, Span, TokenKind};
+use crate::{Span, TokenKind};
+use crate::parser::{Result};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct CallExpression {
@@ -25,12 +26,12 @@ impl Display for CallExpression {
         write!(f, "{}({})", self.function, args)
     }
 }
-impl Parser {
-    pub(super) fn parse_call_expression(&mut self, left: Expression) -> Result<CallExpression, Error> {
+impl<'a> Parser<'a> {
+    pub(super) fn parse_call_expression(&mut self, left: Expression) -> Result<CallExpression> {
         let arguments = self.parse_expression_list(TokenKind::RightParen)?;
 
         Ok(CallExpression {
-            span: self.span_with_start(left.span().start.clone()),
+            span: self.span_with_start(left.span().clone()),
             function: Rc::new(left),
             arguments: arguments.into(),
         })
@@ -40,12 +41,9 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::Lexer;
-    use crate::TokenKind;
     use crate::parser::expressions::Expression;
     use crate::parser::Parser;
     use crate::parser::statements::Statement;
-
-
 
     #[test]
     fn test_call_expression_parsing() {

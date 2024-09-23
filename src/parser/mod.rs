@@ -1,13 +1,13 @@
-use std::rc::Rc;
-use crate::{Error, Lexer, Token, TokenKind};
-use crate::error::InterpreterErrors;
+use crate::{Lexer, Token, TokenKind};
 use crate::tracer::reset_trace;
 
 pub mod expressions;
 pub mod statements;
 mod program;
-mod errors;
+mod error;
 mod tokens;
+
+pub use error::{Error, Result};
 
 pub use expressions::Expression;
 pub use statements::Statement;
@@ -16,20 +16,16 @@ pub use program::Program;
 /// The `Parser` struct is responsible for parsing the source code into an abstract syntax tree (AST).
 /// It uses a lexer to tokenize the input and processes these tokens to produce the AST.
 #[derive(Debug)]
-pub struct Parser {
+pub struct Parser<'a> {
     /// The lexer used to tokenize the source code.
-    lexer: Lexer,
+    lexer: Lexer<'a>,
     /// The current token being processed.
     pub cur_token: Token,
     /// The next token to be processed.
     pub peek_token: Token,
-    /// A list of errors encountered during parsing.
-    errors: Vec<Error>,
-    /// The lines of source code being parsed, used for error reporting.
-    lines: Rc<[String]>,
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Creates a new `Parser` instance.
     ///
     /// This method initializes a new `Parser` with the given `Lexer`. It reads two tokens initially
@@ -52,20 +48,18 @@ impl Parser {
     /// let mut parser = Parser::new(lexer);
     /// let program = parser.parse().unwrap();
     /// ```
-    pub fn new(lexer: Lexer) -> Self {
+    pub fn new(lexer: Lexer<'a>) -> Self {
         let mut parser = Self {
-            lines: lexer.lines(),
             lexer,
             cur_token: Token::default(),
             peek_token: Token::default(),
-            errors: vec![],
         };
 
         reset_trace();
 
         // Read two tokens, so cur_token and peek_token are both set
-        parser.next_token();
-        parser.next_token();
+        let _ = parser.next_token();
+        let _ = parser.next_token();
         parser
     }
     
@@ -89,7 +83,7 @@ impl Parser {
     /// let mut parser = Parser::from_source(source_code);
     /// let program = parser.parse().unwrap();
     /// ```
-    pub fn from_source(src: impl AsRef<str>) -> Self {
+    pub fn from_source(src: &'a str) -> Self {
         Parser::new(Lexer::new(src))
     }
     
@@ -121,22 +115,19 @@ impl Parser {
     ///         // Process the parsed program
     ///         println!("{}", program);
     ///     }
-    ///     Err(errors) => {
+    ///     Err(error) => {
     ///         // Handle parsing errors
-    ///         for error in errors {
-    ///             println!("Error: {}", error);
-    ///         }
+    ///         println!("Error: {}", error);
     ///     }
     /// }
     /// ```
-    pub fn parse(&mut self) -> Result<Program, InterpreterErrors> {
+    pub fn parse(&mut self) -> Result<Program> {
         let mut statements = Vec::new();
 
         while self.cur_token.kind != TokenKind::EOF {
-            let statement = self.parse_statement()
-                .map_err(|err| InterpreterErrors(vec![err]))?;
+            let statement = self.parse_statement()?;
             statements.push(statement);
-            self.next_token();
+            self.next_token()?;
         }
 
         Ok(Program { statements })
@@ -146,11 +137,9 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use color_print::cprintln;
-    use crate::error::InterpreterErrors;
-    use crate::parser::Parser;
-    use crate::parser::statements::Statement;
+    use super::*;
 
-    pub(super) fn parse(input: &str) -> Result<Vec<Statement>, InterpreterErrors> {
+    pub(super) fn parse(input: &str) -> Result<Vec<Statement>> {
         let mut parser = Parser::from_source(input);
 
         let result = parser.parse();
@@ -158,7 +147,7 @@ mod tests {
         if let Err(ref err) = result {
             cprintln!("{}", err)
         }
-
+        
         result.map(|program| program.statements)
     }
 }

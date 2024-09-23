@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::error::InterpreterErrors;
 use crate::evaluator::objects::function::Function;
 
 mod eval_tests;
@@ -10,58 +9,47 @@ pub mod runtime;
 mod config;
 mod statements;
 mod expressions;
-mod errors;
+mod error;
 #[cfg(test)]
 mod tests;
 
 pub use config::EvalConfig;
 pub use objects::Object;
 pub use runtime::{Environment};
-use crate::{Error, Lexer, Parser, Program, Span, Statement, trace};
+pub use error::{Error, Result};
+use crate::{Lexer, Parser, Program, Span, Statement, trace};
 
-pub fn eval_file(file: &str) -> Result<(), Vec<String>> {
+pub fn eval_file(file: &str) -> crate::Result<Object> {
     let input = std::fs::read_to_string(file).unwrap();
     let mut env = Environment::new();
-    Evaluator::eval(input, &mut env, EvalConfig::default())
-        .map(|_| ())
-        .map_err(|e| e.iter().map(|e| color_print::cformat!("{}", e)).collect())
+    Evaluator::eval(&input, &mut env, EvalConfig::default())
 }
 
 pub struct Evaluator {
-    lines: Rc<[String]>,
     current_span: Span,
     globals: HashMap<Rc<str>, Object>,
     eval_config: Rc<EvalConfig>,
 }
 
-pub type EvalResult = Result<Object, InterpreterErrors>;
-
 impl Evaluator {
     pub fn eval(
-        input: impl Into<Rc<str>>,
+        input: &str,
         env: &mut Environment,
         config: EvalConfig,
-    ) -> EvalResult {
-        let input: Rc<str> = input.into();
-
-        
+    ) -> crate::Result<Object> {
         let lexer = Lexer::new(input);
-        let lines = lexer.lines();
+        // println!("{:?}", Lexer::new(input).collect::<std::result::Result<Vec<Token>, crate::lexer::Error>>());
         let mut parser = Parser::new(lexer);
-        
 
         let Program { statements } = parser.parse()?;
 
         let evaluator = Evaluator {
-            lines,
             current_span: Span::default(),
             globals: HashMap::new(),
             eval_config: config.into(),
         };
 
-        evaluator
-            .eval_program(statements, env)
-            .map_err(|err| InterpreterErrors(vec![err]))
+        Ok(evaluator.eval_program(statements, env)?)
     }
 
 
@@ -69,7 +57,7 @@ impl Evaluator {
         mut self,
         program: Vec<Statement>,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!("eval_program");
         let mut result = Object::Unit;
 
@@ -112,6 +100,7 @@ impl Evaluator {
         for statement in program.iter() {
             if let Statement::Function(function) = statement {
                 let func = Function {
+                    span: function.span.clone(),
                     params: function.parameters.clone(),
                     body: function.body.clone(),
                     env: env.clone(),

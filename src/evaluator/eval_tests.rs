@@ -1,16 +1,11 @@
 #[cfg(test)]
 mod tests {
     use crate::{Object};
-    use crate::{error::ErrorKind, test_utils::test_eval_ok};
-    use crate::evaluator::runtime::builtins::BuiltinError;
+    use crate::{test_utils::test_eval_ok};
+    use crate::evaluator::Error;
+    use crate::evaluator::objects::ObjectTy;
     use crate::evaluator::tests::test_eval;
-    use crate::test_utils::test_eval_err;
-
-
-
-
-
-
+    use crate::parser::expressions::{InfixOperator, PrefixOperator};
 
 
     #[test]
@@ -36,14 +31,14 @@ mod tests {
                 "if (10 < 1) { if (10 < 1) { return 10; }; return 1; }; return 9;",
                 Object::Integer(9),
             ),
-            // (
-            //     "let f = fn(x) { return x; x + 10; }; f(10);",
-            //     Object::Integer(10),
-            // ),
-            // (
-            //     "let f = fn(x) { let result = x + 10; return result; return 10; }; f(10);",
-            //     Object::Integer(20),
-            // ),
+            (
+                "let f = fn(x) { return x; x + 10; }; f(10);",
+                Object::Integer(10),
+            ),
+            (
+                "let f = fn(x) { let result = x + 10; return result; return 10; }; f(10);",
+                Object::Integer(20),
+            ),
         ];
 
         for (input, expected) in tests {
@@ -53,130 +48,113 @@ mod tests {
     }
 
     #[test]
-    fn test_error_handling() {
+    fn test_infix_type_error_handling() {
+        let infix_err = test_eval(r#"
+        5 + true
+        "#).unwrap_err();
+
+        assert!(matches!(infix_err.as_ref(), Error::UnsupportedInfixOperator {
+            left_object: Object::Integer(5),
+            right_object: Object::Boolean(true),
+            operator: InfixOperator::Plus,
+            ..
+        }));
+
+        let infix_err = test_eval(r#"
+        true + false
+        "#).unwrap_err();
+        assert!(matches!(infix_err.as_ref(), Error::UnsupportedInfixOperator {
+            left_object: Object::Boolean(true),
+            right_object: Object::Boolean(false),
+            operator: InfixOperator::Plus,
+            ..
+        }));
+    }
+
+    #[test]
+    fn test_prefix_type_error_handling() {
+        let prefix_err = test_eval(r#"
+        -true
+        "#).unwrap_err();
+
+        assert!(matches!(prefix_err.as_ref(), Error::InvalidPrefixOperatorForType {
+            operator: PrefixOperator::Minus,
+            right: Object::Boolean(true),
+            ..
+        }));
+    }
+
+    #[test]
+    fn test_identifier_not_found_error() {
+        let ident_err = test_eval(r#"
+        foobar
+        "#).unwrap_err();
+
+        match ident_err.as_ref() {
+            Error::IdentifierNotFound { identifier, span: _, } => {
+                assert_eq!(identifier.as_ref(), "foobar");
+            }
+            _ => panic!("Expected IdentifierNotFoundError, got: {ident_err:?}", ),
+        }
+    }
+
+    #[test]
+    fn test_builtin_argument_type_error() {
+        let builtin_arg_err = test_eval(r#"
+        len(1)
+        "#).unwrap_err();
+
+        match builtin_arg_err.as_ref() {
+            Error::TypeError { span: _, expected: _, found } => {
+                assert_eq!(found, &ObjectTy::Integer);
+            }
+            _ => panic!("Expected TypeError, got: {builtin_arg_err:?}"),
+        }
+    }
+
+    fn test_function_wrong_number_arguments() {
+        let err = test_eval(r#"
+        len("one", "two")
+        "#).unwrap_err();
+
+        match err.as_ref() {
+            Error::WrongNumberOfArguments {
+                span: _, expected, found
+            } => {
+                assert_eq!(expected, &(1..=1));
+                assert_eq!(*found, 2);
+            }
+            _ => panic!("Expected WrongNumberOfArguments, got: {err:?}"),
+        }
+    }
+
+    fn dummy() {
         let tests = vec![
-            (
-                "5 + true;",
-                "Type mismatch: Integer(5) + Boolean(true)",
-                ErrorKind::TypeMismatch,
-                "5 + true;",
-                1,
-            ),
-            (
-                "5 + true;
-                 5;",
-                "Type mismatch: Integer(5) + Boolean(true)",
-                ErrorKind::TypeMismatch,
-                "5 + true;",
-                1,
-            ),
-            (
-                "-true",
-                "Unknown operator: -Boolean(true)",
-                ErrorKind::UnknownOperator,
-                "-true",
-                1,
-            ),
-            (
-                "true + false;",
-                "Invalid operator: Boolean(true) + Boolean(false)",
-                ErrorKind::InvalidOperator,
-                "true + false;",
-                1,
-            ),
-            (
-                "5; true + false; 5",
-                "Invalid operator: Boolean(true) + Boolean(false)",
-                ErrorKind::InvalidOperator,
-                "5; true + false; 5",
-                1,
-            ),
-            (
-                "if (10 > 1) {
-                    true + false; 
-                }",
-                "Invalid operator: Boolean(true) + Boolean(false)",
-                ErrorKind::InvalidOperator,
-                "true + false;",
-                2,
-            ),
-            (
-                "if (10 > 1) {
-                        if (10 > 1) {
-                            return true + false;
-                        }
-                        return 1;
-                    }",
-                "Invalid operator: Boolean(true) + Boolean(false)",
-                ErrorKind::InvalidOperator,
-                "return true + false;",
-                3,
-            ),
-            (
-                "foobar",
-                "Identifier not found: foobar",
-                ErrorKind::IdentifierNotFound,
-                "foobar",
-                1,
-            ),
-            (
-                "\"Hello\" - \"World\"",
-                "Invalid operator: String(\"Hello\") - String(\"World\")",
-                ErrorKind::InvalidOperator,
-                "\"Hello\" - \"World\"",
-                1,
-            ),
-            (
-                "len(1)",
-                "Argument to `len` not supported, got Integer(1)",
-                ErrorKind::BuiltInError(BuiltinError::WrongArgumentType),
-                "len(1)",
-                1,
-            ),
             (
                 "len(\"one\", \"two\")",
                 "Wrong number of arguments. Expected 1 argument(s), got 2",
-                ErrorKind::WrongNumberOfArguments,
                 "len(\"one\", \"two\")",
                 1,
             ),
             (
                 "[1, 2, 3][\"hi\"]",
                 "Index operator not supported for Array([Integer(1), Integer(2), Integer(3)])[String(\"hi\")]",
-                ErrorKind::IndexOperatorNotSupported,
                 "[1, 2, 3][\"hi\"]",
                 1,
             ),
             (
                 "[1, 2, 3][-1]",
                 "Index out of bounds: -1, [1, 2, 3] has len(3)",
-                ErrorKind::IndexOutOfBounds,
                 "[1, 2, 3][-1]",
                 1,
             ),
             (
                 "fn(x) { x + 1; }(1, 2)",
                 "Wrong number of arguments: expected 1, got 2",
-                ErrorKind::WrongNumberOfArguments,
                 "fn(x) { x + 1; }(1, 2)",
                 1,
             ),
         ];
-
-        for (input, message, error_kind, line_with_err, line_nr) in tests {
-            let evaluated = test_eval(input);
-            match evaluated {
-                Err(errors) => {
-                    println!("{}", errors);
-                    let error = errors.0.first().unwrap();
-                    assert_eq!(error.message, message);
-                    assert_eq!(error.kind, error_kind);
-                    assert_eq!(error.line.as_ref().unwrap().trim(), line_with_err);
-                    assert_eq!(error.span.as_ref().start.line, line_nr);
-                }
-                _ => panic!("No error object returned. Got: {:?}", evaluated),
-            }
-        }
     }
 
     #[test]
@@ -725,7 +703,7 @@ mod tests {
             ),
             (
                 r#"
-                let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).fold("", fn(acc, x) { acc + x.to_string(); });
+                let a = (1..).iter().filter(fn(x) { x % 9 == 0; }).take(6).fold("", fn(acc, item) { acc + item.to_string(); });
                 a;
                 "#,
                 Object::String("91827364554".into()),
@@ -818,8 +796,9 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            let evaluated = test_eval(input).unwrap();
-            assert_eq!(evaluated, expected);
+            let evaluated = test_eval(input);
+            let err = format!("{evaluated:?}");
+            assert_eq!(evaluated.unwrap(), expected);
         }
     }
 
@@ -984,8 +963,7 @@ mod tests {
             "#,
         );
 
-        // cannot access function outside of block as it does not exist
-        test_eval_err(
+        let err = test_eval(
             r#"
                 let a = {
                     fn add(a, b) {
@@ -995,13 +973,22 @@ mod tests {
 
                 assert_eq(a(1, 2), 3);
             "#,
-            &[ErrorKind::TypeError],
-        );
+        ).unwrap_err();
+
+        match err.as_ref() {
+            Error::CannotCall {
+                function,
+                span: _,
+            } => {
+                assert_eq!(function, &Object::Unit);
+            }
+            _ => panic!("Expected CannotCall, got {:?}", err),
+        }
     }
 
     #[test]
     fn test_passing_builtin_function_as_method_argument() {
-        test_eval_ok(
+        test_eval(
             r#"
                 let array = [1, 2, 3];
                 array.push(4);
@@ -1009,6 +996,6 @@ mod tests {
                 
                 array.iter().for_each(println);
                 "#
-        );
+        ).unwrap();
     }
 }

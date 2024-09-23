@@ -3,9 +3,10 @@ use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use crate::parser::expressions::{Expression, Identifier, Precedence};
 use crate::parser::Parser;
-use crate::{Error, trace, TokenKind};
-use crate::error::ErrorKind;
+use crate::{TokenKind, trace};
 use crate::lexer::Span;
+
+use crate::parser::{Error, Result};
 
 /// Represents a `let` statement in Mechylang.
 ///
@@ -53,7 +54,7 @@ impl Display for LetStatement {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses a `let` statement in Mechylang.
     ///
     /// This function handles the parsing of a `let` statement, which is used to declare variables.
@@ -72,18 +73,21 @@ impl Parser {
     /// - The token following the `let` keyword is not an identifier.
     /// - The token following the identifier is not an equals sign (`=`).
     /// - An error occurs while parsing the expression.
-    pub(super) fn parse_let_statement(&mut self) -> Result<LetStatement, Error> {
+    pub(super) fn parse_let_statement(&mut self) -> Result<LetStatement> {
         let _trace = trace!("parse_let_statement");
         debug_assert!(self.is_cur_token(TokenKind::Let), "Expected current token to be `Let`");
-        let start = self.cur_token.span.start.clone();
+        let start = self.cur_token.span.clone();
 
         let name = match self.peek_token.kind {
             TokenKind::Identifier(ref name) => name.clone(),
             _ => {
-                return Err(self.error_peek(
-                    ErrorKind::UnexpectedToken,
-                    format!("Expected an identifier, got {:?}", self.peek_token.kind),
-                ))
+                return Err(
+                    Error::UnexpectedToken {
+                        span: self.peek_token.span.clone(),
+                        expected: vec![TokenKind::Identifier(String::new())],
+                        found: self.peek_token.kind.clone(),
+                    }
+                )
             }
         };
 
@@ -92,11 +96,11 @@ impl Parser {
             value: name.into(),
         };
 
-        self.next_token();
+        self.next_token()?;
 
         self.expect_peek(TokenKind::AssignEqual)?;
 
-        self.next_token();
+        self.next_token()?;
 
         let expression = self.parse_expression(Precedence::Lowest)?;
 
@@ -110,8 +114,8 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::error::ErrorKind;
-    use crate::Parser;
+    use crate::{Parser, TokenKind};
+    use crate::parser::Error;
     use crate::parser::expressions::Expression;
 
     #[test]
@@ -148,11 +152,14 @@ mod tests {
         let result = parser.parse_let_statement();
         assert!(result.is_err());
 
-        if let Err(error) = result {
-            assert_eq!(error.kind, ErrorKind::UnexpectedToken);
-            assert_eq!(error.message, "Expected an identifier, got AssignEqual");
-        } else {
-            panic!("Expected error but found {:#?}", result);
+        match result {
+            Err(Error::UnexpectedToken {
+                    span: _, expected, found
+                }) => {
+                assert_eq!(expected, vec![TokenKind::Identifier(Default::default())]);
+                assert_eq!(found, TokenKind::AssignEqual);
+            },
+            _ => panic!("Expected UnexpectedToken error but found {:#?}", result),
         }
     }
     
@@ -166,10 +173,14 @@ mod tests {
         let result = parser.parse_let_statement();
         assert!(result.is_err());
 
-        if let Err(error) = result {
-            assert_eq!(error.kind, ErrorKind::UnexpectedToken);
-        } else {
-            panic!("Expected error but found {:#?}", result);
+        match result {
+            Err(Error::UnexpectedToken {
+                    span: _, expected, found
+                }) => {
+                assert_eq!(expected, vec![TokenKind::AssignEqual]);
+                assert_eq!(found, TokenKind::Number("5".into()));
+            },
+            _ => panic!("Expected UnexpectedToken error but found {:#?}", result),
         }
     }
 }

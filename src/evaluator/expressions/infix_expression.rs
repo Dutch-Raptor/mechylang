@@ -1,14 +1,14 @@
 use std::rc::Rc;
-use crate::{Environment, Error, Evaluator, Object, trace};
-use crate::error::ErrorKind;
-use crate::parser::expressions::{InfixExpression, InfixOperator};
+use crate::{Environment, Evaluator, Object,  trace};
+use crate::parser::expressions::{ExpressionSpanExt, InfixExpression, InfixOperator};
+use crate::evaluator::{Result, Error};
 
 impl Evaluator {
     pub(super) fn eval_infix_expression(
         &mut self,
         infix: &InfixExpression,
         env: &mut Environment,
-    ) -> Result<Object, Error> {
+    ) -> Result<Object> {
         let _trace = trace!(&format!("Evaluating infix expression: {}", infix).to_string());
         // check if the infix operator is an assignment operator
         if infix.operator.is_assignment() {
@@ -17,6 +17,10 @@ impl Evaluator {
 
         let left = self.eval_expression(&infix.left, env)?;
         let right = self.eval_expression(&infix.right, env)?;
+
+        let left_span = infix.left.span().clone();
+        let right_span = infix.right.span().clone();
+        let operator_span = infix.operator_span.clone();
 
         self.current_span = infix.span.clone();
 
@@ -42,12 +46,15 @@ impl Evaluator {
             (Object::String(left), Object::String(right)) => {
                 self.eval_string_infix_expression(&infix.operator, left.clone(), right.clone())
             }
-            _ => Err(self.error(
-                self.current_span.clone(),
-                format!("Type mismatch: {:?} {} {:?}", left, infix.operator, right).as_str(),
-                ErrorKind::TypeMismatch,
-            )),
-        }
+            _ => None
+        }.ok_or_else(|| Error::UnsupportedInfixOperator {
+            left_span,
+            right_span,
+            left_object: left.clone(),
+            right_object: right.clone(),
+            operator: infix.operator,
+            operator_span,
+        }.into())
     }
 
 
@@ -56,15 +63,11 @@ impl Evaluator {
         operator: &InfixOperator,
         left: &Object,
         right: &Object,
-    ) -> Result<Object, Error> {
+    ) -> Option<Object> {
         match operator {
-            InfixOperator::CompareNotEqual => Ok(Object::Boolean(left != right)),
-            InfixOperator::CompareEqual => Ok(Object::Boolean(left == right)),
-            _ => Err(self.error(
-                self.current_span.clone(),
-                &format!("Invalid operator: {:?} {:?} {:?}", left, operator, right).to_string(),
-                ErrorKind::InvalidOperator,
-            )),
+            InfixOperator::CompareNotEqual => Some(Object::Boolean(left != right)),
+            InfixOperator::CompareEqual => Some(Object::Boolean(left == right)),
+            _ => None,
         }
     }
 
@@ -73,45 +76,33 @@ impl Evaluator {
         operator: &InfixOperator,
         left: i64,
         right: i64,
-    ) -> Result<Object, Error> {
-        let invalid = || {
-            self.error(
-                self.current_span.clone(),
-                format!(
-                    "Invalid operator: Integer({:?}) {} Integer({:?})",
-                    left, operator, right
-                )
-                    .as_str(),
-                ErrorKind::InvalidOperator,
-            )
-        };
-
+    ) -> Option<Object> {
         match operator {
-            InfixOperator::Plus => Ok((left + right).into()),
-            InfixOperator::Minus => Ok((left - right).into()),
-            InfixOperator::Asterisk => Ok((left * right).into()),
-            InfixOperator::Slash => Ok((left / right).into()),
-            InfixOperator::Percent => Ok((left % right).into()),
-            
-            InfixOperator::CompareEqual => Ok((left == right).into()),
-            InfixOperator::CompareNotEqual => Ok((left != right).into()),
-            InfixOperator::CompareGreater => Ok((left > right).into()),
-            InfixOperator::CompareLess => Ok((left < right).into()),
-            InfixOperator::CompareGreaterEqual => Ok((left >= right).into()),
-            InfixOperator::CompareLessEqual => Ok((left <= right).into()),
+            InfixOperator::Plus => Some((left + right).into()),
+            InfixOperator::Minus => Some((left - right).into()),
+            InfixOperator::Asterisk => Some((left * right).into()),
+            InfixOperator::Slash => Some((left / right).into()),
+            InfixOperator::Percent => Some((left % right).into()),
 
-            InfixOperator::BitwiseOr => Ok((left | right).into()),
-            InfixOperator::BitwiseAnd => Ok((left & right).into()),
-            InfixOperator::BitwiseXor => Ok((left ^ right).into()),
-            InfixOperator::BitwiseLeftShift => Ok((left << right).into()),
-            InfixOperator::BitwiseRightShift => Ok((left >> right).into()),
+            InfixOperator::CompareEqual => Some((left == right).into()),
+            InfixOperator::CompareNotEqual => Some((left != right).into()),
+            InfixOperator::CompareGreater => Some((left > right).into()),
+            InfixOperator::CompareLess => Some((left < right).into()),
+            InfixOperator::CompareGreaterEqual => Some((left >= right).into()),
+            InfixOperator::CompareLessEqual => Some((left <= right).into()),
+
+            InfixOperator::BitwiseOr => Some((left | right).into()),
+            InfixOperator::BitwiseAnd => Some((left & right).into()),
+            InfixOperator::BitwiseXor => Some((left ^ right).into()),
+            InfixOperator::BitwiseLeftShift => Some((left << right).into()),
+            InfixOperator::BitwiseRightShift => Some((left >> right).into()),
 
             // Explicitly not supported. This ensures that we always handle all possible operators
-            InfixOperator::LogicalAnd | InfixOperator::LogicalOr | InfixOperator::AssignEqual 
+            InfixOperator::LogicalAnd | InfixOperator::LogicalOr | InfixOperator::AssignEqual
             | InfixOperator::AssignPlus | InfixOperator::AssignMinus | InfixOperator::AssignAsterisk
             | InfixOperator::AssignSlash | InfixOperator::AssignPercent | InfixOperator::AssignBitwiseOr
-            | InfixOperator::AssignBitwiseAnd | InfixOperator::AssignBitwiseXor 
-            => Err(invalid()),
+            | InfixOperator::AssignBitwiseAnd | InfixOperator::AssignBitwiseXor
+            => None,
         }
     }
 
@@ -121,31 +112,19 @@ impl Evaluator {
         operator: &InfixOperator,
         left: f64,
         right: f64,
-    ) -> Result<Object, Error> {
-        let invalid = || {
-            self.error(
-                self.current_span.clone(),
-                format!(
-                    "Invalid operator: Float({:?}) {} Float({:?})",
-                    left, operator, right
-                )
-                    .as_str(),
-                ErrorKind::InvalidOperator,
-            )
-        };
-
+    ) -> Option<Object> {
         match operator {
-            InfixOperator::Plus => Ok((left + right).into()),
-            InfixOperator::Minus => Ok((left - right).into()),
-            InfixOperator::Asterisk => Ok((left * right).into()),
-            InfixOperator::Slash => Ok((left / right).into()),
-            InfixOperator::Percent => Ok((left % right).into()),
-            InfixOperator::CompareEqual => Ok((left == right).into()),
-            InfixOperator::CompareNotEqual => Ok((left != right).into()),
-            InfixOperator::CompareGreater => Ok((left > right).into()),
-            InfixOperator::CompareLess => Ok((left < right).into()),
-            InfixOperator::CompareGreaterEqual => Ok((left >= right).into()),
-            InfixOperator::CompareLessEqual => Ok((left <= right).into()),
+            InfixOperator::Plus => Some((left + right).into()),
+            InfixOperator::Minus => Some((left - right).into()),
+            InfixOperator::Asterisk => Some((left * right).into()),
+            InfixOperator::Slash => Some((left / right).into()),
+            InfixOperator::Percent => Some((left % right).into()),
+            InfixOperator::CompareEqual => Some((left == right).into()),
+            InfixOperator::CompareNotEqual => Some((left != right).into()),
+            InfixOperator::CompareGreater => Some((left > right).into()),
+            InfixOperator::CompareLess => Some((left < right).into()),
+            InfixOperator::CompareGreaterEqual => Some((left >= right).into()),
+            InfixOperator::CompareLessEqual => Some((left <= right).into()),
 
             // Explicitly not supported. This ensures that we always handle all possible operators
             InfixOperator::LogicalAnd | InfixOperator::LogicalOr | InfixOperator::BitwiseOr
@@ -153,7 +132,7 @@ impl Evaluator {
             | InfixOperator::BitwiseRightShift | InfixOperator::AssignEqual | InfixOperator::AssignPlus
             | InfixOperator::AssignMinus | InfixOperator::AssignAsterisk | InfixOperator::AssignSlash
             | InfixOperator::AssignPercent | InfixOperator::AssignBitwiseOr | InfixOperator::AssignBitwiseAnd
-            | InfixOperator::AssignBitwiseXor => Err(invalid()),
+            | InfixOperator::AssignBitwiseXor => None,
         }
     }
 
@@ -162,25 +141,13 @@ impl Evaluator {
         operator: &InfixOperator,
         left: bool,
         right: bool,
-    ) -> Result<Object, Error> {
-        let invalid = || {
-            self.error(
-                self.current_span.clone(),
-                format!(
-                    "Invalid operator: Boolean({:?}) {} Boolean({:?})",
-                    left, operator, right
-                )
-                    .as_str(),
-                ErrorKind::InvalidOperator,
-            )
-        };
-
+    ) -> Option<Object> {
         match operator {
-            InfixOperator::CompareEqual => Ok((left == right).into()),
-            InfixOperator::CompareNotEqual => Ok((left != right).into()),
-            InfixOperator::LogicalAnd => Ok((left && right).into()),
-            InfixOperator::LogicalOr => Ok((left || right).into()),
-            
+            InfixOperator::CompareEqual => Some((left == right).into()),
+            InfixOperator::CompareNotEqual => Some((left != right).into()),
+            InfixOperator::LogicalAnd => Some((left && right).into()),
+            InfixOperator::LogicalOr => Some((left || right).into()),
+
             // Explicitly not supported. This ensures that we always handle all possible operators
             InfixOperator::Plus | InfixOperator::Minus | InfixOperator::Asterisk
             | InfixOperator::Slash | InfixOperator::Percent | InfixOperator::CompareGreater
@@ -189,8 +156,8 @@ impl Evaluator {
             | InfixOperator::BitwiseLeftShift | InfixOperator::BitwiseRightShift | InfixOperator::AssignEqual
             | InfixOperator::AssignPlus | InfixOperator::AssignMinus | InfixOperator::AssignAsterisk
             | InfixOperator::AssignSlash | InfixOperator::AssignPercent | InfixOperator::AssignBitwiseOr
-            | InfixOperator::AssignBitwiseAnd | InfixOperator::AssignBitwiseXor 
-            => Err(invalid()),
+            | InfixOperator::AssignBitwiseAnd | InfixOperator::AssignBitwiseXor
+            => None,
         }
     }
 
@@ -199,15 +166,15 @@ impl Evaluator {
         operator: &InfixOperator,
         left: Rc<str>,
         right: Rc<str>,
-    ) -> Result<Object, Error> {
+    ) -> Option<Object> {
         let _trace = trace!(&format!(
             "eval_string_infix_expression({:?}, {}, {})",
             operator, left, right
         ));
         match operator {
-            InfixOperator::Plus => Ok((left.to_string() + &right).into()),
-            InfixOperator::CompareEqual => Ok((left == right).into()),
-            InfixOperator::CompareNotEqual => Ok((left != right).into()),
+            InfixOperator::Plus => Some((left.to_string() + &right).into()),
+            InfixOperator::CompareEqual => Some((left == right).into()),
+            InfixOperator::CompareNotEqual => Some((left != right).into()),
 
             // Explicitly not supported. This ensures that we always handle all possible operators
             InfixOperator::Minus | InfixOperator::Asterisk | InfixOperator::Slash
@@ -218,15 +185,7 @@ impl Evaluator {
             | InfixOperator::AssignEqual | InfixOperator::AssignPlus | InfixOperator::AssignMinus
             | InfixOperator::AssignAsterisk | InfixOperator::AssignSlash | InfixOperator::AssignPercent
             | InfixOperator::AssignBitwiseOr | InfixOperator::AssignBitwiseAnd | InfixOperator::AssignBitwiseXor
-            => Err(self.error(
-                self.current_span.clone(),
-                format!(
-                    "Invalid operator: String({:?}) {} String({:?})",
-                    left, operator, right
-                )
-                    .as_str(),
-                ErrorKind::InvalidOperator,
-            )),
+            => None,
         }
     }
 }

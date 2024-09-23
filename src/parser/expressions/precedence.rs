@@ -1,8 +1,7 @@
 use crate::{
     parser::Parser,
     TokenKind,
-    error::ErrorKind,
-    Token
+    Token,
 };
 
 #[derive(Debug, PartialEq, Clone, PartialOrd)]
@@ -119,9 +118,19 @@ impl PrecedenceTrait for TokenKind {
             TokenKind::Unit => Precedence::Lowest,
             TokenKind::Break => Precedence::Lowest,
             TokenKind::Continue => Precedence::Lowest,
-            _ => {
-                return None;
-            }
+
+            TokenKind::Struct => Precedence::Lowest,
+            TokenKind::Enum => Precedence::Lowest,
+            TokenKind::Match => Precedence::Lowest,
+            TokenKind::As => Precedence::Lowest,
+            TokenKind::Use => Precedence::Lowest,
+            TokenKind::Char(_) => Precedence::Lowest,
+            TokenKind::Bang => Precedence::Lowest,
+            TokenKind::Question => Precedence::Lowest,
+            TokenKind::Colon => Precedence::Lowest,
+            TokenKind::Semicolon => Precedence::Lowest,
+            TokenKind::BitwiseNot => Precedence::Lowest,
+            TokenKind::Ellipsis => Precedence::Lowest,
         };
 
         Some(precedence)
@@ -134,19 +143,9 @@ impl PrecedenceTrait for Token {
     }
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     pub(super) fn peek_precedence(&mut self) -> Precedence {
-        match self.peek_token.precedence() {
-            Some(precedence) => precedence,
-            None => {
-                self.errors.push(self.error_peek(
-                    ErrorKind::MissingPrecedence,
-                    format!("No precedence found for {:?}", self.peek_token),
-                ));
-
-                Precedence::Lowest
-            }
-        }
+        self.peek_token.precedence().unwrap_or(Precedence::Lowest)
     }
     
     pub(super) fn cur_precedence(&self) -> Precedence {
@@ -232,7 +231,6 @@ mod tests {
 
             let actual = program.to_string();
             assert_eq!(actual.trim(), expected.trim());
-            assert_eq!(parser.errors.len(), 0);
         }
     }
 }

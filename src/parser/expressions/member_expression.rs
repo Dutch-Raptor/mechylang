@@ -2,7 +2,8 @@ use std::fmt;
 use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
-use crate::{Error, Expression, Parser, Span, TokenKind};
+use crate::{Expression, Parser, Span, TokenKind};
+use crate::parser::{Result};
 use crate::parser::expressions::{ExpressionSpanExt, Identifier};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -17,7 +18,7 @@ impl Display for MemberExpression {
         write!(f, "{}.{}", self.object, self.property)
     }
 }
-impl Parser {
+impl<'a> Parser<'a> {
     /// Parses a member access expression in Mechylang, where an object is accessed by its property.
     ///
     /// This function is used to parse member access expressions, where an object is followed by a dot `.` and then
@@ -42,10 +43,10 @@ impl Parser {
     /// This function returns an error if:
     /// * The next token is not an identifier, which indicates that the member access syntax is incorrect.
     /// * An unexpected token is encountered after the dot `.` symbol.
-    pub(super) fn parse_member(&mut self, left: Expression) -> Result<MemberExpression, Error> {
+    pub(super) fn parse_member(&mut self, left: Expression) -> Result<MemberExpression> {
         debug_assert!(self.is_cur_token(TokenKind::Dot), "Expected current token to be `.`");
-        let start = left.span().start.clone();
-        self.next_token();
+        let start = left.span().clone();
+        self.next_token()?;
 
         let property = self.parse_identifier()?;
 
