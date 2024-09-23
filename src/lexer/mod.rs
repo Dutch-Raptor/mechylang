@@ -53,7 +53,7 @@ impl<'a> Lexer<'a> {
 
     /// Read an identifier from the current position. An identifier is a sequence of letters, digits and underscores.
     fn read_identifier(&mut self) -> String {
-        let first_non_ident = self.rest.find(|c: char| !(c.is_alphabetic() || matches!(c, '0'..='9' | 'a'..='z' | 'A'..='Z' | '_')))
+        let first_non_ident = self.rest.find(|c: char| !(c.is_alphabetic() || c == '_' || c.is_numeric()))
             .unwrap_or(self.rest.len());
         let start_byte = self.byte;
         let end_byte = self.byte + first_non_ident;
@@ -84,7 +84,7 @@ impl<'a> Lexer<'a> {
         // If the next character is a dot, and the second next character is a digit,
         // then we have a floating point number.
         let c = self.rest.chars().next().unwrap_or('\0');
-        if c == '.' && is_digit(self.peek_char()) {
+        if c == '.' && self.peek_char().is_ascii_digit() {
             // Here we skip the first char in self.rest as it as a `.`
             let second_non_digit = self.rest[PERIOD_LEN_BYTES..]
                 .find(|c| !matches!(c, '0'..='9' | '_'))
@@ -111,7 +111,7 @@ impl<'a> Lexer<'a> {
 
 
     /// Advances the lexer by the length of `token_kind` and returns `token_kind`
-    /// 
+    ///
     /// # Panics:
     /// - if `token_kind` is a keyword, identifier, number or string
     fn read_token(&mut self, token_kind: TokenKind) -> TokenKind {
@@ -204,7 +204,7 @@ impl<'a> Lexer<'a> {
                 if self.peek_char() == '=' {
                     self.read_token(TokenKind::CompareLessEqual)
                 } else if self.peek_char() == '<' {
-                   self.read_token(TokenKind::BitwiseLeftShift)
+                    self.read_token(TokenKind::BitwiseLeftShift)
                 } else {
                     self.read_token(TokenKind::CompareLess)
                 }
@@ -231,7 +231,7 @@ impl<'a> Lexer<'a> {
                 } else if self.peek_char() == '=' {
                     self.read_token(TokenKind::AssignBitwiseAnd)
                 } else {
-                   self.read_token(TokenKind::Ampersand)
+                    self.read_token(TokenKind::Ampersand)
                 }
             }
             '|' => {
@@ -240,7 +240,7 @@ impl<'a> Lexer<'a> {
                 } else if self.peek_char() == '=' {
                     self.read_token(TokenKind::AssignBitwiseOr)
                 } else {
-                   self.read_token(TokenKind::BitwiseOr)
+                    self.read_token(TokenKind::BitwiseOr)
                 }
             }
             '^' => {
@@ -275,7 +275,7 @@ impl<'a> Lexer<'a> {
                 };
                 TokenKind::String(literal)
             }
-            c if is_letter(c) || c == '_' => {
+            c if c.is_alphabetic() || c == '_' => {
                 let literal = self.read_identifier();
                 if let Some(keyword_token) = TokenKind::is_keyword(&literal) {
                     keyword_token
@@ -373,14 +373,6 @@ impl<'a> Lexer<'a> {
 
         Ok(escaped_literal)
     }
-}
-
-fn is_letter(ch: char) -> bool {
-    ch.is_alphabetic() || ch == '_'
-}
-
-fn is_digit(ch: char) -> bool {
-    ch.is_ascii_digit()
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -735,5 +727,104 @@ mod test {
 
         let tokens = lex_token_kinds(input).unwrap();
         assert_eq!(tokens, expected_tokens);
+    }
+
+    #[test]
+    fn test_unicode_alphabetic_identifiers() {
+        let input = r#"
+            let にほへとちり = 5;
+            let Γαζέες καὶ μυρτιὲς δὲν θὰ βρῶ πιὰ στὸ χρυσαφὶ ξέφωτο = 5;
+        "#;
+
+        let expected_tokens = vec![
+            TokenKind::Let,
+            TokenKind::Identifier("にほへとちり".to_string()),
+            TokenKind::AssignEqual,
+            TokenKind::Number("5".to_string()),
+            TokenKind::Semicolon,
+            TokenKind::Let,
+            TokenKind::Identifier("Γαζέες".to_string()),
+            TokenKind::Identifier("καὶ".to_string()),
+            TokenKind::Identifier("μυρτιὲς".to_string()),
+            TokenKind::Identifier("δὲν".to_string()),
+            TokenKind::Identifier("θὰ".to_string()),
+            TokenKind::Identifier("βρῶ".to_string()),
+            TokenKind::Identifier("πιὰ".to_string()),
+            TokenKind::Identifier("στὸ".to_string()),
+            TokenKind::Identifier("χρυσαφὶ".to_string()),
+            TokenKind::Identifier("ξέφωτο".to_string()),
+            TokenKind::AssignEqual,
+            TokenKind::Number("5".to_string()),
+            TokenKind::Semicolon,
+        ];
+
+        let tokens = lex_token_kinds(input).unwrap();
+        assert_eq!(tokens, expected_tokens);
+    }
+
+
+    #[test]
+    fn test_token_spans() {
+        assert_eq!(lex("let five = 5"), Ok(vec![
+            Token {
+                kind: TokenKind::Let,
+                span: Span {
+                    bytes: 0..3,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("five".to_string()),
+                span: Span {
+                    bytes: 4..8,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::AssignEqual,
+                span: Span {
+                    bytes: 9..10,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Number("5".to_string()),
+                span: Span {
+                    bytes: 11..12,
+                    file: None,
+                },
+            },
+        ]));
+
+        assert_eq!(lex("let にほへとちり = 5"), Ok(vec![
+            Token {
+                kind: TokenKind::Let,
+                span: Span {
+                    bytes: 0..3,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Identifier("にほへとちり".to_string()),
+                span: Span {
+                    bytes: 4..22,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::AssignEqual,
+                span: Span {
+                    bytes: 23..24,
+                    file: None,
+                },
+            },
+            Token {
+                kind: TokenKind::Number("5".to_string()),
+                span: Span {
+                    bytes: 25..26,
+                    file: None,
+                },
+            }
+        ]));
     }
 }
