@@ -25,14 +25,14 @@ impl Evaluator {
     ) -> Result<Object> {
         let left = self.eval_expression(&index.left, env)?;
         let array = left.as_array().ok_or_else(|| Error::TypeError {
-            span: index.span.clone(),
+            span: index.left_span.clone(),
             expected: vec![ObjectTy::Array { expected_item_types: None }],
             found: left.get_type(),
         })?;
 
         let evaluated_index = self.eval_expression(&index.index, env)?;
         let evaluated_index = evaluated_index.as_integer().ok_or_else(|| Error::TypeError {
-            span: index.span.clone(),
+            span: index.index_span.clone(),
             expected: vec![ObjectTy::Integer],
             found: evaluated_index.get_type(),
         })? as usize;

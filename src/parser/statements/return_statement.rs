@@ -57,8 +57,8 @@ impl<'a> Parser<'a> {
             // If there is no expression, let the user know that they need to return something or
             // use a semicolon
             Err(Error::InvalidPrefix { found, .. }) => {
-                return Err(Error::ReturnWithoutExpressionOrSemicolon {
-                    span: self.cur_token.span.clone(),
+                return Err(Error::AmbiguousReturn {
+                    return_span: start,
                     found: found.clone(),
                 });
             }

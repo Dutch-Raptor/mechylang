@@ -601,8 +601,9 @@ pub mod lexer;
 pub mod parser;
 pub mod test_utils;
 mod tracer;
+pub mod pretty_errors;
 pub use error::{Error, Result};
 
 pub use lexer::{Lexer, Token, TokenKind, Span};
 pub use parser::{Parser, Expression, Statement, Program};
-pub use evaluator::{EvalConfig, Evaluator, eval_file, Object, Environment};
+pub use evaluator::{EvalConfig, Evaluator, Object, Environment};

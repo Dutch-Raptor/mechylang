@@ -4,7 +4,8 @@ mod repl;
 use repl::Repl;
 
 use clap::{Parser, Subcommand};
-use mechylang::eval_file;
+use mechylang::{Environment, EvalConfig, Evaluator};
+use mechylang::pretty_errors::PrettyError;
 
 #[derive(Parser)]
 #[command(author, about, version)]
@@ -36,16 +37,25 @@ enum Command {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = CommandArgs::parse();
+    miette::set_hook(Box::new(|_| {
+        Box::new(miette::MietteHandlerOpts::new()
+            .terminal_links(true)
+            .unicode(true)
+            .wrap_lines(true)
+            .build())
+    }))?;
 
     if let Some(command) = args.command {
         match command {
             Command::File { file } => {
                 let file = file.to_str().expect("Invalid file path");
 
-                let res = eval_file(file);
+                let input = std::fs::read_to_string(file).unwrap();
+                let mut env = Environment::new();
+                let res = Evaluator::eval(&input, &mut env, EvalConfig::default());
 
                 if let Err(e) = res {
-                    color_print::cprint!("{}", e);
+                    println!("{:?}", e.as_pretty_with_named_source(file.to_string(), input));
                 }
             }
             Command::Repl { print_tokens, print_ast, print_tokens_with_span } => {

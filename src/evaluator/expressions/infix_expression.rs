@@ -46,6 +46,15 @@ impl Evaluator {
             (Object::String(left), Object::String(right)) => {
                 self.eval_string_infix_expression(&infix.operator, left.clone(), right.clone())
             }
+            (Object::Array(left), Object::Array(right)) => {
+                self.eval_array_infix_expression(&infix.operator, left.clone(), right.clone())
+            }
+            (left, right) if infix.operator == InfixOperator::CompareEqual => {
+                Some(Object::Boolean(left == right))
+            }
+            (left, right) if infix.operator == InfixOperator::CompareNotEqual => {
+                Some(Object::Boolean(left != right))
+            }
             _ => None
         }.ok_or_else(|| Error::UnsupportedInfixOperator {
             left_span,
@@ -186,6 +195,25 @@ impl Evaluator {
             | InfixOperator::AssignAsterisk | InfixOperator::AssignSlash | InfixOperator::AssignPercent
             | InfixOperator::AssignBitwiseOr | InfixOperator::AssignBitwiseAnd | InfixOperator::AssignBitwiseXor
             => None,
+        }
+    }
+
+    fn eval_array_infix_expression(&self, operator: &InfixOperator, left: Vec<Object>, right: Vec<Object>) -> Option<Object> {
+        match operator {
+            InfixOperator::Plus => Some(Object::Array(left.into_iter().chain(right).collect())),
+            InfixOperator::CompareEqual => Some(Object::Boolean(left == right)),
+            InfixOperator::CompareNotEqual => Some(Object::Boolean(left != right)),
+
+            // Explicitly not supported. This ensures that we always handle all possible operators
+
+            InfixOperator::CompareGreater | InfixOperator::CompareLess | InfixOperator::CompareGreaterEqual 
+            | InfixOperator::CompareLessEqual | InfixOperator::LogicalAnd | InfixOperator::LogicalOr 
+            | InfixOperator::BitwiseOr | InfixOperator::BitwiseAnd | InfixOperator::BitwiseXor 
+            | InfixOperator::BitwiseLeftShift | InfixOperator::BitwiseRightShift | InfixOperator::AssignEqual 
+            | InfixOperator::AssignPlus | InfixOperator::AssignMinus | InfixOperator::AssignAsterisk | InfixOperator::AssignSlash
+            | InfixOperator::AssignPercent | InfixOperator::AssignBitwiseOr | InfixOperator::AssignBitwiseAnd
+            | InfixOperator::Minus | InfixOperator::Asterisk | InfixOperator::Slash | InfixOperator::Percent
+            | InfixOperator::AssignBitwiseXor => None,
         }
     }
 }

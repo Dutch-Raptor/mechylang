@@ -4,12 +4,14 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::parser::Parser;
 use crate::{Expression, Span, TokenKind};
-use crate::parser::expressions::Precedence;
+use crate::parser::expressions::{ExpressionSpanExt, Precedence};
 use crate::parser::{Result};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct IndexExpression {
     pub span: Span,
+    pub left_span: Span,
+    pub index_span: Span,
     pub left: Rc<Expression>,
     pub index: Rc<Expression>,
 }
@@ -32,6 +34,8 @@ impl<'a> Parser<'a> {
 
         Ok(IndexExpression {
             span: self.span_with_start(start),
+            left_span: left.span().clone(),
+            index_span: index.span().clone(),
             left: Rc::new(left),
             index: Rc::new(index),
         })

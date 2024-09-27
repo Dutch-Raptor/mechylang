@@ -17,6 +17,8 @@ impl Display for Error {
     }
 }
 
+impl std::error::Error for Error {}
+
 impl From<crate::lexer::Error> for Error {
     fn from(err: crate::lexer::Error) -> Self {
         Error::LexerError(err)

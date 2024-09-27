@@ -1,4 +1,4 @@
-main()
+main();
 
 fn sum_primes(n) {
     // Create a list of all primes found so far
@@ -34,6 +34,7 @@ fn sum_primes(n) {
 
 
 fn main() {
+    [123, "123"] + 123.2516;
     while true {
         println("Enter a number (or q to exit): ");
         let input = input_read_line();

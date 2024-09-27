@@ -71,11 +71,12 @@ impl<'a> Parser<'a> {
 
         self.expect_peek(TokenKind::In)?;
         self.next_token()?;
+        
 
         let iterable = self.parse_expression(Precedence::Lowest)?;
 
         // set current token to the '{' token
-        self.next_token()?;
+        self.expect_peek(TokenKind::LeftSquirly)?;
 
         let body = self.parse_block_expression()?;
 

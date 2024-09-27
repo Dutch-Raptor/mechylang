@@ -2,7 +2,7 @@ use crate::{Span, TokenKind};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Error {
     /// Lexer error
     LexerError(crate::lexer::Error),
@@ -19,8 +19,8 @@ pub enum Error {
     /// Expected an infix operator, but found `{found}`
     InvalidInfix { span: Span, found: TokenKind },
     /// Expected an expression list to either contain an(other) expression or the end token, but found `{found}`
-    UnexpectedExpressionListEnd { span: Span, expected_end_token: TokenKind, found: TokenKind },
-    ReturnWithoutExpressionOrSemicolon { span: Span, found: TokenKind },
+    UnexpectedExpressionListEnd { list_span: Span, expected_end_token: TokenKind, found: TokenKind, parse_expression_error: Option<Box<Error>> },
+    AmbiguousReturn { return_span: Span, found: TokenKind },
     MissingPrecedence { span: Span, for_token_kind: TokenKind },
 }
 

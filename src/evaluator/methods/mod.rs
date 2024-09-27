@@ -451,12 +451,11 @@ lazy_static! {
                 }
                 
                 // Create an enclosed environment for the closure
-                let enclosed_env = Environment::new_enclosed(args.env);
+                let mut enclosed_env = Environment::new_enclosed(args.env);
 
                 Ok(Object::Iterator(IteratorObject {
                     iterator: Box::new(iterator.filter(move |item| {
-                        let mut env = Environment::new_enclosed(&enclosed_env);
-                        match predicate.call(None, vec![Argument::from_obj(item.clone())], &mut env, args.config.clone()) {
+                        match predicate.call(None, vec![Argument::from_obj(item.clone())], &mut enclosed_env, args.config.clone()) {
                             Ok(obj) => Evaluator::is_truthy(&obj),
                             Err(e) => {
                                 eprintln!("Error evaluating closure in filter {}", e);
@@ -501,12 +500,11 @@ lazy_static! {
                     return Err(invalid_transform_type());
                 }
 
-                let enclosed_env = Environment::new_enclosed(args.env);
+                let mut enclosed_env = Environment::new_enclosed(args.env);
                 Ok(Object::Iterator(IteratorObject {
                     iterator: Box::new(iterator.map(move |item| {
-                        let mut env = Environment::new_enclosed(&enclosed_env);
                         let function_span = transform.span.clone();
-                        function.call(None, vec![Argument {span: function_span ,value: item}], &mut env, args.config.clone()).unwrap_or_else(|e| {
+                        function.call(None, vec![Argument {span: function_span ,value: item}], &mut enclosed_env, args.config.clone()).unwrap_or_else(|e| {
                             eprintln!("Error evaluating closure in map: {}", e);
                             Object::Unit
                         })
@@ -660,3 +658,32 @@ lazy_static! {
         );
     }
 
+#[cfg(test)]
+mod tests {
+    use crate::evaluator::tests::test_eval;
+
+    #[test]
+    fn test_iter_take() {
+        let result = test_eval(r#"
+            let nums = (1..).iter();
+            assert_eq(nums.take(2).collect(), [1, 2]);
+        "#);
+        
+        assert!(result.is_ok());
+    }
+    
+    // Fails because of https://github.com/Dutch-Raptor/mechylang/issues/11
+    // #[test]
+    // fn test_iter_for_each() {
+    //     let result = test_eval(r#"
+    //         let nums = (1..).iter().map(fn(x) { x * 2 });
+    //         let sum = 0;
+    //         nums.take(3).for_each(fn(x) {
+    //             sum = sum + x;
+    //         });
+    //         assert_eq(sum, 6);
+    //     "#);
+    // 
+    //     assert!(result.is_ok());
+    // }
+}

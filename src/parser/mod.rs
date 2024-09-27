@@ -1,5 +1,4 @@
 use crate::{Lexer, Token, TokenKind};
-use crate::tracer::reset_trace;
 
 pub mod expressions;
 pub mod statements;
@@ -49,18 +48,11 @@ impl<'a> Parser<'a> {
     /// let program = parser.parse().unwrap();
     /// ```
     pub fn new(lexer: Lexer<'a>) -> Self {
-        let mut parser = Self {
+        Self {
             lexer,
             cur_token: Token::default(),
             peek_token: Token::default(),
-        };
-
-        reset_trace();
-
-        // Read two tokens, so cur_token and peek_token are both set
-        let _ = parser.next_token();
-        let _ = parser.next_token();
-        parser
+        }
     }
     
     /// Creates a new `Parser` instance from the provided source code.
@@ -123,6 +115,10 @@ impl<'a> Parser<'a> {
     /// ```
     pub fn parse(&mut self) -> Result<Program> {
         let mut statements = Vec::new();
+        
+        // Read cur and peek tokens
+        self.next_token()?;
+        self.next_token()?;
 
         while self.cur_token.kind != TokenKind::EOF {
             let statement = self.parse_statement()?;

@@ -287,14 +287,17 @@ impl<'a> Lexer<'a> {
                 let literal = self.read_number();
                 TokenKind::Number(literal)
             }
-            _ =>
+            c => {
+                self.byte += c.len_utf8();
+                self.rest = &self.rest[c.len_utf8()..];
                 return Some(Err(Error::IllegalCharacter {
                     span: Span {
                         bytes: c_start..c_start + c.len_utf8(),
                         file: self.file.clone(),
                     },
-                    char: c,
-                })),
+                    found: c,
+                }))
+            }
         };
 
         let token = Token {
