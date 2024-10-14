@@ -21,8 +21,9 @@ impl Callable for Function {
         args: Vec<Argument>,
         _env: &mut Environment,
         config: Rc<EvalConfig>,
+        call_span: Span,
     ) -> Result<Object, Box<crate::evaluator::Error>> {
-        Evaluator::eval_function(self.clone(), args, config, self.body.span.clone())
+        Evaluator::eval_function(self.clone(), args, config, self.body.span.clone(), call_span)
     }
 
     fn args_len(&self) -> RangeInclusive<usize> {
@@ -35,9 +36,13 @@ impl Callable for Function {
 }
 
 pub trait Callable {
-    fn call(&self, 
+    fn call(&self,
             obj: Option<Object>,
-            args: Vec<Argument>, env: &mut Environment, config: Rc<EvalConfig>) -> Result<Object, Box<crate::evaluator::Error>>;
+            args: Vec<Argument>,
+            env: &mut Environment,
+            config: Rc<EvalConfig>,
+            call_span: Span,
+    ) -> Result<Object, Box<crate::evaluator::Error>>;
     
     /// Returns the number of arguments the function takes
     /// Returns `None` if the amount of arguments is unknown

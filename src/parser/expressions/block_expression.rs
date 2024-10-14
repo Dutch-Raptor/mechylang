@@ -4,6 +4,7 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::{trace, TokenKind, Span};
 use crate::parser::{Error, Parser, Result};
+use crate::parser::error::Location;
 use crate::parser::statements::Statement;
 
 /// Represents a block of code in Mechylang, which is a sequence of statements enclosed in curly braces.
@@ -121,20 +122,23 @@ impl<'a> Parser<'a> {
                 span: self.cur_token.span.clone(),
                 expected: vec![TokenKind::RightSquirly],
                 found: self.cur_token.kind.clone(),
+                location: Some(Location::BlockExpression),
             });
         }
 
-        Ok(BlockExpression { span: self.span_with_start(start), statements: statements.into() })
+        Ok(BlockExpression { span: self.span_with_start(&start), statements: statements.into() })
     }
 }
 
 
 #[cfg(test)]
 mod tests {
+    use ariadne::Source;
     use crate::parser::Error;
     use super::*;
     use crate::parser::expressions::block_expression::BlockExpression;
     use crate::parser::statements::{ExpressionStatement, Statement};
+    use crate::pretty_errors::PrettyError;
 
     /// Test parsing a block expression with multiple statements
     #[test]
@@ -148,7 +152,14 @@ mod tests {
         "#;
 
         let mut parser = Parser::from_source(source_code);
+        // Read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
         let result = parser.parse_block_expression();
+        
+        if let Err(ref err) = result {
+            err.as_pretty_error("test_parse_block_expression_multiple_statements").eprint(("test_parse_block_expression_multiple_statements", Source::from(source_code))).unwrap();
+        }
         assert!(result.is_ok());
 
         if let Ok(BlockExpression { statements, .. }) = result {
@@ -171,6 +182,9 @@ mod tests {
         "#;
 
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
         let result = parser.parse_block_expression();
         assert!(result.is_ok());
 
@@ -190,6 +204,9 @@ mod tests {
         "#;
 
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
         let result = parser.parse_block_expression();
         assert!(result.is_ok());
 
@@ -209,16 +226,19 @@ mod tests {
         "#; // Missing closing brace
 
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
         let result = parser.parse_block_expression();
         assert!(result.is_err());
 
         if let Err(error) = result {
             match error {
                 Error::UnexpectedToken {
-                    span: _, expected, found
-                } => {
+                    span: _, expected, found, location } => {
                     assert_eq!(expected, vec![TokenKind::RightSquirly]);
                     assert_eq!(found, TokenKind::EOF);
+                    assert_eq!(location, Some(Location::BlockExpression));
                 }
                 _ => panic!("Expected UnexpectedTokenError but got {:?}", error),
             }

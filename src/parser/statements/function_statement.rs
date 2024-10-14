@@ -6,6 +6,7 @@ use crate::parser::Parser;
 use crate::parser::statements::Statement;
 use crate::{trace, TokenKind, Span};
 use crate::parser::{Error, Result};
+use crate::parser::error::Location;
 use crate::parser::expressions::{BlockExpression, Identifier};
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -64,22 +65,23 @@ impl<'a> Parser<'a> {
                     span: self.peek_token.span.clone(),
                     expected: vec![TokenKind::Identifier(String::new())],
                     found: self.peek_token.kind.clone(),
+                    location: Some(Location::FunctionStatement),
                 });
             }
         };
 
         self.next_token()?;
 
-        self.expect_peek(TokenKind::LeftParen)?;
+        self.expect_peek(TokenKind::LeftParen, Some(Location::FunctionStatement))?;
 
         let parameters = self.parse_function_parameters()?.into();
 
-        self.expect_peek(TokenKind::LeftSquirly)?;
+        self.expect_peek(TokenKind::LeftSquirly, Some(Location::FunctionStatement))?;
         let body = self.parse_block_expression()?;
 
         let statement = Statement::Function(FunctionStatement {
             name,
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             parameters,
             body,
         });
@@ -102,6 +104,9 @@ mod tests {
         }
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_function_statement();
         assert!(result.is_ok());
@@ -127,6 +132,9 @@ mod tests {
         }
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_function_statement();
         assert!(result.is_ok());

@@ -3,6 +3,8 @@ use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use crate::{Expression, Parser, Span, TokenKind, trace};
 use crate::parser::{Error, Result};
+use crate::parser::error::Location;
+
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FloatLiteral {
     pub span: Span,
@@ -38,6 +40,7 @@ impl<'a> Parser<'a> {
                 span: self.cur_token.span.clone(),
                 expected: vec![TokenKind::Number(String::new())],
                 found: self.cur_token.kind.clone(),
+                location: Some(Location::Expression),
             })?;
         
         let span = token.span.clone();

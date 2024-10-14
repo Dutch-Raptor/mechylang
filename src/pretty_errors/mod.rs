@@ -1,63 +1,73 @@
-use miette::{Diagnostic, NamedSource};
+use std::ops::Range;
+use ariadne::{Color, Config, LabelAttach, Report, ReportBuilder};
 
 mod lexer_errors;
 mod parser_errors;
 mod evaluator_errors;
 
 pub trait PrettyError {
-    fn as_pretty_error(&self) -> miette::Report;
-
-    fn as_pretty_error_with_source_code(&self, source_code: String) -> miette::Report {
-        self.as_pretty_error().with_source_code(source_code)
-    }
-
-    fn as_pretty_with_named_source(&self, name: String, source_code: String) -> miette::Report {
-        NamedSourceCodeError {
-            errors: vec![self.as_pretty_error()],
-            src: NamedSource::new(name, source_code),
-        }.into()
-    }
+    fn as_pretty_error<'a>(&self, source_id: &'a str) -> Report<(&'a str, Range<usize>)>;
 }
 
-#[derive(Debug, Diagnostic)]
-struct NamedSourceCodeError {
-    #[related]
-    pub errors: Vec<miette::Report>,
-    #[source_code]
-    pub src: NamedSource<String>,
+struct HighlightColors {
+    colors: [Color; 3],
+    index: usize,
+    color_generator: ariadne::ColorGenerator,
 }
 
-impl std::fmt::Display for NamedSourceCodeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Some errors occurred while running the code")
+impl HighlightColors {
+    fn new() -> Self {
+        Self {
+            // Credit https://github.com/zkat/miette/blob/5f441d011560a091fe5d6a6cdb05f09acf622d36/src/handlers/theme.rs#L112
+            colors: [
+                Color::Rgb(246, 87, 248),
+                Color::Rgb(30, 201, 212),
+                Color::Rgb(145, 246, 111),
+            ],
+            index: 0,
+            color_generator: ariadne::ColorGenerator::new(),
+        }
     }
-}
-
-impl std::error::Error for NamedSourceCodeError {}
-
-impl PrettyError for crate::Error {
-    fn as_pretty_error(&self) -> miette::Report {
-        match self {
-            crate::Error::LexerError(err) => err.as_pretty_error(),
-            crate::Error::ParserError(err) => err.as_pretty_error(),
-            crate::Error::EvaluatorError(err) => err.as_pretty_error(),
+    
+    fn next(&mut self) -> Color {
+        if self.index >= self.colors.len() {
+            self.color_generator.next()
+        } else {
+            let color = self.colors[self.index];
+            self.index += 1;
+            color
         }
     }
 }
 
-#[derive(Debug, Diagnostic)]
-struct MultiError {
-    #[related]
-    pub errors: Vec<miette::Report>,
-    pub error: String,
+fn highlight_colors() -> HighlightColors {
+    HighlightColors::new()
 }
 
-impl std::fmt::Display for MultiError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.error)
+const KEYWORD_COLOR: Color = Color::Fixed(81);
+
+impl<T:PrettyErrorBuilder> PrettyError for T {
+    fn as_pretty_error<'a>(&self, source_id: &'a str) -> Report<(&'a str, Range<usize>)> {
+        self.as_pretty_error_builder(source_id)
+            .with_config(Config::default()
+                .with_index_type(ariadne::IndexType::Byte)
+                .with_label_attach(LabelAttach::Start)
+            )
+            .finish()
     }
 }
 
-impl std::error::Error for MultiError {}
+trait PrettyErrorBuilder {
+    fn as_pretty_error_builder<'a>(&self, source_id: &'a str) -> ReportBuilder<(&'a str, Range<usize>)>;
+}
 
 
+impl PrettyErrorBuilder for crate::Error {
+    fn as_pretty_error_builder<'a>(&self, source_id: &'a str) -> ReportBuilder<(&'a str, Range<usize>)> {
+        match self {
+            crate::Error::LexerError(err) => err.as_pretty_error_builder(source_id),
+            crate::Error::ParserError(err) => err.as_pretty_error_builder(source_id),
+            crate::Error::EvaluatorError(err) => err.as_pretty_error_builder(source_id),
+        }
+    }
+}

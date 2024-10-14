@@ -95,10 +95,12 @@ pub static ref STRING_METHODS: Arc<[MethodInner]> = Arc::new([
         function: |args| {
             let haystack = args.obj.as_string().expect("Expected string method to be called on a string");
 
-            let needle = args.args[0].as_string().ok_or_else(|| Error::TypeError {
-                span: args.method_span.clone(),
+            let needle_arg = args.args[0].clone();
+            let needle = needle_arg.as_string().ok_or_else(|| Error::TypeError {
+                span: needle_arg.span.clone().unwrap_or(args.method_span.clone()),
                 expected: vec![ObjectTy::String],
-                found: args.args[0].get_type(),
+                found: needle_arg.get_type(),
+                context: Some(args.call_span.clone()),
             })?;
 
             Ok(Object::Boolean(haystack.contains(needle)))
@@ -124,6 +126,7 @@ pub static ref STRING_METHODS: Arc<[MethodInner]> = Arc::new([
                 span: needle_arg.span.clone().unwrap_or(args.method_span.clone()),
                 expected: vec![ObjectTy::String],
                 found: args.args[0].get_type(),
+                context: Some(args.call_span.clone()),
             })?;
 
             let replacement_arg = &args.args[1];
@@ -131,6 +134,7 @@ pub static ref STRING_METHODS: Arc<[MethodInner]> = Arc::new([
                 span: replacement_arg.span.clone().unwrap_or(args.method_span.clone()),
                 expected: vec![ObjectTy::String],
                 found: args.args[1].get_type(),
+                context: Some(args.call_span.clone()),
             })?;
 
             Ok(Object::String(haystack.replace(needle, replacement).into()))
@@ -162,10 +166,12 @@ pub static ref STRING_METHODS: Arc<[MethodInner]> = Arc::new([
         function: |args| {
             let s = args.obj.as_string().expect("Expected string method to be called on a string");
 
-            let delimiter = args.args[0].as_string().ok_or_else(|| Error::TypeError {
-                span: args.args[0].span.clone().unwrap_or(args.method_span.clone()),
+            let delimiter_arg = args.args[0].clone();
+            let delimiter = delimiter_arg.as_string().ok_or_else(|| Error::TypeError {
+                span: delimiter_arg.span.clone().unwrap_or(args.method_span.clone()),
                 expected: vec![ObjectTy::String],
                 found: args.args[0].get_type(),
+                context: Some(args.call_span.clone()),
             })?;
 
             let split: Vec<_> = s.split(delimiter).map(|s| s.into()).collect();

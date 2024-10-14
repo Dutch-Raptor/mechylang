@@ -57,7 +57,7 @@ pub use while_expression::WhileExpression;
 pub use block_expression::BlockExpression;
 use crate::parser::{Parser, Error, Result};
 use crate::{Span, TokenKind, trace};
-
+use crate::parser::error::Location;
 
 /// Represents an expression in Mechylang.
 ///
@@ -405,13 +405,13 @@ impl<'a> Parser<'a> {
 
         if self.cur_token.kind == TokenKind::RightParen {
             return Ok(Expression::Unit(
-                self.span_with_start(start)
+                self.span_with_start(&start)
             ));
         }
 
         let expression = self.parse_expression(Precedence::Lowest)?;
 
-        self.expect_peek(TokenKind::RightParen)?;
+        self.expect_peek(TokenKind::RightParen, Some(Location::Expression))?;
 
         Ok(expression)
     }
@@ -456,7 +456,7 @@ impl<'a> Parser<'a> {
 
         if self.peek_token.kind != end {
             return Err(Error::UnexpectedExpressionListEnd {
-                list_span: self.span_with_start(start_span),
+                list_span: self.span_with_start(&start_span),
                 expected_end_token: end.clone(),
                 found: self.peek_token.kind.clone(),
                 parse_expression_error: None,
@@ -480,6 +480,9 @@ mod tests {
         -x + y * z
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_expression(Precedence::Lowest);
         assert!(result.is_ok());
@@ -525,6 +528,9 @@ mod tests {
         (x + y) * z
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_expression(Precedence::Lowest);
         assert!(result.is_ok());
@@ -558,6 +564,9 @@ mod tests {
         x ++ y
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_expression(Precedence::Lowest);
 

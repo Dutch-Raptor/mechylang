@@ -132,7 +132,8 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use color_print::cprintln;
+    use ariadne::Source;
+    use crate::pretty_errors::PrettyError;
     use super::*;
 
     pub(super) fn parse(input: &str) -> Result<Vec<Statement>> {
@@ -141,7 +142,7 @@ mod tests {
         let result = parser.parse();
 
         if let Err(ref err) = result {
-            cprintln!("{}", err)
+            err.as_pretty_error("test_parse").eprint(("test_parse", Source::from(input))).unwrap();
         }
         
         result.map(|program| program.statements)

@@ -30,6 +30,7 @@ lazy_static! {
                 span: args.method_span.clone(),
                 expected: vec![ObjectTy::Boolean],
                 found: args.obj.get_type(),
+                context: Some(args.call_span.clone()),
             })?;
 
             Ok(Object::Boolean(!boolean))

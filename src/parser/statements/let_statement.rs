@@ -7,6 +7,7 @@ use crate::{TokenKind, trace};
 use crate::lexer::Span;
 
 use crate::parser::{Error, Result};
+use crate::parser::error::Location;
 
 /// Represents a `let` statement in Mechylang.
 ///
@@ -86,6 +87,7 @@ impl<'a> Parser<'a> {
                         span: self.peek_token.span.clone(),
                         expected: vec![TokenKind::Identifier(String::new())],
                         found: self.peek_token.kind.clone(),
+                        location: Some(Location::LetStatement),
                     }
                 )
             }
@@ -98,14 +100,14 @@ impl<'a> Parser<'a> {
 
         self.next_token()?;
 
-        self.expect_peek(TokenKind::AssignEqual)?;
+        self.expect_peek(TokenKind::AssignEqual, Some(Location::LetStatement))?;
 
         self.next_token()?;
 
         let expression = self.parse_expression(Precedence::Lowest)?;
 
         Ok(LetStatement {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             name,
             value: expression,
         })
@@ -116,6 +118,7 @@ impl<'a> Parser<'a> {
 mod tests {
     use crate::{Parser, TokenKind};
     use crate::parser::Error;
+    use crate::parser::error::Location;
     use crate::parser::expressions::Expression;
 
     #[test]
@@ -124,6 +127,9 @@ mod tests {
         let x = 5;
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_let_statement();
 
@@ -148,16 +154,20 @@ mod tests {
         let = 5;
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_let_statement();
         assert!(result.is_err());
 
         match result {
             Err(Error::UnexpectedToken {
-                    span: _, expected, found
+                    span: _, expected, found, location
                 }) => {
                 assert_eq!(expected, vec![TokenKind::Identifier(Default::default())]);
                 assert_eq!(found, TokenKind::AssignEqual);
+                assert_eq!(location, Some(Location::LetStatement));
             },
             _ => panic!("Expected UnexpectedToken error but found {:#?}", result),
         }
@@ -169,16 +179,20 @@ mod tests {
         let x 5;
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_let_statement();
         assert!(result.is_err());
 
         match result {
             Err(Error::UnexpectedToken {
-                    span: _, expected, found
+                    span: _, expected, found, location
                 }) => {
                 assert_eq!(expected, vec![TokenKind::AssignEqual]);
                 assert_eq!(found, TokenKind::Number("5".into()));
+                assert_eq!(location, Some(Location::LetStatement));
             },
             _ => panic!("Expected UnexpectedToken error but found {:#?}", result),
         }

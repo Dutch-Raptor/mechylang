@@ -14,6 +14,7 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ariadne = { version = "0.4.1", features = ["auto-color"] }
 clap = { version = "4.4.4", features = ["derive"] }
 color-print = "0.3.4"
 itertools = "0.13.0"
@@ -22,6 +23,7 @@ miette = { version = "7.2.0", features = ["fancy"] }
 rustyline = "14.0.0"
 serde = { version = "1.0.197", features = ["derive", "rc"] }
 serde_json = "1.0.114"
+strsim = "0.11.1"
 tap = "1.0.1"
 
 

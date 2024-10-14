@@ -234,7 +234,7 @@ impl<'a> Parser<'a> {
         let right = self.parse_expression(precedence)?;
 
         Ok(InfixExpression {
-            span: self.span_with_start(left.span().clone()),
+            span: self.span_with_start(&left.span().clone()),
             operator,
             operator_span,
             left: Rc::new(left),

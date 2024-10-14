@@ -27,10 +27,12 @@ lazy_static! {
             },
             function: |args| {
                 let base = args.obj.as_float().expect("Expected obj to be an integer");
-                let exponent = args.args[0].as_integer().ok_or_else(|| Error::TypeError {
-                    span: args.method_span.clone(),
+                let exponent_arg = args.args[0].clone();
+                let exponent = exponent_arg.as_integer().ok_or_else(|| Error::TypeError {
+                    span: exponent_arg.span.clone().unwrap_or(args.method_span.clone()),
                     expected: vec![ObjectTy::Integer],
                     found: args.args[0].get_type(),
+                    context: Some(args.call_span.clone()),
                 })?;
 
                 Ok(Object::Float(base.powi(exponent as i32)))
@@ -46,10 +48,12 @@ lazy_static! {
                 },
             },
             function: |args| {
-                let float = args.obj.as_float().ok_or_else(|| Error::TypeError {
-                    span: args.method_span.clone(),
+                let float_arg = args.obj.clone();
+                let float = float_arg.as_float().ok_or_else(|| Error::TypeError {
+                    span: args.obj_span.clone(),
                     expected: vec![ObjectTy::Float],
                     found: args.obj.get_type(),
+                    context: Some(args.call_span.clone()),
                 })?;
 
                 Ok(Object::Float(float.abs()))
@@ -85,10 +89,12 @@ lazy_static! {
             debug_assert!(matches!(args.obj, Object::Integer(_)), "Expected obj to be an integer");
 
             let base = args.obj.as_integer().expect("Expected obj to be an integer");
-            let exponent = args.args[0].as_integer().ok_or_else(|| Error::TypeError {
-                span: args.method_span.clone(),
+            let exponent_arg = args.args[0].clone();
+            let exponent = exponent_arg.as_integer().ok_or_else(|| Error::TypeError {
+                span: exponent_arg.span.clone().unwrap_or(args.method_span.clone()),
                 expected: vec![ObjectTy::Integer],
                 found: args.args[0].get_type(),
+                context: Some(args.call_span.clone()),
             })?;
 
             Ok(Object::Integer(base.pow(exponent as u32)))

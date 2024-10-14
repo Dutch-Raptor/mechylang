@@ -296,7 +296,7 @@ impl<'a> Lexer<'a> {
                         file: self.file.clone(),
                     },
                     found: c,
-                }))
+                }));
             }
         };
 
@@ -313,6 +313,7 @@ impl<'a> Lexer<'a> {
 
     fn read_string(&mut self) -> Result<String> {
         const QUOTE_CHAR_LEN: usize = '"'.len_utf8();
+        let string_start_byte = self.byte;
         let literal_start_byte = self.byte + QUOTE_CHAR_LEN;
 
         // Read the opening quote
@@ -324,12 +325,13 @@ impl<'a> Lexer<'a> {
             let mut chars = self.rest.char_indices();
 
             loop {
-                let (c_at, c) = chars.next().ok_or_else(|| Error::UnterminatedString {
-                    span: Span {
-                        bytes: self.byte..self.rest.len(),
-                        file: self.file.clone(),
-                    }
-                })?;
+                let (c_at, c) = chars.next().ok_or_else(||
+                    Error::UnterminatedString {
+                        span: Span {
+                            bytes: string_start_byte..self.whole.len(),
+                            file: self.file.clone(),
+                        }
+                    })?;
                 if c == '"' {
                     break c_at;
                 }
@@ -366,7 +368,7 @@ impl<'a> Lexer<'a> {
                     _ => return Err(Error::UnsupportedEscapeSequence {
                         span: Span {
                             file: self.file.clone(),
-                            bytes: c_at..(c2_at + c2.len_utf8()),
+                            bytes: (literal_start_byte + c_at)..(literal_start_byte + c2_at + c2.len_utf8()),
                         }
                     })
                 }

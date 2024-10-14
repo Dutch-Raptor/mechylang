@@ -1,3 +1,4 @@
+use strsim::jaro_winkler;
 use crate::{Environment, Evaluator, Object, trace};
 use crate::evaluator::{Result, Error};
 use crate::evaluator::objects::traits::UnwrapReturnValue;
@@ -19,10 +20,30 @@ impl Evaluator {
         } else if let Ok(builtin) = BuiltinFunction::try_from(ident) {
             Ok(builtin.into())
         } else {
-            Err(Error::IdentifierNotFound {
-                span: ident.span.clone(),
-                identifier: ident.value.clone(),
-            }.into())
+            Err(Self::identifier_not_found_error(ident, env).into())
+        }
+    }
+
+
+    pub(in crate::evaluator) fn identifier_not_found_error(ident: &Identifier, env: &Environment) -> Error {
+        let all_vars = env.get_all_keys();
+        let similar = all_vars.into_iter()
+            .filter_map(|key| {
+                let sim_score = jaro_winkler(&key, &ident.value);
+                if sim_score > 0.8 {
+                    Some((key, sim_score))
+                } else {
+                    None
+                }
+            })
+            .max_by(|a, b| {
+                a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+            }).map(|(s, _)| s);
+
+        Error::IdentifierNotFound {
+            span: ident.span.clone(),
+            identifier: ident.value.clone(),
+            similar,
         }
     }
 }

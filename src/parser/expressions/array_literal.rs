@@ -34,7 +34,7 @@ impl<'a> Parser<'a> {
         
         debug_assert!(self.is_cur_token(TokenKind::RightSquare), "Expected current token to be `]`");
 
-        Ok(ArrayLiteral { span: self.span_with_start(start), elements: elements.into() })
+        Ok(ArrayLiteral { span: self.span_with_start(&start), elements: elements.into() })
     }
 }
 

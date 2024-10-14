@@ -592,6 +592,7 @@
 //! To see some examples, check out [examples]
 //!
 //! [examples]: crate::docs::examples
+extern crate core;
 
 #[cfg(doc)]
 pub mod docs;
@@ -602,6 +603,7 @@ pub mod parser;
 pub mod test_utils;
 mod tracer;
 pub mod pretty_errors;
+mod support;
 pub use error::{Error, Result};
 
 pub use lexer::{Lexer, Token, TokenKind, Span};

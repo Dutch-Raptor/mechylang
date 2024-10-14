@@ -108,7 +108,7 @@
 //! # "#);
 //! ```
 
-use crate::EvalConfig;
+use crate::{EvalConfig, Span};
 use crate::Object;
 use std::{
     io::{stdin, BufRead},
@@ -135,7 +135,7 @@ pub struct BuiltinFunction {
     /// - `args`: The arguments passed to the function
     /// - `env`: The environment the function is being called in
     /// - `eval`: The evaluator, used for configuration (e.g. printing)
-    pub function: fn(&Vec<Argument>, &mut Environment, &EvalConfig) -> Result<Object>,
+    pub function: fn(&Vec<Argument>, &mut Environment, &EvalConfig, call_span: Span) -> Result<Object>,
 }
 
 impl BuiltinFunction {
@@ -145,8 +145,8 @@ impl BuiltinFunction {
 }
 
 impl Callable for BuiltinFunction {
-    fn call(&self, _obj: Option<Object>, args: Vec<Argument>, env: &mut Environment, config: Rc<EvalConfig>) -> Result<Object> {
-        (self.function)(&args, env, &config)
+    fn call(&self, _obj: Option<Object>, args: Vec<Argument>, env: &mut Environment, config: Rc<EvalConfig>, call_span: Span) -> Result<Object> {
+        (self.function)(&args, env, &config, call_span)
     }
 
     fn args_len(&self) -> RangeInclusive<usize> {
@@ -176,7 +176,7 @@ lazy_static! {
                 expected_return_type: Some(Box::new(ObjectTy::Integer)),
             },
         },
-        function: |args, _, _| match args[0].value {
+        function: |args, _, _, call_span| match args[0].value {
             Object::String(ref s) => Ok(Object::Integer(s.len() as i64)),
             Object::Array(ref a) => Ok(Object::Integer(a.len() as i64)),
             _ => Err(
@@ -184,6 +184,7 @@ lazy_static! {
                     span: args[0].span.clone().unwrap_or_default(),
                     expected: vec![ObjectTy::String, ObjectTy::Array { expected_item_types: None }],
                     found: args[0].get_type(),
+                        context: Some(call_span.clone()),
                 }.into(),
             ),
         },
@@ -201,7 +202,7 @@ lazy_static! {
                 expected_return_type: Some(Box::new(ObjectTy::Unit)),
             },
         },
-        function: |args, _, eval_config| {
+        function: |args, _, eval_config, _| {
             (eval_config.output_fn)(
                 args.iter()
                     .map(|a| a.to_string())
@@ -220,7 +221,7 @@ lazy_static! {
                 expected_return_type: Some(Box::new(ObjectTy::Unit)),
             },
         },
-        function: |args, _, eval_config| {
+        function: |args, _, eval_config, _| {
             (eval_config.output_fn)(format!(
                 "{}\n",
                 args.iter()
@@ -240,13 +241,14 @@ lazy_static! {
                 expected_return_type: Some(Box::new(ObjectTy::Unit)),
             },
         },
-        function: |args, _, _| {
+        function: |args, _, _, call_span| {
             let value = args[0].value.clone();
             if value == Object::Boolean(true) {
                 Ok(Object::Unit)
             } else {
                 Err(Error::AssertionFailed {
                     span: args[0].span.clone().unwrap_or_default(),
+                    assert_span: call_span.clone(),
                     value: value.clone(),
                 }.into())
             }
@@ -265,11 +267,12 @@ lazy_static! {
                 expected_return_type: Some(Box::new(ObjectTy::Unit)),
             },
         },
-        function: |args, _, _| {
+        function: |args, _, _, call_span| {
             let first = args[0].clone();
             for arg in args.iter().skip(1) {
                 if first.value != arg.value {
                     return Err(Error::AssertionEqualFailed {
+                        assert_span: call_span.clone(),
                         first_span: first.span.clone().unwrap_or_default(),
                         second_span: arg.span.clone().unwrap_or_default(),
                         first_value: first.value.clone(),
@@ -289,13 +292,14 @@ lazy_static! {
                 expected_return_type: Some(Box::new(ObjectTy::String)),
             },
         },
-        function: |_, _, _| {
+        function: |_, _, _, call_span| {
             stdin()
                 .lock()
                 .lines()
                 .collect::<std::result::Result<Vec<String>, std::io::Error>>()
                 .map(|val| Object::String(val.join("\n").into()))
                 .map_err(|e| Error::IOError {
+                    span: Some(call_span.clone()),
                     error: e.into(),
                 }.into())
         },
@@ -309,13 +313,14 @@ lazy_static! {
                 expected_return_type: Some(Box::new(ObjectTy::String)),
             },
         },
-        function: |_, _, _| {
+        function: |_, _, _, call_span| {
             stdin()
                 .lock()
                 .lines()
                 .next()
                 .map(|val| Object::String(val.unwrap_or_default().into()))
                 .ok_or(Error::IOError {
+                    span: Some(call_span.clone()),
                     error: std::io::Error::new(std::io::ErrorKind::Other, "Failed to get input").into(),
                 }.into())
         },
@@ -330,7 +335,7 @@ lazy_static! {
             },
         },
         
-        function: |args, _, _| {
+        function: |args, _, _, call_span| {
             let value = args[0].value.clone();
             match value {
                 Object::String(s) => s.parse::<i64>().map(Object::Integer).map_err(|e| {
@@ -344,6 +349,7 @@ lazy_static! {
                     span: args[0].span.clone().unwrap_or_default(),
                     expected: vec![ObjectTy::String],
                     found: value.get_type(),
+                    context: Some(call_span.clone()),
                 }.into()),
             }
         },
@@ -357,7 +363,7 @@ lazy_static! {
                 expected_return_type: Some(Box::new(ObjectTy::Float)),
             },
         },
-        function: |args, _, _| match &args[0].value {
+        function: |args, _, _, call_span| match &args[0].value {
             Object::String(s) => s.parse::<f64>().map(Object::Float).map_err(|e| {
                 Error::BuiltInError {
                     span: args[0].span.clone().unwrap_or_default(),
@@ -369,6 +375,7 @@ lazy_static! {
                 span: args[0].span.clone().unwrap_or_default(),
                 expected: vec![ObjectTy::String],
                 found: args[0].get_type(),
+                    context: Some(call_span.clone()),
             }.into()),
         },
     },

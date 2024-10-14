@@ -28,6 +28,7 @@ impl Evaluator {
             span: index.left_span.clone(),
             expected: vec![ObjectTy::Array { expected_item_types: None }],
             found: left.get_type(),
+            context: None,
         })?;
 
         let evaluated_index = self.eval_expression(&index.index, env)?;
@@ -35,6 +36,7 @@ impl Evaluator {
             span: index.index_span.clone(),
             expected: vec![ObjectTy::Integer],
             found: evaluated_index.get_type(),
+            context: None,
         })? as usize;
         
         match array.get(evaluated_index) {

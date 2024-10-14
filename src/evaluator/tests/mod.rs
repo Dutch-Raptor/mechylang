@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+use ariadne::Source;
 use crate::{Evaluator, Object};
 use crate::pretty_errors::PrettyError;
 
@@ -14,7 +16,9 @@ pub(super) fn test_eval(input: &str) -> crate::evaluator::Result<Object> {
     Evaluator::eval(input, &mut Default::default(), Default::default())
         .inspect_err(|error| {
             println!("error: {}", error);
-            println!("error: {:?}", error.as_pretty_error_with_source_code(input.to_string()));
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+            error.as_pretty_error("test_eval").write(("test_eval", Source::from(input)), &mut handle).unwrap();
         })
         .map_err(|error| {
             match error {

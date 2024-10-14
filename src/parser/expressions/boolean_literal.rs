@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use crate::parser::{Parser, Error, Result};
 use crate::{Span, TokenKind, trace};
-
+use crate::parser::error::Location;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct BooleanLiteral {
@@ -28,6 +28,7 @@ impl<'a> Parser<'a> {
                     span: self.cur_token.span.clone(),
                     expected: vec![TokenKind::True, TokenKind::False],
                     found: self.cur_token.kind.clone(),
+                    location: Some(Location::Expression),
                 })
             }
         };

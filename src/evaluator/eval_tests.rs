@@ -91,7 +91,7 @@ mod tests {
         "#).unwrap_err();
 
         match ident_err.as_ref() {
-            Error::IdentifierNotFound { identifier, span: _, } => {
+            Error::IdentifierNotFound { identifier, span: _, similar: _ } => {
                 assert_eq!(identifier.as_ref(), "foobar");
             }
             _ => panic!("Expected IdentifierNotFoundError, got: {ident_err:?}", ),
@@ -105,7 +105,7 @@ mod tests {
         "#).unwrap_err();
 
         match builtin_arg_err.as_ref() {
-            Error::TypeError { span: _, expected: _, found } => {
+            Error::TypeError { span: _, expected: _, found, context: _ } => {
                 assert_eq!(found, &ObjectTy::Integer);
             }
             _ => panic!("Expected TypeError, got: {builtin_arg_err:?}"),
@@ -119,7 +119,7 @@ mod tests {
 
         match err.as_ref() {
             Error::WrongNumberOfArguments {
-                span: _, expected, found
+                span: _, expected, found, unexpected_arg: _
             } => {
                 assert_eq!(expected, &(1..=1));
                 assert_eq!(*found, 2);

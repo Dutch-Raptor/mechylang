@@ -34,11 +34,12 @@ impl Evaluator {
         self.current_span = infix.left.span().clone();
 
         match infix.left.as_ref() {
-            Expression::Identifier(ident) => Self::update_identifier(infix, env, new_value, ident)?,
+            Expression::Identifier(ident) => Self::update_identifier(env, new_value, ident)
+                .map_err(|_| Self::identifier_not_found_error(ident, env))?,
             Expression::Index(index_expr) => self.assign_index_expression(infix, env, new_value, &index_expr)?,
             Expression::Prefix(PrefixExpression {
                                    span: _,
-                                   operator: PrefixOperator::Asterisk,
+                                   right_span: _right_span, operator_span: _operator_span, operator: PrefixOperator::Asterisk,
                                    right: _,
                                }) => {
                 todo!("Dereference operator not implemented yet");
@@ -60,7 +61,7 @@ impl Evaluator {
                         Object::Array(ref mut arr) => arr,
                         _ => return Err(Error::IndexingNonIndexableType {
                             indexed_span: index_expr.left.span().clone(),
-                            indexed_type: index_expr.left.span().clone(),
+                            indexed_obj: obj.clone(),
                         }.into()),
                     };
 
@@ -69,6 +70,7 @@ impl Evaluator {
                             expected: vec![ObjectTy::Integer],
                             found: index.get_type(),
                             span: index_expr.index.span().clone(),
+                            context: Some(index_expr.span.clone()),
                         })? as usize;
 
                     if let Some(item) = array.get_mut(index) {
@@ -79,7 +81,7 @@ impl Evaluator {
                             array_span: index_expr.left.span().clone(),
                             index_span: index_expr.index.span().clone(),
                             index,
-                            length: array.len()
+                            length: array.len(),
                         }.into())
                     }
                 })?;
@@ -91,16 +93,13 @@ impl Evaluator {
                 }.into())
             }
         };
-        
+
         Ok(())
     }
 
-    fn update_identifier(infix: &InfixExpression, env: &mut Environment, new_value: Object, ident: &Identifier) -> Result<()> {
+    fn update_identifier(env: &mut Environment, new_value: Object, ident: &Identifier) -> Result<()> {
         env.update(ident.value.clone(), new_value).map_err(|_| {
-            Error::IdentifierNotFound {
-                span: infix.left.span().clone(),
-                identifier: ident.value.clone(),
-            }
+            Evaluator::identifier_not_found_error(ident, env)
         })?;
         Ok(())
     }

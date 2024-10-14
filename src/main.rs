@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use ariadne::Source;
 
 mod repl;
 use repl::Repl;
@@ -55,7 +56,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let res = Evaluator::eval(&input, &mut env, EvalConfig::default());
 
                 if let Err(e) = res {
-                    println!("{:?}", e.as_pretty_with_named_source(file.to_string(), input));
+                    e.as_pretty_error(file)
+                        .eprint((file, Source::from(input)))
+                        .expect("Expected to be able to print error");
                 }
             }
             Command::Repl { print_tokens, print_ast, print_tokens_with_span } => {

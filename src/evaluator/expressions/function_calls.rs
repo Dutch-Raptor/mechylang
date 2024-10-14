@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::RangeInclusive;
 use std::rc::Rc;
 use crate::{Environment, EvalConfig, Evaluator, Object, Span, trace};
 use crate::evaluator::methods::{Method, MethodArgs};
@@ -21,6 +22,7 @@ impl Evaluator {
 
         // set current token so error messages are more helpful
         self.current_span = call.function.span().clone();
+        let call_span = call.span.clone();
 
         let arguments = call.arguments
             .iter()
@@ -31,15 +33,15 @@ impl Evaluator {
             .collect::<Result<Vec<Argument>>>()?;
 
         if let Object::BuiltinFunction(builtin) = function {
-            return self.apply_builtin_function(&builtin, arguments, env);
+            return self.apply_builtin_function(&builtin, arguments, env, call_span);
         }
 
         if let Object::Method(method) = function {
-            return self.apply_method(method, arguments, env);
+            return self.apply_method(method, arguments, env, call_span);
         }
 
         if let Object::Function(function) = function {
-            return self.apply_function(function, arguments);
+            return self.apply_function(function, arguments, call_span);
         }
 
         Err(Error::CannotCall {
@@ -54,35 +56,27 @@ impl Evaluator {
         function: &BuiltinFunction,
         arguments: Vec<Argument>,
         env: &mut Environment,
+        call_span: Span,
     ) -> Result<Object> {
         let _trace = trace!(&format!(
             "apply_builtin_function({}, {:?})",
             function.ty.name, arguments
         ));
 
-        self.validate_argument_length(function, &arguments)?;
+        Self::validate_argument_len(function.args_len(), &arguments, call_span.clone())?;
 
-        (function.function)(&arguments, env, &self.eval_config)
+        (function.function)(&arguments, env, &self.eval_config, call_span)
     }
 
-    fn validate_argument_length(&mut self, function: &dyn Callable, arguments: &[Argument]) -> Result<()> {
-        if !function.args_len().contains(&arguments.len()) {
-            return Err(Error::WrongNumberOfArguments {
-                span: self.current_span.clone(),
-                expected: function.args_len(),
-                found: arguments.len(),
-            }.into());
-        };
-        Ok(())
-    }
 
     pub(in crate::evaluator) fn apply_method(
         &mut self,
         method: Method,
         arguments: Vec<Argument>,
         env: &mut Environment,
+        call_span: Span,
     ) -> Result<Object> {
-        self.validate_argument_length(&method, &arguments)?;
+        Self::validate_argument_len(method.args_len(), &arguments, call_span.clone())?;
 
         (method.function)(
             MethodArgs {
@@ -93,6 +87,7 @@ impl Evaluator {
                 args: arguments,
                 env,
                 config: self.eval_config.clone(),
+                call_span,
             }
         )
     }
@@ -101,12 +96,14 @@ impl Evaluator {
         &mut self,
         function: Function,
         arguments: Vec<Argument>,
+        call_span: Span,
     ) -> Result<Object> {
         let _trace = trace!(&format!("apply_function({}, {:?})", function, arguments));
 
         let mut extended_env = self.extend_function_env(
             &function,
-            arguments.into_iter().map(|arg| arg.value).collect::<Vec<Object>>())?;
+            arguments,
+            call_span)?;
 
         // TODO: figure out if this is actually needed
         // // if any external environment was passed, extend the function environment with it
@@ -126,7 +123,8 @@ impl Evaluator {
     fn extend_function_env(
         &mut self,
         function: &Function,
-        arguments: Vec<Object>,
+        arguments: Vec<Argument>,
+        call_span: Span,
     ) -> Result<Environment> {
         let _trace = trace!(&format!(
             "extend_function_env({}, {:?})",
@@ -134,29 +132,45 @@ impl Evaluator {
         ));
         let mut env = Environment::new_enclosed(&function.env);
 
-        if function.params.len() != arguments.len() {
-            return Err(
-                Error::WrongNumberOfArguments {
-                    span: function.span.clone(),
-                    expected: function.args_len(),
-                    found: arguments.len(),
-                }.into()
-            );
-        }
+        Self::validate_argument_len(function.args_len(), &arguments, call_span)?;
 
         for (parameter, argument) in function.params.iter().zip(arguments) {
-            env.set(parameter.value.clone(), argument);
+            env.set(parameter.value.clone(), argument.value);
         }
 
         Ok(env)
     }
 
+    fn validate_argument_len(
+        args_len: RangeInclusive<usize>,
+        arguments: &[Argument],
+        call_span: Span
+    ) -> Result<()> {
+        let unexpected_arg = if arguments.len() > *args_len.end() {
+            Some((*args_len.end() + 1, arguments[*args_len.end()].clone()))
+        } else {
+            None
+        };
+
+        if !args_len.contains(&arguments.len()) {
+            return Err(
+                Error::WrongNumberOfArguments {
+                    span: call_span,
+                    unexpected_arg,
+                    expected: args_len,
+                    found: arguments.len(),
+                }.into()
+            );
+        }
+        Ok(())
+    }
 
     pub(in crate::evaluator) fn eval_function(
         function: Function,
         arguments: Vec<Argument>,
         config: Rc<EvalConfig>,
         span: Span,
+        call_span: Span,
     ) -> Result<Object> {
         let mut evaluator = Evaluator {
             globals: HashMap::new(),
@@ -165,7 +179,7 @@ impl Evaluator {
         };
 
         evaluator
-            .apply_function(function, arguments)
+            .apply_function(function, arguments, call_span)
             .map(|object| object.unwrap_return_value())
     }
 }

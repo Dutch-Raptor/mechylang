@@ -6,6 +6,7 @@ use crate::parser::Parser;
 use crate::{Expression, Span, TokenKind};
 use crate::parser::expressions::{ExpressionSpanExt, Precedence};
 use crate::parser::{Result};
+use crate::parser::error::Location;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct IndexExpression {
@@ -30,10 +31,10 @@ impl<'a> Parser<'a> {
 
         let index = self.parse_expression(Precedence::Lowest)?;
 
-        self.expect_peek(TokenKind::RightSquare)?;
+        self.expect_peek(TokenKind::RightSquare, Some(Location::Expression))?;
 
         Ok(IndexExpression {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             left_span: left.span().clone(),
             index_span: index.span().clone(),
             left: Rc::new(left),

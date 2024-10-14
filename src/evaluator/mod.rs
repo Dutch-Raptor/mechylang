@@ -14,7 +14,7 @@ mod error;
 mod tests;
 
 pub use config::EvalConfig;
-pub use objects::Object;
+pub use objects::{Object, iterators::IntoIteratorError};
 pub use runtime::{Environment};
 pub use error::{Error, Result};
 use crate::{Lexer, Parser, Program, Span, Statement, trace};

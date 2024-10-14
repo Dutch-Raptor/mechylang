@@ -37,7 +37,7 @@ impl<'a> Parser<'a> {
         };
 
         Ok(BreakStatement { 
-            span: self.span_with_start(start), 
+            span: self.span_with_start(&start), 
             value 
         })
     }

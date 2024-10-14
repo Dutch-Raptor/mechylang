@@ -47,7 +47,7 @@ impl<'a> Parser<'a> {
 
         if let TokenKind::Semicolon = self.cur_token.kind {
              return Ok(ReturnStatement {
-                 span: self.span_with_start(start),
+                 span: self.span_with_start(&start),
                  return_value: None,
              });
         }
@@ -57,7 +57,7 @@ impl<'a> Parser<'a> {
             // If there is no expression, let the user know that they need to return something or
             // use a semicolon
             Err(Error::InvalidPrefix { found, .. }) => {
-                return Err(Error::AmbiguousReturn {
+                return Err(Error::IncompleteReturnStatemen {
                     return_span: start,
                     found: found.clone(),
                 });
@@ -66,7 +66,7 @@ impl<'a> Parser<'a> {
         };
 
         Ok(ReturnStatement {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             return_value: Some(expression),
         })
     }
@@ -83,6 +83,9 @@ mod tests {
         return 5;
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_return_statement();
 
@@ -107,6 +110,9 @@ mod tests {
         return;
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_return_statement();
 

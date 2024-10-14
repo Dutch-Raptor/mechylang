@@ -1,3 +1,4 @@
+use ariadne::Source;
 use color_print::cprintln;
 
 use mechylang::{Environment, EvalConfig, Evaluator, Lexer, Object, Parser, TokenKind};
@@ -91,8 +92,10 @@ impl Repl {
                             println!("{}", evaluated);
                         }
                         Err(error) => {
-                            println!("{:?}", error.as_pretty_error().with_source_code(line + " "));
-                            cprintln!("{}", error)
+                            error
+                                .as_pretty_error("repl")
+                                .eprint(("repl", Source::from(line + " ")))
+                                .expect("Expected to be able to print error");
                         }
                     }
                 }

@@ -51,7 +51,7 @@ impl<'a> Parser<'a> {
         let property = self.parse_identifier()?;
 
         Ok(MemberExpression {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             object: Rc::new(left),
             property,
         })

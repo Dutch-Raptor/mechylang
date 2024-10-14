@@ -119,6 +119,7 @@ lazy_static! {
                             span: args.method_span.clone(),
                             expected: vec![ObjectTy::Array { expected_item_types: None }],
                             found: arr.get_type(),
+                            context: Some(args.call_span.clone()),
                         }.into())
                     }
                 });
@@ -151,10 +152,12 @@ lazy_static! {
             },
         },
         function: |args| {
-            let index = args.args.first().and_then(|arg| arg.as_integer()).ok_or_else(|| Error::TypeError {
-                span: args.method_span.clone(),
+                let arg = args.args[0].clone();
+            let index = arg.as_integer().ok_or_else(|| Error::TypeError {
+                span: arg.span.clone().unwrap_or(args.method_span.clone()),
                 expected: vec![ObjectTy::Integer],
                 found: args.args[0].get_type(),
+                context: Some(args.call_span.clone()),
             })?;
 
             if let Some(ident) = args.obj_identifier {
@@ -163,9 +166,10 @@ lazy_static! {
                         Ok(arr.remove(index as usize))
                     } else {
                         Err(Error::TypeError {
-                            span: args.method_span.clone(),
+                            span: args.obj_span.clone(),
                             expected: vec![ObjectTy::Array { expected_item_types: None }],
                             found: arr.get_type(),
+                                context: Some(args.call_span.clone()),
                         }.into())
                     }
                 })
@@ -173,9 +177,10 @@ lazy_static! {
                 match args.obj {
                     Object::Array(ref arr) => Ok(arr.get(index as usize).cloned().unwrap_or(Object::Unit)),
                     _ => Err(Error::TypeError {
-                        span: args.method_span.clone(),
+                        span: args.obj_span.clone(),
                         expected: vec![ObjectTy::Array { expected_item_types: None }],
                         found: args.obj.get_type(),
+                            context: Some(args.call_span.clone()),
                     }.into()),
                 }
             }
@@ -198,10 +203,12 @@ lazy_static! {
                 None => return Ok(Object::Unit), // No identifier, so no need to mutate the array as it will be dropped
             };
 
-            let index = args.args.first().and_then(|arg| arg.as_integer()).ok_or_else(|| Error::TypeError {
-                span: args.method_span.clone(),
+                let arg = args.args[0].clone();
+            let index = arg.as_integer().ok_or_else(|| Error::TypeError {
+                span: arg.span.clone().unwrap_or(args.method_span.clone()),
                 expected: vec![ObjectTy::Integer],
                 found: args.args[0].get_type(),
+                    context: Some(args.call_span.clone()),
             })?;
 
             let value = args.args[1].clone();
@@ -212,9 +219,10 @@ lazy_static! {
                     Ok(Object::Unit)
                 } else {
                     Err(Error::TypeError {
-                        span: args.method_span.clone(),
+                        span: args.obj_span.clone(),
                         expected: vec![ObjectTy::Array { expected_item_types: None }],
                         found: arr.get_type(),
+                            context: Some(args.call_span.clone()),
                     }.into())
                 }
             })
@@ -275,9 +283,10 @@ lazy_static! {
                         Ok(arr.pop().unwrap_or(Object::Unit))
                     } else {
                         Err(Error::TypeError {
-                            span: args.method_span.clone(),
+                            span: args.obj_span.clone(),
                             expected: vec![ObjectTy::Array { expected_item_types: None }],
                             found: obj.get_type(),
+                            context: Some(args.call_span.clone()),
                         }.into())
                     }
                 })
@@ -286,9 +295,10 @@ lazy_static! {
                 match args.obj {
                     Object::Array(ref arr) => Ok(arr.last().cloned().unwrap_or(Object::Unit)),
                     _ => Err(Error::TypeError {
-                        span: args.method_span.clone(),
+                        span: args.obj_span.clone(),
                         expected: vec![ObjectTy::Array { expected_item_types: None }],
                         found: args.obj.get_type(),
+                        context: Some(args.call_span.clone()),
                     }.into()),
                 }
             }
