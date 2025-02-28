@@ -22,6 +22,10 @@ impl Span {
     pub fn end(&self) -> usize {
         self.bytes.end
     }
+    
+    pub fn bytes(&self) -> Range<usize> {
+        self.bytes.clone()
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]

@@ -2,6 +2,12 @@
 name = "mechylang"
 version = "0.1.0"
 edition = "2021"
+authors = ["Pieter Huizenga <mail@pieterhuizenga.com>"]
+description = "Mechylang is a toy language created for learning purposes"
+repository = "https://github.com/Dutch-Raptor/mechylang"
+homepage = "https://dutch-raptor.github.io/mechylang/mechylang"
+keywords = ["language", "interpreter", "repl"]
+categories = ["command-line-utilities", "development-tools"]
 
 [lib]
 name = "mechylang"
@@ -14,17 +20,14 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ariadne = { version = "0.4.1", features = ["auto-color"] }
+ariadne = { version = "0.5.0", features = ["auto-color"] }
 clap = { version = "4.4.4", features = ["derive"] }
-color-print = "0.3.4"
-itertools = "0.13.0"
+color-print = "0.3.7"
+itertools = "0.14.0"
 lazy_static = "1.5.0"
-miette = { version = "7.2.0", features = ["fancy"] }
-rustyline = "14.0.0"
+rustyline = "15.0.0"
 serde = { version = "1.0.197", features = ["derive", "rc"] }
-serde_json = "1.0.114"
 strsim = "0.11.1"
-tap = "1.0.1"
 
 
 [dependencies.uuid]

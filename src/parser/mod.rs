@@ -142,7 +142,7 @@ mod tests {
         let result = parser.parse();
 
         if let Err(ref err) = result {
-            err.as_pretty_error("test_parse").eprint(("test_parse", Source::from(input))).unwrap();
+            err.as_pretty_errors("test_parse").eprint(("test_parse", Source::from(input))).unwrap();
         }
         
         result.map(|program| program.statements)

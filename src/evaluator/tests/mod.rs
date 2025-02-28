@@ -18,7 +18,7 @@ pub(super) fn test_eval(input: &str) -> crate::evaluator::Result<Object> {
             println!("error: {}", error);
             let stdout = std::io::stdout();
             let mut handle = stdout.lock();
-            error.as_pretty_error("test_eval").write(("test_eval", Source::from(input)), &mut handle).unwrap();
+            error.as_pretty_errors("test_eval").write(("test_eval", Source::from(input)), &mut handle).unwrap();
         })
         .map_err(|error| {
             match error {

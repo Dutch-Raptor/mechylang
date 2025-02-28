@@ -158,7 +158,7 @@ mod tests {
         let result = parser.parse_block_expression();
         
         if let Err(ref err) = result {
-            err.as_pretty_error("test_parse_block_expression_multiple_statements").eprint(("test_parse_block_expression_multiple_statements", Source::from(source_code))).unwrap();
+            err.as_pretty_errors("test_parse_block_expression_multiple_statements").eprint(("test_parse_block_expression_multiple_statements", Source::from(source_code))).unwrap();
         }
         assert!(result.is_ok());
 

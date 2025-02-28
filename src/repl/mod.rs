@@ -93,7 +93,7 @@ impl Repl {
                         }
                         Err(error) => {
                             error
-                                .as_pretty_error("repl")
+                                .as_pretty_errors("repl")
                                 .eprint(("repl", Source::from(line + " ")))
                                 .expect("Expected to be able to print error");
                         }

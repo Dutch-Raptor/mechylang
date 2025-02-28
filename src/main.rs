@@ -6,7 +6,7 @@ use repl::Repl;
 
 use clap::{Parser, Subcommand};
 use mechylang::{Environment, EvalConfig, Evaluator};
-use mechylang::pretty_errors::PrettyError;
+use mechylang::pretty_errors::{error_demo, PrettyError};
 
 #[derive(Parser)]
 #[command(author, about, version)]
@@ -34,18 +34,12 @@ enum Command {
         #[arg(long)]
         print_ast: bool,
     },
+    ErrorDemo
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = CommandArgs::parse();
-    miette::set_hook(Box::new(|_| {
-        Box::new(miette::MietteHandlerOpts::new()
-            .terminal_links(true)
-            .unicode(true)
-            .wrap_lines(true)
-            .build())
-    }))?;
-
+    
     if let Some(command) = args.command {
         match command {
             Command::File { file } => {
@@ -56,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let res = Evaluator::eval(&input, &mut env, EvalConfig::default());
 
                 if let Err(e) = res {
-                    e.as_pretty_error(file)
+                    e.as_pretty_errors(file)
                         .eprint((file, Source::from(input)))
                         .expect("Expected to be able to print error");
                 }
@@ -67,6 +61,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .with_print_tokens(print_tokens)
                     .with_print_tokens_with_span(print_tokens_with_span)
                     .run()?;
+            }
+            Command::ErrorDemo => {
+                error_demo();
             }
         }
     } else {
