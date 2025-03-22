@@ -14,16 +14,10 @@ mod error;
 mod tests;
 
 pub use config::EvalConfig;
-pub use objects::Object;
+pub use objects::{Object, iterators::IntoIteratorError};
 pub use runtime::{Environment};
 pub use error::{Error, Result};
 use crate::{Lexer, Parser, Program, Span, Statement, trace};
-
-pub fn eval_file(file: &str) -> crate::Result<Object> {
-    let input = std::fs::read_to_string(file).unwrap();
-    let mut env = Environment::new();
-    Evaluator::eval(&input, &mut env, EvalConfig::default())
-}
 
 pub struct Evaluator {
     current_span: Span,
@@ -38,7 +32,6 @@ impl Evaluator {
         config: EvalConfig,
     ) -> crate::Result<Object> {
         let lexer = Lexer::new(input);
-        // println!("{:?}", Lexer::new(input).collect::<std::result::Result<Vec<Token>, crate::lexer::Error>>());
         let mut parser = Parser::new(lexer);
 
         let Program { statements } = parser.parse()?;

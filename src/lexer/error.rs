@@ -1,10 +1,10 @@
 use crate::{Span};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Error {
     UnterminatedString { span: Span },
     UnsupportedEscapeSequence { span: Span },
-    IllegalCharacter { span: Span, char: char },
+    IllegalCharacter { span: Span, found: char },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

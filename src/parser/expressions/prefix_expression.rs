@@ -8,10 +8,13 @@ use crate::parser::{
     Error,
     Result,
 };
+use crate::parser::expressions::ExpressionSpanExt;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct PrefixExpression {
     pub span: Span,
+    pub right_span: Span,
+    pub operator_span: Span,
     pub operator: PrefixOperator,
     pub right: Rc<Expression>,
 }
@@ -22,7 +25,7 @@ impl Display for PrefixExpression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Copy)]
 pub enum PrefixOperator {
     Bang,
     Minus,
@@ -43,7 +46,7 @@ impl Display for PrefixOperator {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(crate) fn parse_prefix(&mut self) -> Result<Expression> {
         let _trace = trace!("parse_prefix");
         match self.cur_token.kind {
@@ -83,7 +86,7 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_prefix_expression(&mut self) -> Result<PrefixExpression> {
         let _trace = trace!("parse_prefix_expression");
-        let start = self.cur_token.span.clone();
+        let operator_span = self.cur_token.span.clone();
 
         let operator = match &self.cur_token.kind {
             TokenKind::Bang => PrefixOperator::Bang,
@@ -103,7 +106,9 @@ impl<'a> Parser<'a> {
         let right = self.parse_expression(Precedence::Prefix)?;
 
         Ok(PrefixExpression {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&operator_span),
+            right_span: right.span().clone(),
+            operator_span,
             operator,
             right: Rc::new(right),
         })

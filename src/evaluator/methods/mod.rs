@@ -32,6 +32,7 @@ use crate::evaluator::objects::iterators::IteratorObject;
 use crate::evaluator::{Result, Error};
 use crate::evaluator::methods::numeric_methods::INTEGER_METHODS;
 use crate::evaluator::objects::{Argument, ArgumentList, ArgumentType, FunctionTy, MethodTy, ObjectTy};
+use crate::parser::expressions::Identifier;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Method {
@@ -57,14 +58,14 @@ impl Method {
 }
 
 impl Callable for Method {
-    fn call(&self, _obj: Option<Object>, args: Vec<Argument>, env: &mut Environment, config: Rc<EvalConfig>) -> Result<Object> {
+    fn call(&self, _obj: Option<Object>, args: Vec<Argument>, env: &mut Environment, config: Rc<EvalConfig>, call_span: Span) -> Result<Object> {
         let mut evaluator = Evaluator {
             globals: HashMap::new(),
             current_span: self.method_span.clone(),
             eval_config: config,
         };
 
-        evaluator.apply_method(self.clone(), args, env)
+        evaluator.apply_method(self.clone(), args, env, call_span)
     }
 
     fn args_len(&self) -> RangeInclusive<usize> {
@@ -170,6 +171,7 @@ impl ObjectMethods for Object {
                     function: |args| {
                         Ok(Object::Iterator(IteratorObject::try_from(args.obj.clone()).map_err(|e| Error::IterCallOnNonIterable {
                             obj_span: args.obj_span.clone(),
+                            obj: args.obj.clone(),
                             iter_call_span: args.method_span.clone(),
                             reason: e,
                         })?))
@@ -219,6 +221,7 @@ pub struct MethodArgs<'a> {
     pub args: Vec<Argument>,
     pub env: &'a mut Environment,
     pub config: Rc<EvalConfig>,
+    pub call_span: Span,
 }
 
 type MethodFunction = fn(
@@ -276,10 +279,12 @@ lazy_static! {
                             } else {
                                 Object::Unit
                             })
-                        }).map_err(|_| Error::MutateError {
-                            span: args.obj_span.clone(),
-                            name: ident.clone(),
-                        }.into());
+                        }).map_err(|_| Evaluator::identifier_not_found_error(
+                            &Identifier {
+                                span: args.obj_span, value: ident
+                            }, 
+                            args.env
+                        ).into());
                     }
 
                     // otherwise just return the next item from the passed iterator
@@ -320,10 +325,12 @@ lazy_static! {
             },
             function: |args| {
                 let iterator = args.obj.to_iterator().expect("Expected Iterator method to be called on an iterator");
-                let step = args.args[0].as_integer().ok_or_else(|| Error::TypeError {
-                    span: args.method_span.clone(),
+                let step_arg = args.args[0].clone();
+                let step = step_arg.as_integer().ok_or_else(|| Error::TypeError {
+                    span: step_arg.span.clone().unwrap_or(args.method_span.clone()),
                     expected: vec![ObjectTy::Integer],
-                    found: args.args[0].get_type(),
+                    found: step_arg.get_type(),
+                    context: Some(args.call_span.clone()),
                 })?;
 
                 Ok(Object::Iterator(IteratorObject {
@@ -343,10 +350,12 @@ lazy_static! {
             },
             function: |args| {
                 let iterator = args.obj.to_iterator().expect("Expected Iterator method to be called on an iterator");
-                let skip = args.args[0].as_integer().ok_or_else(|| Error::TypeError {
-                    span: args.method_span.clone(),
+                let skip_arg = args.args[0].clone();
+                let skip = skip_arg.as_integer().ok_or_else(|| Error::TypeError {
+                    span: skip_arg.span.clone().unwrap_or(args.method_span.clone()),
                     expected: vec![ObjectTy::Integer],
-                    found: args.args[0].get_type(),
+                    found: skip_arg.get_type(),
+                    context: Some(args.call_span.clone()),
                 })?;
 
                 Ok(Object::Iterator(IteratorObject {
@@ -366,10 +375,12 @@ lazy_static! {
             },
             function: |args| {
                 let iterator = args.obj.to_iterator().expect("Expected Iterator method to be called on an iterator");
-                let take = args.args[0].as_integer().ok_or_else(|| Error::TypeError {
-                    span: args.method_span.clone(),
+                let take_arg = args.args[0].clone();
+                let take = take_arg.as_integer().ok_or_else(|| Error::TypeError {
+                    span: take_arg.span.clone().unwrap_or(args.method_span.clone()),
                     expected: vec![ObjectTy::Integer],
                     found: args.args[0].get_type(),
+                    context: Some(args.call_span.clone()),
                 })?;
                 
                 if let Some(ident) = args.obj_identifier {
@@ -379,11 +390,17 @@ lazy_static! {
                                 iterator: Box::new(iterator_ref.take(take as usize).collect::<Vec<_>>().into_iter()),
                             }))
                         } else {
+                            
                             Err(Error::MutateError {
-                                span: args.obj_span, name: ident,
+                                span: args.obj_span.clone(), name: ident.clone(),
                             }.into())
                         }
-                    });
+                        }).map_err(|_| Evaluator::identifier_not_found_error(
+                            &Identifier {
+                                span: args.obj_span, value: ident
+                            }, 
+                            args.env
+                        ));
                     
                     if let Ok(iterator) = mutated {
                         return Ok(iterator);
@@ -425,38 +442,40 @@ lazy_static! {
                 };
 
                 let predicate = args.args.remove(0);
+                let predicate_span = predicate.span.clone().unwrap_or(args.method_span.clone());
 
                 let invalid_predicate_type = || Error::TypeError {
-                    span: args.method_span.clone(),
+                    span: predicate_span.clone(),
                     expected: vec![expected_type.clone()],
                     found: predicate.get_type(),
+                    context: Some(args.call_span.clone()),
                 };
 
-                let predicate = predicate.value.clone().to_callable()
+                let predicate_callable = predicate.value.clone().to_callable()
                     .map_err(|_| invalid_predicate_type())?;
 
-                let args_len = predicate.args_len();
+                let args_len = predicate_callable.args_len();
 
                 if !args_len.contains(&1usize) {
                     return Err(Error::TypeError {
-                        span: args.method_span.clone(),
+                        span: predicate_span.clone(),
                         expected: vec![expected_type],
                         found: ObjectTy::Function {
                             function_ty: FunctionTy {
-                                arguments: predicate.argument_list().unwrap_or(ArgumentList::Unknown),
+                                arguments: predicate_callable.argument_list().unwrap_or(ArgumentList::Unknown),
                                 expected_return_type: Some(Box::new(ObjectTy::Unknown)),
                             },
                         },
+                        context: Some(args.call_span.clone()),
                     }.into());
                 }
                 
                 // Create an enclosed environment for the closure
-                let enclosed_env = Environment::new_enclosed(args.env);
+                let mut enclosed_env = Environment::new_enclosed(args.env);
 
                 Ok(Object::Iterator(IteratorObject {
                     iterator: Box::new(iterator.filter(move |item| {
-                        let mut env = Environment::new_enclosed(&enclosed_env);
-                        match predicate.call(None, vec![Argument::from_obj(item.clone())], &mut env, args.config.clone()) {
+                        match predicate_callable.call(None, vec![Argument::from_obj(item.clone())], &mut enclosed_env, args.config.clone(), predicate_span.clone()) {
                             Ok(obj) => Evaluator::is_truthy(&obj),
                             Err(e) => {
                                 eprintln!("Error evaluating closure in filter {}", e);
@@ -482,9 +501,10 @@ lazy_static! {
                 
 
                 let transform = args.args.remove(0);
+                let transform_span = transform.span.clone().unwrap_or(args.method_span.clone());
 
                 let invalid_transform_type = || Box::new(Error::TypeError {
-                    span: args.method_span.clone(),
+                    span: transform_span.clone(),
                     expected: vec![ObjectTy::Function {
                         function_ty: FunctionTy {
                             arguments: ArgumentList::new_exactly(vec![ArgumentType { name: "item".into(), ty: ObjectTy::Any }]),
@@ -492,6 +512,7 @@ lazy_static! {
                         },
                     }],
                     found: transform.get_type(),
+                    context: Some(args.call_span.clone()),
                 });
 
                 let function = transform.value.clone().to_callable().map_err(|_| invalid_transform_type())?;
@@ -501,12 +522,17 @@ lazy_static! {
                     return Err(invalid_transform_type());
                 }
 
-                let enclosed_env = Environment::new_enclosed(args.env);
+                let mut enclosed_env = Environment::new_enclosed(args.env);
                 Ok(Object::Iterator(IteratorObject {
                     iterator: Box::new(iterator.map(move |item| {
-                        let mut env = Environment::new_enclosed(&enclosed_env);
-                        let function_span = transform.span.clone();
-                        function.call(None, vec![Argument {span: function_span ,value: item}], &mut env, args.config.clone()).unwrap_or_else(|e| {
+                        let transform_span = transform_span.clone();
+                        function.call(
+                            None,
+                            vec![Argument {span: Some(transform_span.clone()) ,value: item}],
+                            &mut enclosed_env,
+                            args.config.clone(),
+                            transform_span.clone()
+                        ).unwrap_or_else(|e| {
                             eprintln!("Error evaluating closure in map: {}", e);
                             Object::Unit
                         })
@@ -565,28 +591,31 @@ lazy_static! {
                     };
 
                     
-                    let function = args.args[0]
-                        .value
+                    let function = args.args[0].clone();
+                    let function_span = function.span.clone().unwrap_or(args.method_span.clone());
+                    let function_callable = function.value
                         .as_callable()
                         .ok_or_else(|| Error::TypeError {
-                            span: args.method_span.clone(),
+                            span: function_span.clone(),
                             expected: vec![expected_type.clone()],
                             found: args.args[0].get_type(),
+                            context: Some(args.call_span.clone()),
                         })?;
                     
-                    let args_len = function.args_len();
+                    let args_len = function_callable.args_len();
                     
                     if !args_len.contains(&1usize) {
                         return Err(Error::TypeError {
-                            span: args.method_span.clone(),
+                            span: function_span.clone(),
                             expected: vec![expected_type.clone()],
                             found: args.args[0].get_type(),
+                            context: Some(args.call_span.clone()),
                         }.into());
                     }
 
                     iterator.for_each(|item| {
                         let mut env = Environment::new_enclosed(args.env);
-                        function.call(None, vec![Argument::from_obj(item)], &mut env, Rc::new(EvalConfig::default())).unwrap_or_else(|e| {
+                        function_callable.call(None, vec![Argument::from_obj(item)], &mut env, Rc::new(EvalConfig::default()), function_span.clone()).unwrap_or_else(|e| {
                             eprintln!("Error evaluating closure in for_each {}", e);
                             Object::Unit
                         });
@@ -625,8 +654,11 @@ lazy_static! {
 
                 let initial = args.args.remove(0).value;
 
+                let function = args.args[0].clone();
+                let function_span = function.span.unwrap_or(args.method_span.clone());
+                
                 let invalid_fold_function_type = || Box::new(Error::TypeError {
-                    span: args.method_span.clone(),
+                    span: function_span.clone(),
                     expected: vec![ObjectTy::Function {
                         function_ty: FunctionTy {
                             arguments: ArgumentList::new_exactly(vec![
@@ -637,19 +669,26 @@ lazy_static! {
                         },
                     }],
                     found: args.args[0].get_type(),
+                    context: Some(args.call_span.clone()),
                 });
 
-                let function = args.args[0].value
+                let function_callable = function.value
                     .as_callable()
                     .ok_or_else(invalid_fold_function_type)?;
                 
-                if !function.args_len().contains(&2usize) {
+                if !function_callable.args_len().contains(&2usize) {
                     return Err(invalid_fold_function_type())
                 }
 
                 Ok(iterator.clone().fold(initial, move |acc, obj| {
                     let mut env = Environment::new_enclosed(args.env);
-                    function.call(None, vec![Argument::from_obj(acc.clone()), Argument::from_obj(obj.clone())], &mut env, args.config.clone()).unwrap_or_else(|e| {
+                    function_callable.call(
+                        None,
+                        vec![Argument::from_obj(acc.clone()), Argument::from_obj(obj.clone())],
+                        &mut env,
+                        args.config.clone(),
+                        function_span.clone(),
+                    ).unwrap_or_else(|e| {
                         eprintln!("Error evaluating closure in fold {}", e);
                         Object::Unit
                     })
@@ -660,3 +699,32 @@ lazy_static! {
         );
     }
 
+#[cfg(test)]
+mod tests {
+    use crate::evaluator::tests::test_eval;
+
+    #[test]
+    fn test_iter_take() {
+        let result = test_eval(r#"
+            let nums = (1..).iter();
+            assert_eq(nums.take(2).collect(), [1, 2]);
+        "#);
+
+        assert!(result.is_ok());
+    }
+
+    // Fails because of https://github.com/Dutch-Raptor/mechylang/issues/11
+    // #[test]
+    // fn test_iter_for_each() {
+    //     let result = test_eval(r#"
+    //         let nums = (1..).iter().map(fn(x) { x * 2 });
+    //         let sum = 0;
+    //         nums.take(3).for_each(fn(x) {
+    //             sum = sum + x;
+    //         });
+    //         assert_eq(sum, 6);
+    //     "#);
+    // 
+    //     assert!(result.is_ok());
+    // }
+}

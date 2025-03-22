@@ -3,8 +3,9 @@ use crate::{Token, TokenKind};
 use crate::lexer::{Span};
 
 use crate::parser::{Error, Result};
+use crate::parser::error::Location;
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Advances the parser to the next token in the input stream.
     ///
     /// This method retrieves the next token from the lexer and updates the
@@ -46,7 +47,7 @@ impl<'a> Parser<'a> {
     ///
     /// Returns `Ok(())` if the current token matches the expected `token`.
     /// Returns an `Error` otherwise, indicating an unexpected token.
-    pub(crate) fn expect_current(&self, token: TokenKind) -> Result<()> {
+    pub(crate) fn expect_current(&self, token: TokenKind, location: Option<Location>) -> Result<()> {
         if self.cur_token.kind == token {
             Ok(())
         } else {
@@ -55,6 +56,7 @@ impl<'a> Parser<'a> {
                     span: self.cur_token.span.clone(),
                     expected: vec![token],
                     found: self.cur_token.kind.clone(),
+                    location,
                 }
             )
         }
@@ -73,7 +75,7 @@ impl<'a> Parser<'a> {
     ///
     /// Returns `Ok(())` if the next token (peek token) matches the expected `token` and advances to consume it.
     /// Returns an `Error` otherwise, indicating an unexpected token.
-    pub(crate) fn expect_peek(&mut self, expected_token_kind: TokenKind) -> Result<()> {
+    pub(crate) fn expect_peek(&mut self, expected_token_kind: TokenKind, location: Option<Location>) -> Result<()> {
         if self.peek_token.kind == expected_token_kind {
             self.next_token()?;
             Ok(())
@@ -83,6 +85,7 @@ impl<'a> Parser<'a> {
                     span: self.peek_token.span.clone(),
                     expected: vec![expected_token_kind],
                     found: self.peek_token.kind.clone(),
+                    location,
                 }
             )
         }
@@ -122,7 +125,7 @@ impl<'a> Parser<'a> {
     ///
     /// # Returns
     /// A new `Span` with the given start position and the end position set to the current token's end position.
-    pub(super) fn span_with_start(&self, start: Span) -> Span {
+    pub(super) fn span_with_start(&self, start: &Span) -> Span {
         Span {
             bytes: start.bytes.start..self.cur_token.span.bytes.end,
             file: self.cur_token.span.file.clone(),

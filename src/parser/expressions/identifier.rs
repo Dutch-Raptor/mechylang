@@ -4,6 +4,7 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::parser::{Parser, Error, Result};
 use crate::{trace, TokenKind, Span};
+use crate::parser::error::Location;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Identifier {
@@ -22,7 +23,7 @@ impl From<Identifier> for Rc<str> {
         ident.value
     }
 }
-impl<'a> Parser<'a> {
+impl Parser<'_> {
 
      pub(super) fn parse_identifier(&mut self) -> Result<Identifier> {
          let _trace = trace!("parse_identifier");
@@ -34,6 +35,7 @@ impl<'a> Parser<'a> {
                      span: self.cur_token.span.clone(),
                      expected: vec![TokenKind::Identifier(String::new())],
                      found: self.cur_token.kind.clone(),
+                     location: Some(Location::Expression),
                  })
              }
          };

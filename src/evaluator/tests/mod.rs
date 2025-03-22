@@ -1,4 +1,6 @@
+use ariadne::Source;
 use crate::{Evaluator, Object};
+use crate::pretty_errors::PrettyError;
 
 mod integers;
 mod booleans;
@@ -12,7 +14,10 @@ mod scoping;
 pub(super) fn test_eval(input: &str) -> crate::evaluator::Result<Object> {
     Evaluator::eval(input, &mut Default::default(), Default::default())
         .inspect_err(|error| {
-            println!("error: {:?}", error);
+            println!("error: {}", error);
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+            error.as_pretty_errors("test_eval").write(("test_eval", Source::from(input)), &mut handle).unwrap();
         })
         .map_err(|error| {
             match error {

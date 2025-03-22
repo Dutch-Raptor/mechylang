@@ -5,6 +5,7 @@ use serde::Serialize;
 use crate::{Expression, Parser, Span, TokenKind};
 use crate::parser::expressions::Precedence;
 use crate::parser::{Error, Result};
+use crate::parser::error::Location;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StructLiteral {
@@ -22,7 +23,7 @@ impl Display for StructLiteral {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses a struct literal
     ///
     /// valid syntax is:
@@ -38,7 +39,7 @@ impl<'a> Parser<'a> {
         debug_assert!(self.is_cur_token(TokenKind::Struct), "Expected current token to be `struct`");
         let start = self.cur_token.span.clone();
 
-        self.expect_peek(TokenKind::LeftSquirly)?;
+        self.expect_peek(TokenKind::LeftSquirly, Some(Location::StructLiteral))?;
 
         // move past the opening brace
         self.next_token()?;
@@ -55,7 +56,7 @@ impl<'a> Parser<'a> {
                 .to_string();
 
             // ensure key is followed by a colon
-            self.expect_peek(TokenKind::Colon)?;
+            self.expect_peek(TokenKind::Colon, Some(Location::StructLiteral))?;
             // move past the colon
             self.next_token()?;
 
@@ -70,6 +71,7 @@ impl<'a> Parser<'a> {
                     span: self.cur_token.span.clone(),
                     expected: vec![TokenKind::Comma, TokenKind::RightSquirly],
                     found: self.cur_token.kind.clone(),
+                    location: Some(Location::StructLiteral),
                 });
             }
 
@@ -78,10 +80,10 @@ impl<'a> Parser<'a> {
             }
         }
 
-        self.expect_current(TokenKind::RightSquirly)?;
+        self.expect_current(TokenKind::RightSquirly, Some(Location::StructLiteral))?;
 
         Ok(StructLiteral {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             entries,
         })
     }

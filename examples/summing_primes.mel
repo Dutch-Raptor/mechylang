@@ -1,4 +1,4 @@
-main()
+
 
 fn sum_primes(n) {
     // Create a list of all primes found so far
@@ -8,7 +8,8 @@ fn sum_primes(n) {
     if n == 2 {
         return 2;
     }
-       
+
+
     let primes = [2];
     let sum = 2;
     // Loop through all numbers from 3 to n
@@ -28,12 +29,22 @@ fn sum_primes(n) {
             primes.push(i);
             sum += i;
         }
-    }
+    };
     sum
 }
 
 
 fn main() {
+
+    for i in "a"..2 {
+        println(i);
+    } else {
+        println("No primes found");
+    }
+
+
+    assert_eq(sum_primes(10), 19);
+//    [123, "123"] + 123.2516;
     while true {
         println("Enter a number (or q to exit): ");
         let input = input_read_line();
@@ -50,3 +61,5 @@ fn main() {
     }
     println("Goodbye!");
 }
+
+main();

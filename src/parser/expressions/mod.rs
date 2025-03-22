@@ -55,10 +55,9 @@ pub use string_literal::StringLiteral;
 pub use struct_literal::StructLiteral;
 pub use while_expression::WhileExpression;
 pub use block_expression::BlockExpression;
-use crate::parser::{Parser,  Error, Result};
+use crate::parser::{Parser, Error, Result};
 use crate::{Span, TokenKind, trace};
-
-
+use crate::parser::error::Location;
 
 /// Represents an expression in Mechylang.
 ///
@@ -345,7 +344,7 @@ impl Display for Expression {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses an expression in Mechylang with the given precedence.
     ///
     /// This method parses an expression from the current token, handling different levels of precedence. It supports
@@ -401,23 +400,26 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_grouped_expression(&mut self) -> Result<Expression> {
         let _trace = trace!("parse_grouped_expression");
         debug_assert!(self.is_cur_token(TokenKind::LeftParen), "Expected current token to be `(`");
+        let start = self.cur_token.span.clone();
         self.next_token()?;
 
         if self.cur_token.kind == TokenKind::RightParen {
             return Ok(Expression::Unit(
-                self.cur_token.span.clone()
+                self.span_with_start(&start)
             ));
         }
 
         let expression = self.parse_expression(Precedence::Lowest)?;
 
-        self.expect_peek(TokenKind::RightParen)?;
+        self.expect_peek(TokenKind::RightParen, Some(Location::Expression))?;
 
         Ok(expression)
     }
 
     pub(super) fn parse_expression_list(&mut self, end: TokenKind) -> Result<Vec<Expression>> {
         let mut arguments = Vec::new();
+
+        let start_span = self.cur_token.span.clone();
 
         if self.peek_token.kind == end {
             self.next_token()?;
@@ -426,17 +428,19 @@ impl<'a> Parser<'a> {
 
         self.next_token()?;
 
-        arguments.push(match self.parse_expression(Precedence::Lowest) {
-            Err(Error::InvalidPrefix { found, .. }) => {
+        let expression = match self.parse_expression(Precedence::Lowest) {
+            Err(Error::InvalidPrefix { found, span }) =>
                 return Err(Error::UnexpectedExpressionListEnd {
-                    span: self.cur_token.span.clone(),
+                    list_span: self.cur_token.span.clone(),
                     expected_end_token: end.clone(),
                     found: found.clone(),
-                })
-            }
+                    parse_expression_error: Some(Box::new(Error::InvalidPrefix { span, found })),
+                }),
             Err(e) => return Err(e),
             Ok(e) => e,
-        });
+        };
+
+        arguments.push(expression);
 
         while self.peek_token.kind == TokenKind::Comma {
             self.next_token()?;
@@ -452,12 +456,13 @@ impl<'a> Parser<'a> {
 
         if self.peek_token.kind != end {
             return Err(Error::UnexpectedExpressionListEnd {
-                span: self.cur_token.span.clone(),
+                list_span: self.span_with_start(&start_span),
                 expected_end_token: end.clone(),
                 found: self.peek_token.kind.clone(),
+                parse_expression_error: None,
             });
         }
-        
+
         self.next_token()?;
 
         Ok(arguments)
@@ -475,6 +480,9 @@ mod tests {
         -x + y * z
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
 
         let result = parser.parse_expression(Precedence::Lowest);
         assert!(result.is_ok());
@@ -513,23 +521,27 @@ mod tests {
             panic!("Expected infix expression");
         }
     }
-    
+
     #[test]
     fn test_parse_expression_with_parentheses() {
         let source_code = r#"
         (x + y) * z
         "#;
         let mut parser = Parser::from_source(source_code);
-        
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
+
         let result = parser.parse_expression(Precedence::Lowest);
         assert!(result.is_ok());
-        
+
         if let Ok(Expression::Infix(InfixExpression { left, operator, right, .. })) = result {
             if let Expression::Infix(
-                InfixExpression { 
-                    left: ref inner_left, 
-                    operator: ref inner_op, 
-                    right: ref inner_right, .. }
+                InfixExpression {
+                    left: ref inner_left,
+                    operator: ref inner_op,
+                    right: ref inner_right, ..
+                }
             ) = *left {
                 assert!(matches!(inner_left.as_ref(), Expression::Identifier(_)));
                 assert_eq!(inner_op, &InfixOperator::Plus);
@@ -537,24 +549,27 @@ mod tests {
             } else {
                 panic!("Expected infix expression within parentheses");
             }
-            
+
             assert_eq!(operator, InfixOperator::Asterisk);
-            
+
             assert!(matches!(right.as_ref(), Expression::Identifier(_)));
         } else {
             panic!("Expected infix expression");
         }
     }
-    
+
     #[test]
     fn test_parse_expression_with_invalid_token() {
         let source_code = r#"
         x ++ y
         "#;
         let mut parser = Parser::from_source(source_code);
-        
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
+
         let result = parser.parse_expression(Precedence::Lowest);
-        
+
         assert!(result.is_err(), "Expected parsing error for invalid token");
     }
 }

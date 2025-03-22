@@ -2,7 +2,7 @@ use std::ops::RangeInclusive;
 use std::rc::Rc;
 use crate::{Expression, Object, Span};
 use crate::evaluator::objects::iterators::IntoIteratorError;
-use crate::evaluator::objects::ObjectTy;
+use crate::evaluator::objects::{Argument, ObjectTy};
 use crate::evaluator::runtime::builtins::BuiltinError;
 use crate::parser::expressions::{InfixOperator, PrefixOperator};
 
@@ -14,9 +14,9 @@ pub enum Error {
     LexerError(crate::lexer::Error),
     ParserError(crate::parser::Error),
     /// Error when trying to use an invalid prefix operator for the given type
-    InvalidPrefixOperatorForType { span: Span, operator: PrefixOperator, right: Object },
+    InvalidPrefixOperatorForType { span: Span, operator: PrefixOperator, right: Object, operator_span: Span, right_span: Span },
     /// Error when trying to find an identifier that does not exist
-    IdentifierNotFound { span: Span, identifier: Rc<str> },
+    IdentifierNotFound { span: Span, identifier: Rc<str>, similar: Option<Rc<str>> },
     /// Error when trying to assign to an indexed expression
     InvalidIndexedAssignmentExpression { span: Span, left: Rc<Expression> },
     /// Error when trying to mutate a value that is not mutable
@@ -31,21 +31,31 @@ pub enum Error {
         operator_span: Span
     },
     /// Error when trying to iterate over a non-iterable
-    IteratingOverNonIterable { span: Span, reason: IntoIteratorError },
+    IteratingOverNonIterable { 
+        obj: Object, 
+        obj_span: Span, 
+        for_span: Span,
+        reason: IntoIteratorError },
     /// Error when trying to call a non-function
     CannotCall { function: Object, span: Span },
-    WrongNumberOfArguments { span: Span, expected: RangeInclusive<usize>, found: usize },
+    WrongNumberOfArguments { 
+        span: Span, 
+        unexpected_arg: Option<(usize, Argument)>,
+        expected: RangeInclusive<usize>, found: usize },
     BuiltInError { span: Span, message: String, error_type: BuiltinError },
-    IterCallOnNonIterable { obj_span: Span, iter_call_span: Span, reason: IntoIteratorError },
-    TypeError { span: Span, expected: Vec<ObjectTy>, found: ObjectTy },
-    AssertionFailed { span: Span, value: Object },
-    AssertionEqualFailed { first_span: Span, second_span: Span, first_value: Object, second_value: Object },
-    IOError { error: IOError },
+    IterCallOnNonIterable { 
+        obj: Object,
+        obj_span: Span, 
+        iter_call_span: Span, reason: IntoIteratorError },
+    TypeError { span: Span, expected: Vec<ObjectTy>, found: ObjectTy, context: Option<Span> },
+    AssertionFailed { span: Span, assert_span: Span, value: Object },
+    AssertionEqualFailed { assert_span: Span, first_span: Span, second_span: Span, first_value: Object, second_value: Object },
+    IOError { error: IOError, span: Option<Span> },
     MutateNonExistentVariable { name: Rc<str> },
     IndexOutOfBounds { array_span: Span, index_span: Span, index: usize, length: usize },
-    IterMethodOnIterable { method_span: Span, method_name: Rc<str>, object_type: ObjectTy, object_span: Span },
+    IteratorMethodOnIterable { method_span: Span, method_name: Rc<str>, object_type: ObjectTy, object_span: Span },
     PropertyNotFound { span: Span, property: Rc<str>, object_type: ObjectTy },
-    IndexingNonIndexableType { indexed_span: Span, indexed_type: Span },
+    IndexingNonIndexableType { indexed_span: Span, indexed_obj: Object },
 }
 
 #[derive(Debug)]

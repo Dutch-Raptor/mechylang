@@ -17,6 +17,7 @@ const TRACE_ENABLED: bool = false;
 #[cfg(test)]
 const TRACE_ENABLED: bool = false;
 
+#[allow(unused)]
 pub fn reset_trace() {
     unsafe {
         INDENT = 0;

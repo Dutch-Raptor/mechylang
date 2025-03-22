@@ -21,7 +21,7 @@ impl Display for BreakStatement {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_break_statement(&mut self) -> Result<BreakStatement> {
         let _trace = trace!("parse_break_statement");
         debug_assert!(self.is_cur_token(TokenKind::Break), "Expected current token to be `Break`");
@@ -37,7 +37,7 @@ impl<'a> Parser<'a> {
         };
 
         Ok(BreakStatement { 
-            span: self.span_with_start(start), 
+            span: self.span_with_start(&start), 
             value 
         })
     }
@@ -74,7 +74,7 @@ mod tests {
 
         match &statements[2] {
             Statement::Break(ref break_stmt) => {
-                assert_eq!(break_stmt.value.is_some(), true);
+                assert!(break_stmt.value.is_some());
                 assert_eq!(break_stmt.value.as_ref().unwrap().to_string(), "1");
             }
             _ => panic!("expected expression statement"),

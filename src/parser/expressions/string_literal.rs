@@ -4,6 +4,7 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::{Parser, Span, TokenKind};
 use crate::parser::{Error, Result};
+use crate::parser::error::Location;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StringLiteral {
@@ -17,7 +18,7 @@ impl Display for StringLiteral {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_string(&mut self) -> Result<StringLiteral> {
         let start = self.cur_token.span.clone();
         
@@ -27,9 +28,10 @@ impl<'a> Parser<'a> {
                 span: self.cur_token.span.clone(),
                 expected: vec![TokenKind::String(String::new())],
                 found: self.cur_token.kind.clone(),
+                location: Some(Location::Expression),
             })?;
 
-        Ok(StringLiteral { span: self.span_with_start(start), value: value.into() })
+        Ok(StringLiteral { span: self.span_with_start(&start), value: value.into() })
     }
 }
 #[cfg(test)]

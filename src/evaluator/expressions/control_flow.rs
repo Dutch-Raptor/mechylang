@@ -32,10 +32,12 @@ impl Evaluator {
 
         let iterable = self.eval_expression(&for_expr.iterable, env)?;
 
-        let iterator = IteratorObject::try_from(iterable).map_err(|err| {
+        let iterator = IteratorObject::try_from(iterable.clone()).map_err(|err| {
             Error::IteratingOverNonIterable {
-                span: for_expr.iterable.span().clone(),
+                obj_span: for_expr.iterable.span().clone(),
                 reason: err,
+                obj: iterable.clone(),
+                for_span: for_expr.span.clone(),
             }
         })?;
 

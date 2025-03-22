@@ -336,7 +336,7 @@ impl Object {
             Object::String(_) => ObjectTy::String,
             Object::Array(_) => ObjectTy::Array { expected_item_types: None },
             Object::Range(from, to) => ObjectTy::Range { from: Box::new(from.get_type()), to: Box::new(to.get_type()) },
-            Object::RangeInclusive(_, _) => ObjectTy::RangeInclusive { from: Box::new(ObjectTy::Any), to: Box::new(ObjectTy::Any) },
+            Object::RangeInclusive(from, to) => ObjectTy::RangeInclusive { from: Box::new(from.get_type()), to: Box::new(to.get_type()) },
             Object::RangeFrom(from) => ObjectTy::RangeFrom { from: Box::new(from.get_type()) },
             Object::RangeTo(to) => ObjectTy::RangeTo { to: Box::new(to.get_type()) },
             Object::RangeToInclusive(to) => ObjectTy::RangeToInclusive { to: Box::new(to.get_type()) },
@@ -392,6 +392,13 @@ impl Object {
         match self {
             Object::Array(a) => Some(a),
             _ => None,
+        }
+    }
+    
+    pub fn to_array(self) -> Result<Vec<Object>, Object> {
+        match self {
+            Object::Array(array) => Ok(array),
+            _ => Err(self),
         }
     }
 

@@ -9,6 +9,7 @@ use crate::parser::Parser;
 use crate::{Span, TokenKind, trace};
 use crate::parser::expressions::block_expression::BlockExpression;
 use crate::parser::{Result};
+use crate::parser::error::Location;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct ForExpression {
@@ -35,7 +36,7 @@ impl Display for ForExpression {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
 
     /// Parses a for expression
     ///
@@ -56,7 +57,7 @@ impl<'a> Parser<'a> {
                 self.next_token()?;
                 let index_ident = self.parse_identifier()?;
                 
-                self.expect_peek(TokenKind::Comma)?;
+                self.expect_peek(TokenKind::Comma, Some(Location::Expression))?;
                 self.next_token()?;
                 Some(index_ident)
             }
@@ -66,23 +67,24 @@ impl<'a> Parser<'a> {
         let iterator = self.parse_identifier()?;
 
         if index.is_some() {
-            self.expect_peek(TokenKind::RightParen)?;
+            self.expect_peek(TokenKind::RightParen, Some(Location::Expression))?;
         }
 
-        self.expect_peek(TokenKind::In)?;
+        self.expect_peek(TokenKind::In, Some(Location::Expression))?;
         self.next_token()?;
+        
 
         let iterable = self.parse_expression(Precedence::Lowest)?;
 
         // set current token to the '{' token
-        self.next_token()?;
+        self.expect_peek(TokenKind::LeftSquirly, Some(Location::Expression))?;
 
         let body = self.parse_block_expression()?;
 
         let else_block = self.parse_else_block()?;
 
         Ok(ForExpression {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             iterator,
             iterable: Rc::new(iterable),
             body,

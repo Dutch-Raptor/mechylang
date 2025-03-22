@@ -1,7 +1,9 @@
+use ariadne::Source;
 use color_print::cprintln;
 
 use mechylang::{Environment, EvalConfig, Evaluator, Lexer, Object, Parser, TokenKind};
 use rustyline::{error::ReadlineError, DefaultEditor};
+use mechylang::pretty_errors::PrettyError;
 
 pub struct Repl {
     pub print_ast: bool,
@@ -27,13 +29,15 @@ impl Repl {
         self.print_tokens = print_tokens;
         self
     }
-    
+
     pub fn with_print_tokens_with_span(mut self, print_tokens_with_span: bool) -> Self {
         self.print_tokens_with_span = print_tokens_with_span;
         self
     }
 
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+
+
         let mut env = Environment::new();
         let mut rl = DefaultEditor::new()?;
 
@@ -65,7 +69,7 @@ impl Repl {
                     if self.print_tokens {
                         println!("Tokens: {:?}\n", Lexer::new(&line).map(|result| result.map(|t| t.kind)).collect::<Vec<mechylang::lexer::Result<TokenKind>>>());
                     }
-                    
+
                     if self.print_tokens_with_span {
                         println!("Tokens: {:#?}\n", Lexer::new(&line).map(|token| token.map(|t| format!("{:>24?} {:?}", t.kind, t.span))).collect::<Vec<mechylang::lexer::Result<String>>>());
                     }
@@ -76,19 +80,22 @@ impl Repl {
                             println!("AST: {:#?}\n", parsed.statements);
                         }
                     }
-                    
-                    
+
+
                     let evaluated = Evaluator::eval(
                         &line, &mut env,
-                        EvalConfig::default()
+                        EvalConfig::default(),
                     );
                     match evaluated {
                         Ok(Object::Unit) => {} // Don't print unit
                         Ok(evaluated) => {
                             println!("{}", evaluated);
                         }
-                        Err(errors) => {
-                            cprintln!("{}", errors)
+                        Err(error) => {
+                            error
+                                .as_pretty_errors("repl")
+                                .eprint(("repl", Source::from(line + " ")))
+                                .expect("Expected to be able to print error");
                         }
                     }
                 }

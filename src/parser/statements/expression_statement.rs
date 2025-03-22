@@ -40,7 +40,7 @@ impl Display for ExpressionStatement {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses an expression statement in Mechylang.
     ///
     /// This function handles the parsing of an expression statement, which consists of an expression
@@ -64,7 +64,7 @@ impl<'a> Parser<'a> {
         let expression = self.parse_expression(Precedence::Lowest)?;
         
         let statement = ExpressionStatement {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             expression,
         };
 
@@ -87,6 +87,9 @@ mod tests {
         5 + 10;
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
         let result = parser.parse_expression_statement();
         assert!(result.is_ok());
 
@@ -127,6 +130,9 @@ mod tests {
         42
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
         let result = parser.parse_expression_statement();
         assert!(result.is_ok());
 
@@ -148,6 +154,9 @@ mod tests {
         some_var;
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
         let result = parser.parse_expression_statement();
         assert!(result.is_ok());
 
@@ -169,6 +178,9 @@ mod tests {
         some_function(1, 2);
         "#;
         let mut parser = Parser::from_source(source_code);
+        // read tokens into cur and peek
+        parser.next_token().unwrap();
+        parser.next_token().unwrap();
         let result = parser.parse_expression_statement();
         assert!(result.is_ok());
 

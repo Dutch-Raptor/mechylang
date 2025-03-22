@@ -4,12 +4,15 @@ use std::rc::Rc;
 use serde::Serialize;
 use crate::parser::Parser;
 use crate::{Expression, Span, TokenKind};
-use crate::parser::expressions::Precedence;
+use crate::parser::expressions::{ExpressionSpanExt, Precedence};
 use crate::parser::{Result};
+use crate::parser::error::Location;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct IndexExpression {
     pub span: Span,
+    pub left_span: Span,
+    pub index_span: Span,
     pub left: Rc<Expression>,
     pub index: Rc<Expression>,
 }
@@ -19,7 +22,7 @@ impl Display for IndexExpression {
         write!(f, "({}[{}])", self.left, self.index)
     }
 }
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_index_expression(&mut self, left: Expression) -> Result<IndexExpression> {
         let start = self.cur_token.span.clone();
         debug_assert!(self.is_cur_token(TokenKind::LeftSquare), "Expected current token to be `[`");
@@ -28,10 +31,12 @@ impl<'a> Parser<'a> {
 
         let index = self.parse_expression(Precedence::Lowest)?;
 
-        self.expect_peek(TokenKind::RightSquare)?;
+        self.expect_peek(TokenKind::RightSquare, Some(Location::Expression))?;
 
         Ok(IndexExpression {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
+            left_span: left.span().clone(),
+            index_span: index.span().clone(),
             left: Rc::new(left),
             index: Rc::new(index),
         })

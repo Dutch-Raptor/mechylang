@@ -143,7 +143,7 @@ impl PrecedenceTrait for Token {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn peek_precedence(&mut self) -> Precedence {
         self.peek_token.precedence().unwrap_or(Precedence::Lowest)
     }

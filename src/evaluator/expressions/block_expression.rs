@@ -33,21 +33,15 @@ impl Evaluator {
 
         for statement in block.statements.iter() {
             result = self.eval_statement(statement, env)?;
-
-            // if the result is a return value, bubble it up and stop evaluating the block
-            if let Object::ReturnValue(_) = result {
-                return Ok(result);
-            }
-
-            // if the result is a break, bubble it up and stop evaluating the block
-            if let Object::Break(_) = result {
-                return Ok(result);
-            }
-
-            // if the result is a continue, bubble it up and stop evaluating the block
-            if let Object::Continue = result {
-                return Ok(result);
-            }
+            
+            // If the result is a return, break or continue, 
+            // bubble it up and stop evaluating the block
+            match result {
+                Object::ReturnValue(_) |
+                Object::Break(_) |
+                Object::Continue => return Ok(result),
+                _ => {}
+            };
         }
 
         Ok(result)

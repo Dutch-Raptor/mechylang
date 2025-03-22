@@ -26,12 +26,12 @@ impl Display for CallExpression {
         write!(f, "{}({})", self.function, args)
     }
 }
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_call_expression(&mut self, left: Expression) -> Result<CallExpression> {
         let arguments = self.parse_expression_list(TokenKind::RightParen)?;
 
         Ok(CallExpression {
-            span: self.span_with_start(left.span().clone()),
+            span: self.span_with_start(&left.span().clone()),
             function: Rc::new(left),
             arguments: arguments.into(),
         })

@@ -14,6 +14,18 @@ impl Span {
     pub fn length(&self) -> usize {
         self.bytes.end - self.bytes.start
     }
+    
+    pub fn start(&self) -> usize {
+        self.bytes.start
+    }
+    
+    pub fn end(&self) -> usize {
+        self.bytes.end
+    }
+    
+    pub fn bytes(&self) -> Range<usize> {
+        self.bytes.clone()
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -238,8 +250,8 @@ impl TokenKind {
             TokenKind::CompareGreaterEqual => ">=",
             TokenKind::LeftParen => "(",
             TokenKind::RightParen => ")",
-            TokenKind::LeftSquirly => "{{",
-            TokenKind::RightSquirly => "}}",
+            TokenKind::LeftSquirly => "{",
+            TokenKind::RightSquirly => "}",
             TokenKind::LeftSquare => "[",
             TokenKind::RightSquare => "]",
             TokenKind::RangeExclusive => "..",

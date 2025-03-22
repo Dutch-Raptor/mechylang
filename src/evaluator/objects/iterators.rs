@@ -70,24 +70,27 @@ impl DerefMut for IteratorObject {
 
 #[derive(Debug, PartialEq)]
 pub enum IntoIteratorError {
-    InvalidRange { start: Object, end: Option<Object> },
-    NotAnIterable { object: Object },
+    InvalidRange,
+    NotAnIterable,
 }
 
 impl TryFrom<Object> for IteratorObject {
     type Error = IntoIteratorError;
 
     fn try_from(obj: Object) -> Result<Self, Self::Error> {
-        match obj {
-            Object::Iterator(iterator) => Ok(iterator),
-            Object::Array(array) => Ok(IteratorObject {
-                iterator: Box::new(array.into_iter()),
+        match &obj {
+            Object::Iterator(_) => Ok(obj.to_iterator().expect("obj to be matched as iterator")),
+            Object::Array(_) => Ok(IteratorObject {
+                iterator: Box::new(obj
+                    .to_array()
+                    .expect("obj to be matched as array")
+                    .into_iter()
+                ),
             }),
             Object::String(string) => {
-                let string = string.to_string();
                 Ok(IteratorObject {
                     iterator: Box::new(
-                        string
+                        string.to_string()
                             .chars()
                             .map(|c| c.to_string().into())
                             .collect::<Vec<_>>()
@@ -104,10 +107,7 @@ impl TryFrom<Object> for IteratorObject {
                         iterator: Box::new((*start..*end).map(|i| i.into())),
                     })
                 } else {
-                    Err(IntoIteratorError::InvalidRange {
-                        start: start.as_ref().clone(),
-                        end: Some(end.as_ref().clone()),
-                    })
+                    Err(IntoIteratorError::InvalidRange)
                 }
             }
             Object::RangeInclusive(start, end) => {
@@ -118,10 +118,7 @@ impl TryFrom<Object> for IteratorObject {
                         iterator: Box::new((*start..=*end).map(|i| i.into())),
                     })
                 } else {
-                    Err(IntoIteratorError::InvalidRange {
-                        start: start.as_ref().clone(),
-                        end: Some(end.as_ref().clone()),
-                    })
+                    Err(IntoIteratorError::InvalidRange)
                 }
             }
             Object::RangeFrom(start) => {
@@ -130,16 +127,11 @@ impl TryFrom<Object> for IteratorObject {
                         iterator: Box::new((*start..).map(|i| i.into())),
                     })
                 } else {
-                    Err(IntoIteratorError::InvalidRange {
-                        start: start.as_ref().clone(),
-                        end: None,
-                    })
+                    Err(IntoIteratorError::InvalidRange)
                 }
             }
 
-            _ => Err(IntoIteratorError::NotAnIterable {
-                object: obj.clone(),
-            }),
+            _ => Err(IntoIteratorError::NotAnIterable),
         }
     }
 }

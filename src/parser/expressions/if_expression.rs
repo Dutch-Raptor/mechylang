@@ -5,6 +5,7 @@ use serde::Serialize;
 use crate::{trace, TokenKind, Expression, Parser, Span};
 use crate::parser::expressions::{BlockExpression, Precedence};
 use crate::parser::{Result};
+use crate::parser::error::Location;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct IfExpression {
@@ -24,7 +25,7 @@ impl Display for IfExpression {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
 
     pub(super) fn parse_if_expression(&mut self) -> Result<IfExpression> {
         let _trace = trace!("parse_if_expression");
@@ -34,7 +35,7 @@ impl<'a> Parser<'a> {
         self.next_token()?;
         let condition = self.parse_expression(Precedence::Lowest)?;
 
-        self.expect_peek(TokenKind::LeftSquirly)?;
+        self.expect_peek(TokenKind::LeftSquirly, Some(Location::Expression))?;
 
         let consequence = self.parse_block_expression()?;
         debug_assert!(self.is_cur_token(TokenKind::RightSquirly), "Expected current token to be `}}` after parse_block_expression call");
@@ -42,7 +43,7 @@ impl<'a> Parser<'a> {
         let alternative = self.parse_else_block()?;
 
         Ok(IfExpression {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             condition: Rc::new(condition),
             consequence,
             alternative,
@@ -53,7 +54,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_else_block(&mut self) -> Result<Option<BlockExpression>> {
         let else_block = if self.peek_token.kind == TokenKind::Else {
             self.next_token()?;
-            self.expect_peek(TokenKind::LeftSquirly)?;
+            self.expect_peek(TokenKind::LeftSquirly, Some(Location::Expression))?;
             Some(self.parse_block_expression()?)
         } else {
             None
@@ -85,7 +86,7 @@ mod tests {
                 Expression::If(ref if_expr) => {
                     assert_eq!(if_expr.condition.to_string(), "(x < y)");
                     assert_eq!(if_expr.consequence.to_string().split_whitespace().collect::<Vec<&str>>().join(" "), "{ x; }");
-                    assert_eq!(if_expr.alternative.is_none(), true);
+                    assert!(if_expr.alternative.is_none());
                 }
                 _ => panic!("expected if expression"),
             },

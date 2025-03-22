@@ -5,6 +5,7 @@ use serde::Serialize;
 use crate::parser::expressions::identifier::Identifier;
 use crate::parser::{Parser, Result};
 use crate::{trace, TokenKind, Span};
+use crate::parser::error::Location;
 use crate::parser::expressions::block_expression::BlockExpression;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -27,22 +28,22 @@ impl Display for FunctionLiteral {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
 
     pub(super) fn parse_function_literal(&mut self) -> Result<FunctionLiteral> {
         let _trace = trace!("parse_function_literal");
         let start = self.cur_token.span.clone();
 
-        self.expect_peek(TokenKind::LeftParen)?;
+        self.expect_peek(TokenKind::LeftParen, Some(Location::FunctionExpression))?;
 
         let parameters = self.parse_function_parameters()?;
 
-        self.expect_peek(TokenKind::LeftSquirly)?;
+        self.expect_peek(TokenKind::LeftSquirly, Some(Location::FunctionExpression))?;
 
         let body = self.parse_block_expression()?;
 
         Ok(FunctionLiteral {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             parameters: parameters.into(),
             body,
         })
@@ -71,7 +72,7 @@ impl<'a> Parser<'a> {
             identifiers.push(ident);
         }
 
-        self.expect_peek(TokenKind::RightParen)?;
+        self.expect_peek(TokenKind::RightParen, Some(Location::FunctionExpression))?;
 
         Ok(identifiers)
     }

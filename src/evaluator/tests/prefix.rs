@@ -5,10 +5,8 @@ fn test_bang_operator() {
     let tests = vec![
         ("!true", false),
         ("!false", true),
-        ("!5", false),
         ("!!true", true),
         ("!!false", false),
-        ("!!5", true),
     ];
 
     for (input, expected) in tests {

@@ -3,8 +3,9 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde::Serialize;
 use crate::{Expression, Parser, Span, Token, TokenKind};
-use crate::parser::expressions::Precedence;
+use crate::parser::expressions::{ExpressionSpanExt, Precedence};
 use crate::parser::{Error, Result};
+use crate::parser::error::Location;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RangeExpression {
@@ -67,9 +68,9 @@ impl Display for RangeFullExpression {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_range_infix_expression(&mut self, left: Expression) -> Result<Expression> {
-        let start = self.cur_token.span.clone();
+        let range_start = left.span();
 
         let precedence = self.cur_precedence();
         let inclusive = Self::range_is_inclusive(&self.cur_token)?;
@@ -82,7 +83,7 @@ impl<'a> Parser<'a> {
         // [1..] // RangeFrom
         if self.peek_token.kind == TokenKind::RightParen || self.peek_token.kind == TokenKind::RightSquare {
             return Ok(Expression::RangeFrom(RangeFromExpression {
-                span: self.span_with_start(start),
+                span: self.span_with_start(range_start),
                 left: Rc::new(left),
                 inclusive,
             }));
@@ -94,7 +95,7 @@ impl<'a> Parser<'a> {
         let right = self.parse_expression(precedence)?;
 
         Ok(Expression::Range(RangeExpression {
-            span: self.span_with_start(start),
+            span: self.span_with_start(range_start),
             left: Rc::new(left),
             right: Rc::new(right),
             inclusive,
@@ -112,7 +113,7 @@ impl<'a> Parser<'a> {
         // e.g. `..`
         // if so, we would have a `..` token followed by a ')' or a ']' token
         if self.peek_token.kind == TokenKind::RightParen || self.peek_token.kind == TokenKind::RightSquare {
-            return Ok(Expression::RangeFull(RangeFullExpression { span: self.span_with_start(start) }));
+            return Ok(Expression::RangeFull(RangeFullExpression { span: self.span_with_start(&start) }));
         }
 
         self.next_token()?;
@@ -123,7 +124,7 @@ impl<'a> Parser<'a> {
         let inclusive = Self::range_is_inclusive(&range_token)?;
 
         Ok(Expression::RangeTo(RangeToExpression {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             right: Rc::new(right),
             inclusive,
         }))
@@ -137,6 +138,7 @@ impl<'a> Parser<'a> {
                 span: token.span.clone(),
                 expected: vec![TokenKind::RangeInclusive, TokenKind::RangeExclusive],
                 found: token.kind.clone(),
+                location: Some(Location::Expression),
             }),
         }
     }
@@ -160,7 +162,7 @@ mod tests {
                 Expression::Range(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
                     assert_eq!(range.right.to_string(), "5");
-                    assert_eq!(range.inclusive, false);
+                    assert!(!range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },
@@ -172,7 +174,7 @@ mod tests {
                 Expression::Range(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
                     assert_eq!(range.right.to_string(), "5");
-                    assert_eq!(range.inclusive, true);
+                    assert!(range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },
@@ -192,7 +194,7 @@ mod tests {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeFrom(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
-                    assert_eq!(range.inclusive, false);
+                    assert!(!range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },
@@ -203,7 +205,7 @@ mod tests {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeFrom(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
-                    assert_eq!(range.inclusive, true);
+                    assert!(range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },
@@ -223,7 +225,7 @@ mod tests {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeTo(ref range) => {
                     assert_eq!(range.right.to_string(), "5");
-                    assert_eq!(range.inclusive, false);
+                    assert!(!range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },
@@ -234,7 +236,7 @@ mod tests {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeTo(ref range) => {
                     assert_eq!(range.right.to_string(), "5");
-                    assert_eq!(range.inclusive, true);
+                    assert!(range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },

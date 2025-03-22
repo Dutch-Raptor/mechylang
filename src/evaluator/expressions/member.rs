@@ -24,7 +24,7 @@ impl Evaluator {
             Ok(method) => return Ok(Object::Method(method)),
             Err(MethodError::NotFound) => {}
             Err(MethodError::IterMethodOnIterable(_)) => {
-                return Err(Error::IterMethodOnIterable {
+                return Err(Error::IteratorMethodOnIterable {
                     method_span: member.property.span.clone(),
                     method_name: property.clone(),
                     object_type: object.get_type(),

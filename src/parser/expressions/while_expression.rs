@@ -5,6 +5,7 @@ use serde::Serialize;
 use crate::{Expression, Parser, Span, TokenKind};
 use crate::parser::expressions::{BlockExpression, Precedence};
 use crate::parser::{Result};
+use crate::parser::error::Location;
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct WhileExpression {
@@ -20,7 +21,7 @@ impl Display for WhileExpression {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
 
     /// Parses a while expression
     ///
@@ -35,14 +36,14 @@ impl<'a> Parser<'a> {
 
         let condition = self.parse_expression(Precedence::Lowest)?;
 
-        self.expect_peek(TokenKind::LeftSquirly)?;
+        self.expect_peek(TokenKind::LeftSquirly, Some(Location::Expression))?;
 
         let body = self.parse_block_expression()?;
 
         let else_block = self.parse_else_block()?;
 
         Ok(WhileExpression {
-            span: self.span_with_start(start),
+            span: self.span_with_start(&start),
             condition: Rc::new(condition),
             body,
             else_block,
