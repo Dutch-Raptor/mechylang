@@ -8,6 +8,8 @@ repository = "https://github.com/Dutch-Raptor/mechylang"
 homepage = "https://dutch-raptor.github.io/mechylang/mechylang"
 keywords = ["language", "interpreter", "repl"]
 categories = ["command-line-utilities", "development-tools"]
+license = "MIT"
+license-file = "LICENSE.txt"
 
 [lib]
 name = "mechylang"
