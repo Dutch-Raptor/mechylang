@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["MechyPrettyError","MechyPrettyErrorBuilder"],"fn":["error_demo"],"struct":["MultiError","MultiErrorBuilder"],"trait":["PrettyError"]};

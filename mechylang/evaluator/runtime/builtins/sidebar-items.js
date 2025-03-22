@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["BuiltinError"],"struct":["BUILTINS","BuiltinFunction"]};
