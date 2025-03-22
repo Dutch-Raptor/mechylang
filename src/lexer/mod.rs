@@ -17,7 +17,7 @@ pub struct Lexer<'a> {
 /// Implement the Lexer struct
 ///
 /// The Lexer struct is responsible for lexing the input string into tokens.
-impl<'a> Lexer<'a> {
+impl Lexer<'_> {
     /// Create a new Lexer
     ///
     /// # Arguments
@@ -380,7 +380,7 @@ impl<'a> Lexer<'a> {
     }
 }
 
-impl<'a> Iterator for Lexer<'a> {
+impl Iterator for Lexer<'_> {
     type Item = Result<Token>;
 
     fn next(&mut self) -> Option<Self::Item> {

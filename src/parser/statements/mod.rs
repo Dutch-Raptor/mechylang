@@ -115,7 +115,7 @@ impl Display for Statement {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses a single statement in Mechylang.
     ///
     /// This function handles the parsing of various types of statements, including `let`, `return`,

@@ -112,6 +112,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn test_function_wrong_number_arguments() {
         let err = test_eval(r#"
         len("one", "two")
@@ -126,35 +127,6 @@ mod tests {
             }
             _ => panic!("Expected WrongNumberOfArguments, got: {err:?}"),
         }
-    }
-
-    fn dummy() {
-        let tests = vec![
-            (
-                "len(\"one\", \"two\")",
-                "Wrong number of arguments. Expected 1 argument(s), got 2",
-                "len(\"one\", \"two\")",
-                1,
-            ),
-            (
-                "[1, 2, 3][\"hi\"]",
-                "Index operator not supported for Array([Integer(1), Integer(2), Integer(3)])[String(\"hi\")]",
-                "[1, 2, 3][\"hi\"]",
-                1,
-            ),
-            (
-                "[1, 2, 3][-1]",
-                "Index out of bounds: -1, [1, 2, 3] has len(3)",
-                "[1, 2, 3][-1]",
-                1,
-            ),
-            (
-                "fn(x) { x + 1; }(1, 2)",
-                "Wrong number of arguments: expected 1, got 2",
-                "fn(x) { x + 1; }(1, 2)",
-                1,
-            ),
-        ];
     }
 
     #[test]
@@ -797,7 +769,6 @@ mod tests {
 
         for (input, expected) in tests {
             let evaluated = test_eval(input);
-            let err = format!("{evaluated:?}");
             assert_eq!(evaluated.unwrap(), expected);
         }
     }

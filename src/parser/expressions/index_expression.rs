@@ -22,7 +22,7 @@ impl Display for IndexExpression {
         write!(f, "({}[{}])", self.left, self.index)
     }
 }
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_index_expression(&mut self, left: Expression) -> Result<IndexExpression> {
         let start = self.cur_token.span.clone();
         debug_assert!(self.is_cur_token(TokenKind::LeftSquare), "Expected current token to be `[`");

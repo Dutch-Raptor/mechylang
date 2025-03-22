@@ -17,7 +17,7 @@ impl Display for BooleanLiteral {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_boolean(&self) -> Result<BooleanLiteral> {
         let _trace = trace!("parse_boolean");
         let value = match self.cur_token.kind {

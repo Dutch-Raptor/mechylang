@@ -5,7 +5,7 @@ use crate::lexer::{Span};
 use crate::parser::{Error, Result};
 use crate::parser::error::Location;
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Advances the parser to the next token in the input stream.
     ///
     /// This method retrieves the next token from the lexer and updates the

@@ -25,7 +25,7 @@ impl Display for ArrayLiteral {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
 
     pub(super) fn parse_array_expression(&mut self) -> Result<ArrayLiteral> {
         debug_assert!(self.is_cur_token(TokenKind::LeftSquare), "Expected current token to be `[`");

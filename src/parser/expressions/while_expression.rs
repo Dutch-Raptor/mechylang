@@ -21,7 +21,7 @@ impl Display for WhileExpression {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
 
     /// Parses a while expression
     ///

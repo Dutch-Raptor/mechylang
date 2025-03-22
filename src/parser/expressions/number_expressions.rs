@@ -28,7 +28,7 @@ impl Display for IntegerLiteral {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_number(&mut self) -> Result<Expression> {
         let _trace = trace!("parse_number");
         let token = &self.cur_token;

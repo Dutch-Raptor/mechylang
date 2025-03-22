@@ -18,7 +18,7 @@ impl Display for MemberExpression {
         write!(f, "{}.{}", self.object, self.property)
     }
 }
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses a member access expression in Mechylang, where an object is accessed by its property.
     ///
     /// This function is used to parse member access expressions, where an object is followed by a dot `.` and then

@@ -40,7 +40,7 @@ impl Display for ExpressionStatement {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses an expression statement in Mechylang.
     ///
     /// This function handles the parsing of an expression statement, which consists of an expression

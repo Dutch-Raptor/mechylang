@@ -82,7 +82,7 @@ impl Display for BlockExpression {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses a block expression in Mechylang.
     ///
     /// This function handles the parsing of a block expression, which is a sequence of statements enclosed

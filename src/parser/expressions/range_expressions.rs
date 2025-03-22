@@ -68,7 +68,7 @@ impl Display for RangeFullExpression {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn parse_range_infix_expression(&mut self, left: Expression) -> Result<Expression> {
         let range_start = left.span();
 
@@ -162,7 +162,7 @@ mod tests {
                 Expression::Range(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
                     assert_eq!(range.right.to_string(), "5");
-                    assert_eq!(range.inclusive, false);
+                    assert!(!range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },
@@ -174,7 +174,7 @@ mod tests {
                 Expression::Range(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
                     assert_eq!(range.right.to_string(), "5");
-                    assert_eq!(range.inclusive, true);
+                    assert!(range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },
@@ -194,7 +194,7 @@ mod tests {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeFrom(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
-                    assert_eq!(range.inclusive, false);
+                    assert!(!range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },
@@ -205,7 +205,7 @@ mod tests {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeFrom(ref range) => {
                     assert_eq!(range.left.to_string(), "1");
-                    assert_eq!(range.inclusive, true);
+                    assert!(range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },
@@ -225,7 +225,7 @@ mod tests {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeTo(ref range) => {
                     assert_eq!(range.right.to_string(), "5");
-                    assert_eq!(range.inclusive, false);
+                    assert!(!range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },
@@ -236,7 +236,7 @@ mod tests {
             Statement::Expression(ref expr) => match expr.expression {
                 Expression::RangeTo(ref range) => {
                     assert_eq!(range.right.to_string(), "5");
-                    assert_eq!(range.inclusive, true);
+                    assert!(range.inclusive);
                 }
                 _ => panic!("expected range expression"),
             },

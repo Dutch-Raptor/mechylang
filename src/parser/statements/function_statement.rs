@@ -27,7 +27,7 @@ impl Display for FunctionStatement {
         )
     }
 }
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses a function statement in Mechylang.
     ///
     /// This method handles the parsing of function declarations and anonymous functions in the source code.

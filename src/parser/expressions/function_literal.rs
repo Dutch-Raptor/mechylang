@@ -28,7 +28,7 @@ impl Display for FunctionLiteral {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
 
     pub(super) fn parse_function_literal(&mut self) -> Result<FunctionLiteral> {
         let _trace = trace!("parse_function_literal");

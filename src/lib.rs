@@ -72,7 +72,7 @@
 //!
 //! All code examples in this documentation are automatically tested using the [test_eval_ok] function.
 //!
-//! [test_eval_ok]: crate::test_utils::test_eval_ok
+//! [test_eval_ok]: test_utils::test_eval_ok
 //! ```rust
 //! mechylang::test_utils::test_eval_ok(r#"
 //! assert_eq(2 + 3, 5)
@@ -337,11 +337,11 @@
 //!
 //!
 //!
-//! ### Built in functions:
+//! ### Built-in functions:
 //!
-//! `mechylang` has a few built in functions, to learn more about them, check out the [builtins module](crate::evaluator::runtime::builtins).
+//! `mechylang` has a few built-in functions, to learn more about them, check out the [builtins module](evaluator::runtime::builtins).
 //!
-//! Built in functions can be called like any other function. And even passed as arguments to other functions.
+//! Built-in functions can be called like any other function. And even passed as arguments to other functions.
 //!
 //! ```rust
 //! # mechylang::test_utils::test_eval_ok(r#"

@@ -21,7 +21,7 @@ impl Display for ReturnStatement {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses a `return` statement in Mechylang.
     ///
     /// This function handles the parsing of a `return` statement, which is used to return a value

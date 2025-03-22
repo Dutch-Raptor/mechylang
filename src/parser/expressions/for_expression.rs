@@ -36,7 +36,7 @@ impl Display for ForExpression {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
 
     /// Parses a for expression
     ///

@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use ariadne::Source;
 use crate::{Evaluator, Object};
 use crate::pretty_errors::PrettyError;

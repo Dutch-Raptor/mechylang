@@ -119,7 +119,7 @@ impl Display for InfixOperator {
 }
 
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(super) fn has_infix(&self, token: &TokenKind) -> bool {
         match token {
             TokenKind::Plus | TokenKind::Minus | TokenKind::Divide

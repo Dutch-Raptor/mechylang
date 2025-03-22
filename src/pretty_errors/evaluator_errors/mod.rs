@@ -472,7 +472,7 @@ impl PrettyErrorBuilder for Error {
                 value,
             } => MechyPrettyErrorBuilder::Single(
                 Report::build(ReportKind::Error, (source_id, span.bytes()))
-                    .with_message(format!("Assertion failed"))
+                    .with_message("Assertion failed".to_string())
                     .with_label(
                         Label::new((source_id, span.bytes.clone()))
                             .with_message(format!("This expression evaluates to `{value}`"))

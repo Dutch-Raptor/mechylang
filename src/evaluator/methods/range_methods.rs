@@ -238,10 +238,7 @@ fn contains(
     end_inclusive: bool,
 ) -> Option<bool> {
     if let Some(start) = start {
-        let ord = match start.partial_cmp(value) {
-            Some(ord) => ord,
-            None => return None,
-        };
+        let ord = start.partial_cmp(value)?;
 
         if ord == std::cmp::Ordering::Greater {
             return Some(false);
@@ -249,10 +246,7 @@ fn contains(
     }
 
     if let Some(end) = end {
-        let ord = match end.partial_cmp(value) {
-            Some(ord) => ord,
-            None => return None,
-        };
+        let ord = end.partial_cmp(value)?;
 
         if ord == std::cmp::Ordering::Less {
             return Some(false);

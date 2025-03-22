@@ -25,7 +25,7 @@ impl Display for IfExpression {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
 
     pub(super) fn parse_if_expression(&mut self) -> Result<IfExpression> {
         let _trace = trace!("parse_if_expression");
@@ -86,7 +86,7 @@ mod tests {
                 Expression::If(ref if_expr) => {
                     assert_eq!(if_expr.condition.to_string(), "(x < y)");
                     assert_eq!(if_expr.consequence.to_string().split_whitespace().collect::<Vec<&str>>().join(" "), "{ x; }");
-                    assert_eq!(if_expr.alternative.is_none(), true);
+                    assert!(if_expr.alternative.is_none());
                 }
                 _ => panic!("expected if expression"),
             },

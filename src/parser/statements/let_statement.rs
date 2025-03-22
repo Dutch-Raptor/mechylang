@@ -55,7 +55,7 @@ impl Display for LetStatement {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses a `let` statement in Mechylang.
     ///
     /// This function handles the parsing of a `let` statement, which is used to declare variables.

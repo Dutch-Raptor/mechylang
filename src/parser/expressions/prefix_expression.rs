@@ -46,7 +46,7 @@ impl Display for PrefixOperator {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub(crate) fn parse_prefix(&mut self) -> Result<Expression> {
         let _trace = trace!("parse_prefix");
         match self.cur_token.kind {

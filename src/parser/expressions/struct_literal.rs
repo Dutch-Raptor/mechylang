@@ -23,7 +23,7 @@ impl Display for StructLiteral {
     }
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     /// Parses a struct literal
     ///
     /// valid syntax is:
