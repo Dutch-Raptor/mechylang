@@ -1,364 +1,521 @@
-# Welcome to Mechylang!
+## What is `mechylang`?
 
-Mechylang was created because I wanted to learn how human written code gets turned into machine understandable code. 
-**This is a very simple language and is not meant to be used for anything other than learning.**
+`mechylang` is a programming language that was created for the purpose of learning how to create a programming language.
 
-_This is a work in progress and is not ready for use yet._
+It is a dynamically typed, interpreted language that is heavily inspired by Rust.
 
-Thanks to [Writing an Interpreter in Go](https://interpreterbook.com/) for helping me learn how to write an interpreter.
+Find the full documentation on [docs.rs](https://docs.rs/mechylang/latest/mechylang/).
 
-## Features
+It supports the following features:
 
-- [x] Basic arithmetic
-- [x] Variables
-- [x] Functions
-- [x] Functions as first class citizens
-- [x] Closures
-- [x] If statements
-- [x] For loops
-- [x] While loops
-- [x] Arrays
-- [ ] Objects
-- [x] Strings
-- [ ] Modules
-- [ ] Standard library
+- Variables
+- Functions (with support for closures, recursion, and higher order functions)
+- Control flow (if/else, while, for)
+- Comments (single line and multi line)
+- Arithmetic operations
+- Comparison operations
+- Logical operations
+- String operations (concatenation)
+- Printing to the console (or using a custom function passed to the interpreter)
+- Iterators and some of their methods:
+    - `map`
+    - `filter`
+    - `fold`
+    - `step_by`
+    - `sum`
+    - `take`
 
-## How to use Mechylang
+Special thanks to [Thorsten Ball](https://thorstenball.com/) for his
+book [Writing An Interpreter In Go](https://interpreterbook.com/), it was a great read and a lot of help.
 
-First you'll need to install the interpreter.
+## How do I use `mechylang`?
 
-```bash
-cargo install --locked --git https://github.com/Dutch-Raptor/mechylang
-```
+### Using as a binary
 
-Then you can run a file with the interpreter.
+Install `mechylang` using `cargo install mechylang`.
 
-```bash
-mechylang_cli file <file>
-```
+You can then run a file using `mechylang_cli <file>`. Or just run the REPL using `mechylang_cli`.
 
-If you want to run a repl, you can do that too.
+### Using as a library
 
-```bash
-mechylang_cli repl
-```
+If you want to use `mechylang` as a library, you can add it to your `Cargo.toml` file like so:
 
-## Syntax
+ ```toml
+ [dependencies]
+mechylang = "0.1.0"
+ ```
 
-### Getting Started
+Or just run `cargo add mechylang`.
 
-Of course, every language needs a hello world program.
+Then, you can use it in your code like so:
 
 ```rust
-// This is a comment
-// With the print function you can print to stdout
-print("Hello World!");
+use mechylang::{Evaluator, Environment, EvalConfig, Object};
+
+let mut env = Environment::new();
+
+let code = "let x = 5; x + 5";
+
+let result = Evaluator::eval(code, &mut env, EvalConfig::default());
+assert_eq!(result, Ok(Object::Integer(10)));
 ```
+
+## Mechylang Syntax
+
+### Hello World
+
+No programming language is complete without a hello world example.
+
+ ```rust
+ // This is a comment
+ // With the println function you can println to stdout
+ println("Hello World!")
+ ```
 
 ### Variables
 
-To create a variable, you use the `let` keyword.
+Variables can be declared using the `let` keyword.
 
-```rust
-let x = 5;
-let y = 10;
-let z = x + y;
-```
+ ```rust
+ let x = 5
+ let y = 10
+ assert_eq(x, 5)
+ assert_eq(y, 10)
+ ```
 
-Valid variable names are any combination of letters, numbers, and underscores, but they must start with a letter or underscore.
+Variables can be reassigned using the `=` operator.
 
-```rust
-let _x = 5;
-let x1 = 10;
-let x_1 = 15;
-let x = 20;
-```
+ ```rust
+ let x = 5
+ x = 10
+ assert_eq(x, 10)
+ ```
 
-Variables are mutable, so you can change their value.
+Valid variable names are any combination of alphabetic characters, numbers, and underscores, as long as they don't start
+with a number.
 
-_Variable mutability being the default may change in the future._
+ ```rust
+ let x = 5
+ let Y = 10
+ let _ = 15
+ let _z = 15
+ let _Z_1 = 35
+ let Οι_χαρακτήρες_που_δεν_είναι_ASCII_λειτουργούν_επίσης =
+ "non-ASCII characters also work"
+ ```
 
-```rust
-let x = 5;
-x = 10;
-```
+### Types
+
+`mechylang` has the following types:
+
+- Integer
+- Float
+- Boolean
+- String
+- Array
+- Function
+- Unit
+- Iterator
+
+### Arithmetic Operations
+
+`mechylang` supports the following arithmetic operations:
+
+- Addition (`+`)
+- Subtraction (`-`)
+- Multiplication (`*`)
+- Division (`/`)
+- Remainder (`%`)
+- Negation (`-`)
+- Bitwise Or (`|`)
+- Bitwise And (`&`)
+- Bitwise Xor (`^`)
+- Bitwise Not (`~`)
+- Bitwise Left Shift (`<<`)
+- Bitwise Right Shift (`>>`)
+
+ ```rust
+ let a = 5
+ let b = 10
+ assert_eq(a + b, 15)
+ assert_eq(a - b, -5)
+ assert_eq(a * b, 50)
+ assert_eq(a / b, 0)
+ assert_eq(a % b, 5)
+ assert_eq(-a, -5)
+ assert_eq(10 | 3, 11)
+ assert_eq(10 & 3, 2)
+ assert_eq(10 ^ 3, 9)
+ assert_eq(~10, -11)
+ assert_eq(10 << 1, 20)
+ assert_eq(10 >> 1, 5)
+ ```
+
+### Comparison Operations
+
+`mechylang` supports the following comparison operations:
+
+- Equal (`==`)
+- Not Equal (`!=`)
+- Less Than (`<`)
+- Less Than Or Equal (`<=`)
+- Greater Than (`>`)
+- Greater Than Or Equal (`>=`)
+- Logical And (`&&`)
+- Logical Or (`||`)
+- Logical Not (`!`)
+
+ ```rust
+ assert_eq(5 == 5, true)
+ assert_eq(5 != 5, false)
+ assert_eq(5 < 10, true)
+ assert_eq(5 <= 10, true)
+ assert_eq(5 > 10, false)
+ assert_eq(5 >= 10, false)
+ assert_eq(true && false, false)
+ assert_eq(false || true, true)
+ assert_eq(!true, false)
+ ```
+
+#### Unit `()`
+
+`mechylang` has a special type `()` called `Unit`. It is the bottom type, and is used to represent the absence of a
+value.
+It is similar to `void` in C, or `()` in Rust.
+
+`Unit` is the return type of a function that doesn't return anything.
+
+ ```rust
+ fn foo() {
+    // This function returns unit
+ }
+
+ assert_eq(foo(), ());
+ ```
 
 ### Functions
 
-Functions are created with the `fn` keyword.
+In `mechylang`, functions are first class citizens. This means that they can be passed as arguments to other functions,
+and returned from other functions.
 
-```rust
-let add = fn(x, y) {
-  return x + y;
-};
+Functions can be declared in 2 ways:
 
-let result = add(5, 10); // result = 15
-```
+- As a function declaration using the `fn <name>(<args>) { <body> }` syntax
+- As an anonymous function using the `fn(<args>) { <body> }` syntax, which can be assigned to a variable
 
-Functions are first class citizens, so you can pass them around like any other value.
+A function declaration looks like this:
 
-```rust
-let apply = fn(f, x, y) {
-  return f(x, y);
-};
+ ```rust
+ fn add(a, b) {
+     a + b
+ }
 
-let add = fn(x, y) {
-  return x + y;
-};
+ assert_eq(add(5, 10), 15)
+ ```
 
-let result = apply(add, 5, 10); // result = 15
-```
+An anonymous function looks like this:
 
-This goes for builtin functions too.
+ ```rust
+ fn(a, b) {
+    a + b
+ }
 
-```rust
-let apply = fn(f, x) {
-  return f(x);
-};
+ // You can also assign an anonymous function to a variable
+ let add = fn(a, b) {
+    a + b
+ }
 
-let result = apply(len, "Hello World!"); // result = 12
-```
+ assert_eq(add(5, 10), 15)
+ ```
 
-Functions can also be returned from other functions.
+The `return` keyword can be used to return early from a function.
 
-```rust
-let adder = fn(x) {
-  return fn(y) {
-    return x + y;
-  };
-};
+ ```rust
+ let add = fn(a, b) {
+   return a + b
+   // This line is never reached
+   a - b
+ }
 
-let add5 = adder(5);
-let result = add5(10); // result = 15
-```
+ assert_eq(add(5, 10), 15)
+ ```
 
-### If Statements
+The last expression in a function is implicitly returned.
 
-If statements are pretty standard.
+ ```rust
+ fn is_even(x) {
+   if x % 2 == 0 {
+     return true
+   }
+   false
+ }
+ assert_eq(is_even(10), true)
+ assert_eq(is_even(11), false)
+ ```
 
-```rust
-let x = 5;
+Functions can be passed as arguments to other functions.
 
-if (x == 5) {
-  print("x is 5");
-} else {
-  print("x is not 5");
-}
-```
+ ```rust
+ fn apply(f, a, b) {
+  f(a, b)
+ }
 
-The else statement is optional.
+ let add = fn(a, b) {
+  a + b
+ }
 
+ assert_eq(apply(add, 5, 10), 15)
+ // You can also use an anonymous function without binding it to a variable
+ assert_eq(apply(fn(a, b) { a - b }, 5, 10), -5)
+ ```
 
-```rust
-let x = 5;
+Functions can be returned from other functions.
 
-if (x == 5) {
-  print("x is 5");
-}
-```
+ ```rust
+ fn make_adder(a) {
+     return fn(b) {
+         a + b
+     }
+ }
 
-_Support for else if statements may be added in the future._
+ let add_five = make_adder(5)
+ let remove_five = make_adder(-5)
 
-### Loops
+ assert_eq(add_five(10), 15)
+ assert_eq(remove_five(10), 5)
+ ```
 
-In Mechylang, there are two types of loops: for loops and while loops. These loops are expressions, so they return can return a value.
+# Function declarations are hoisted
 
-#### For Loops
+Functions declared with the `fn <name>(<args>) { <body> }` syntax are hoisted.
 
-To create a for loop, use the syntax `for <variable> in <iterable> { <body> }`.
+This means that you can call a function before it is declared.
 
-```rust
-for i in [1, 2, 3] {
-  print(i);
-}
+ ```rust
+ assert_eq(add(5, 10), 15)
+ fn add(a, b) {
+    a + b
+ }
+ ```
 
-// or use a range
-for i in 0..3 {
-  print(i);
-}
-```
+Functions declared with the `let <name> = fn(<args>) { <body> }` syntax are not hoisted.
 
-More information on ranges can be found in the [Ranges](#ranges) section.
-More information on iterables can be found in the [Iterables](#iterables) section.
+ ```rust
+ assert_eq(add(5, 10), 15) // Results in `Identifier not found: add`
+ let add = fn(a, b) {
+   a + b
+ }
+ ```
 
-#### While Loops
+### Built-in functions:
 
-To create a while loop, use the syntax `while <condition> { <body> }`.
+`mechylang` has a few built-in functions, to learn more about them, check out
+the [docs.rs](https://docs.rs/mechylang/latest/mechylang/evaluator/runtime/builtins/index.html).
 
-```rust
-let x = 0;
+Built-in functions can be called like any other function. And even passed as arguments to other functions.
 
-while (x < 10) {
-  print(x);
-  x = x + 1;
-}
-```
+ ```rust
+ let apply = fn(f, x) {
+     f(x)
+ }
 
-#### Break and Continue
+ assert_eq(apply(len, "Hello World!"), 12)
+ ```
 
-You can use the `break` and `continue` keywords to break out of a loop or skip to the next iteration.
+### Statements and Expressions
 
-```rust
-for i in 0..10 {
-  if (i == 5) {
-    break;
-  }
-  print(i);
-}
-```
+In mechylang, almost all statements are expressions. This means that they return a value.
 
-```rust
-for i in 0..10 {
-  if (i % 2 == 0) {
-    continue;
-  }
-  print(i);
-}
-```
+#### Blocks
 
-You can also break with a value. This value will be returned from the loop. This is where it becomes important that loops are expressions.
+Blocks are expressions and return the value of the last expression in the block.
 
-```rust
-let x = for i in 0..10 {
-  if (i == 5) {
-    break i;
-  }
-  print(i); // prints 0, 1, 2, 3, 4
-};
+ ```rust
+ let x = {
+    let y = 5
+    y * 2
+ }
 
-print(x); // x = 5, prints 5
-```
+ assert_eq(x, 10)
+ ```
+
+#### If/Else
+
+The `if` statement is an expression and returns a value.
+The value of the `if` expression is the value of the last expression in the block that is executed.
+
+ ```rust
+ let x = if (true) { 5 } else { 10 }
+ assert_eq(x, 5)
+ ```
+
+ ```rust
+ let x = if (false) { 5 } else { 10 }
+ assert_eq(x, 10)
+ ```
+
+If none of the branches are executed, the value of the `if` expression is `unit`.
+
+ ```rust
+ let x = if (false) { 5 } // A false condition without an else branch returns unit
+ assert_eq(x, ())
+ ```
+
+#### Loops
+
+The `while` and `for` loops are also expressions and return a value.
+The value of the loop expression is the value of the last iteration.
+
+ ```rust
+ let x = 0
+ let y = while (x < 5) {
+     x = x + 1
+     x * 2
+ }
+ assert_eq(y, 10)
+ ```
+
+ ```rust
+ let x = for i in 0..5 {
+    i * 4
+    // loops return the value of the last iteration
+ }
+
+ assert_eq(x, 16)
+ ```
+
+##### Breaking with a value
+
+You can break out of a loop with a value using the `break` keyword.
+
+ ```rust
+ let x = for i in 0..5 {
+   if i == 3 {
+     break i
+   }
+   i * 4
+ }
+
+ assert_eq(x, 3)
+ ```
+
+Statements (like `let`) that do not produce a value return `unit` which is represented by `()`.
+
+ ```rust
+ let x = {
+   let y = 5
+ }
+ assert_eq(x, ())
+ ```
+
+### Blocks
+
+Blocks are a list of expressions that are evaluated sequentially.
+Blocks themselves are expressions, and the last expression in a block is returned.
+
+ ```rust
+ let x = {
+    let a = 5
+    let b = 10
+    a + b
+ }
+
+ assert_eq(x, 15)
+ ```
+
+In blocks you can also use the `return` keyword to return early.
+
+ ```rust
+ let x = {
+   let a = 5
+   let b = 10
+   return a + b
+   // This line is never reached
+   a - b
+ };
+
+ assert_eq(x, 15)
+ ```
+
+Returning from a bloct within a function will return from the function.
+
+ ```rust
+ let add = fn(a, b) {
+     {
+         return a + b
+         // This line is never reached
+         a - b
+     } // Since blocks are expressions and we want to evaluate this block as a statement
+     // we need to add a semicolon at the end.
+
+     // This line is never reached
+     2 * (a + b)
+ }
+
+ assert_eq(add(5, 10), 15)
+ ```
 
 ### Arrays
 
-Arrays are created with the syntax `[<value>, <value>, ...]`.
+Arrays are declared using the `[]` syntax.
+Arrays can contain any type of object, including other arrays and functions.
 
-```rust
-let x = [1, 2, 3];
-```
+ ```rust
+ let a = [1, 2, 3]
+ let b = [1, 2, 3, [4, 5, 6]]
+ let c = [1, 2, 3, fn(a, b) { a + b }]
+ ```
 
-Arrays are 0 indexed, so you can access the first element with `x[0]`.
+Arrays can be accessed using the `[]` operator.
 
-```rust
-let x = [1, 2, 3];
-let y = x[0]; // y = 1
-```
+ ```rust
+ assert_eq([1, 2, 3][0], 1)
+ assert_eq([1, 2, 3][1], 2)
+ assert_eq([1, 2, 3][2], 3)
+ ```
 
-_Arrays are not mutable yet, but this may change in the future._
+Array values can be reassigned using the `[]` operator.
+This will replace the value at the given index with the new value.
+If the index is out of bounds, an error will be returned.
+The index must be an integer.
+
+ ```rust
+ let a = [1, 2, 3]
+ a[0] = 10
+ assert_eq(a, [10, 2, 3])
+ a[1] = 20
+ assert_eq(a, [10, 20, 3])
+ a[2] = 30
+ assert_eq(a, [10, 20, 30])
+ ```
+
+To push an item to the end of an array, use the `push` method.
+
+ ```rust
+ let a = [1, 2, 3]
+ a.push(4)
+ assert_eq(a, [1, 2, 3, 4])
+ # "#)
+ ```
+
+Or to remove an item from the end of an array, use the `pop` method.
+
+ ```rust
+ let a = [1, 2, 3]
+ assert_eq(a.pop(), 3)
+ assert_eq(a, [1, 2])
+ assert_eq(a.pop(), 2)
+ assert_eq(a, [1])
+ ```
 
 ### Strings
 
-Strings are created with the syntax `"<value>"`.
+Strings are declared using the `""` syntax.
+Strings can contain any unicode character, including emojis.
 
-```rust
-let x = "Hello World!";
-```
-
-
-
-### Iterables
-
-Iterables are anything that can be iterated over. This includes arrays and ranges.
-
-#### Ranges
-
-Ranges are created with the syntax `[start]..[[=]end]`. Here anything in brackets is optional.
-
-```rust
-let x = 0..3; // 0 <= x < 3
-let y = 0..=3; // 0 <= y <= 3
-let z = ..3; // z < 3
-let a = (6..); // a >= 6
-let b = (..); // b is all integers
-let c = ..=9; // c <= 9
-```
-
-_Note that ranges that are open ended on the right require parentheses._
-_Note that ranges that are open ended on the left are not iterable as there is no starting point._
-
-#### Iterating
-
-To iterate over an iterable, you can use a for loop.
-
-```rust
-for i in 0..10 {
-  print(i);
-}
-```
-
-### Comments
-
-```rust
-// This is a comment
-/* This is a multiline comment */
-```
-
-## Examples
-
-### FizzBuzz
-
-```rust
-let fizzbuzz = fn(n) {
-  for i in 1..=n {
-    if (i % 3 == 0 && i % 5 == 0) {
-      print("FizzBuzz");
-      continue;
-    }
-
-    if (i % 3 == 0) {
-      print("Fizz");
-      continue;
-    }
-
-    if (i % 5 == 0) {
-      print("Buzz");
-      continue;
-    }
-
-    print(i);
-
-  }
-};
-
-fizzbuzz(100);
-```
-
-
-### Fibonacci
-
-Recursive
-
-```rust
-let fib = fn(n) {
-  if (n == 0) {
-    return 0;
-  }
-
-  if (n == 1) {
-    return 1;
-  }
-
-  return fib(n - 1) + fib(n - 2);
-};
-
-fib(10); // 55
-```
-
-Dynamically Programmed
-
-```rust
-let fib = fn(n) {
-  let a = 0;
-  let b = 1;
-
-  for i in 0..n {
-    b = a + b;
-    a = b - a;
-  }
-
-  return a;
-};
-
-fib(10); // 55
-```
-
+ ```rust
+ let a = "Hello World!"
+ let b = "👋🌎"
+ let c = a + b
+ assert_eq(c, "Hello World!👋🌎")
+ ```
