@@ -1,0 +1,390 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="A dynamically typed, interpreted programming language. This is the documentation for the `mechylang` crate."><title>mechylang - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="mechylang" data-themes="" data-resource-suffix="" data-rustdoc-version="1.86.0 (05f9846f8 2025-03-31)" data-channel="1.86.0" data-search-js="search-581efc7a.js" data-settings-js="settings-6dad6058.js" ><script src="../static.files/storage-3a5871a4.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-4d63596a.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../mechylang/index.html">mechylang</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#what-is-mechylang" title="What is `mechylang`?">What is <code>mechylang</code>?</a></li><li><a href="#how-do-i-use-mechylang" title="How do I use `mechylang`?">How do I use <code>mechylang</code>?</a></li><li><a href="#mechylang-syntax" title="Mechylang Syntax">Mechylang Syntax</a><ul><li><a href="#hello-world" title="Hello World">Hello World</a></li><li><a href="#variables" title="Variables">Variables</a></li><li><a href="#types" title="Types">Types</a></li><li><a href="#arithmetic-operations" title="Arithmetic Operations">Arithmetic Operations</a></li><li><a href="#comparison-operations" title="Comparison Operations">Comparison Operations</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></li><li><a href="#function-declarations-are-hoisted" title="Function declarations are hoisted">Function declarations are hoisted</a><ul><li><a href="#built-in-functions" title="Built-in functions:">Built-in functions:</a></li><li><a href="#statements-and-expressions" title="Statements and Expressions">Statements and Expressions</a></li><li><a href="#blocks-1" title="Blocks">Blocks</a></li><li><a href="#arrays" title="Arrays">Arrays</a></li><li><a href="#strings" title="Strings">Strings</a></li><li><a href="#examples" title="Examples">Examples</a></li></ul></li></ul><h3><a href="#reexports">Crate Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#macros" title="Macros">Macros</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#types-1" title="Type Aliases">Type Aliases</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>mechylang</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/mechylang/lib.rs.html#2-611">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>A dynamically typed, interpreted programming language.
+This is the documentation for the <code>mechylang</code> crate.</p>
+<h3 id="what-is-mechylang"><a class="doc-anchor" href="#what-is-mechylang">§</a>What is <code>mechylang</code>?</h3>
+<p><code>mechylang</code> is a programming language that was created for the purpose of learning how to create a programming language.</p>
+<p>It is a dynamically typed, interpreted language that is heavily inspired by Rust.</p>
+<p>It supports the following features:</p>
+<ul>
+<li>Variables</li>
+<li>Functions (with support for closures, recursion, and higher order functions)</li>
+<li>Control flow (if/else, while, for)</li>
+<li>Comments (single line and multi line)</li>
+<li>Arithmetic operations</li>
+<li>Comparison operations</li>
+<li>Logical operations</li>
+<li>String operations (concatenation)</li>
+<li>Printing to the console (or using a custom function passed to the interpreter)</li>
+<li>Iterators and some of their methods:
+<ul>
+<li><code>map</code></li>
+<li><code>filter</code></li>
+<li><code>fold</code></li>
+<li><code>step_by</code></li>
+<li><code>sum</code></li>
+<li><code>take</code></li>
+</ul>
+</li>
+</ul>
+<p>Special thanks to <a href="https://thorstenball.com/">Thorsten Ball</a> for his book <a href="https://interpreterbook.com/">Writing An Interpreter In Go</a>, it was a great read and a lot of help.</p>
+<h3 id="how-do-i-use-mechylang"><a class="doc-anchor" href="#how-do-i-use-mechylang">§</a>How do I use <code>mechylang</code>?</h3>
+<p>Your currently looking at the documentation for the <code>mechylang</code> library crate. There is also a binary crate that can be used to run <code>mechylang</code> programs. It supports running a file, or opening a <code>repl</code>.</p>
+<p>If you want to use the library crate, you can add it to your <code>Cargo.toml</code> file like so:</p>
+<div class="example-wrap"><pre class="language-toml"><code>[dependencies]
+mechylang = &quot;0.1.0&quot;</code></pre></div>
+<p>Then, you can use it in your code like so:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>mechylang::{Evaluator, Environment, EvalConfig, Object};
+
+<span class="kw">let </span><span class="kw-2">mut </span>env = Environment::new();
+
+<span class="kw">let </span>code = <span class="string">"let x = 5; x + 5"</span>;
+
+<span class="kw">let </span>result = Evaluator::eval(code, <span class="kw-2">&amp;mut </span>env, EvalConfig::default());
+<span class="macro">assert_eq!</span>(result, <span class="prelude-val">Ok</span>(Object::Integer(<span class="number">10</span>)));</code></pre></div>
+<h3 id="mechylang-syntax"><a class="doc-anchor" href="#mechylang-syntax">§</a>Mechylang Syntax</h3><h4 id="hello-world"><a class="doc-anchor" href="#hello-world">§</a>Hello World</h4>
+<p>No programming language is complete without a hello world example.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// This is a comment
+// With the print function you can print to stdout
+</span>print(<span class="string">"Hello World!"</span>)</code></pre></div>
+<h5 id="note-about-code-examples"><a class="doc-anchor" href="#note-about-code-examples">§</a>Note about code examples:</h5>
+<p>All code examples in this documentation are automatically tested using the <a href="test_utils/fn.test_eval_ok.html" title="fn mechylang::test_utils::test_eval_ok">test_eval_ok</a> function.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>mechylang::test_utils::test_eval_ok(<span class="string">r#"
+assert_eq(2 + 3, 5)
+"#</span>);</code></pre></div>
+<p>Only the mechylang executed code is shown in the examples, not the rust code that runs the tests.</p>
+<h4 id="variables"><a class="doc-anchor" href="#variables">§</a>Variables</h4>
+<p>Variables can be declared using the <code>let</code> keyword.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">5
+</span><span class="kw">let </span>y = <span class="number">10
+</span>assert_eq(x, <span class="number">5</span>)
+assert_eq(y, <span class="number">10</span>)</code></pre></div>
+<p>Variables can be reassigned using the <code>=</code> operator.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">5
+</span>x = <span class="number">10
+</span>assert_eq(x, <span class="number">10</span>)</code></pre></div>
+<p>Valid variable names are any combination of alphabetic characters, numbers, and underscores, as long as they don’t start with a number.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">5
+</span><span class="kw">let </span>Y = <span class="number">10
+</span><span class="kw">let _ </span>= <span class="number">15
+</span><span class="kw">let </span>_z = <span class="number">15
+</span><span class="kw">let </span>_Z_1 = <span class="number">35
+</span><span class="kw">let </span>Οι_χαρακτήρες_που_δεν_είναι_ASCII_λειτουργούν_επίσης =
+<span class="string">"non-ASCII characters also work"</span></code></pre></div>
+<h4 id="types"><a class="doc-anchor" href="#types">§</a>Types</h4>
+<p><code>mechylang</code> has the following types:</p>
+<ul>
+<li>Integer</li>
+<li>Float</li>
+<li>Boolean</li>
+<li>String</li>
+<li>Array</li>
+<li>Function</li>
+<li>Unit</li>
+</ul>
+<h4 id="arithmetic-operations"><a class="doc-anchor" href="#arithmetic-operations">§</a>Arithmetic Operations</h4>
+<p><code>mechylang</code> supports the following arithmetic operations:</p>
+<ul>
+<li>Addition (<code>+</code>)</li>
+<li>Subtraction (<code>-</code>)</li>
+<li>Multiplication (<code>*</code>)</li>
+<li>Division (<code>/</code>)</li>
+<li>Remainder (<code>%</code>)</li>
+<li>Negation (<code>-</code>)</li>
+<li>Bitwise Or (<code>|</code>)</li>
+<li>Bitwise And (<code>&amp;</code>)</li>
+<li>Bitwise Xor (<code>^</code>)</li>
+<li>Bitwise Not (<code>~</code>)</li>
+<li>Bitwise Left Shift (<code>&lt;&lt;</code>)</li>
+<li>Bitwise Right Shift (<code>&gt;&gt;</code>)</li>
+</ul>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a = <span class="number">5
+</span><span class="kw">let </span>b = <span class="number">10
+</span>assert_eq(a + b, <span class="number">15</span>)
+assert_eq(a - b, -<span class="number">5</span>)
+assert_eq(a * b, <span class="number">50</span>)
+assert_eq(a / b, <span class="number">0</span>)
+assert_eq(a % b, <span class="number">5</span>)
+assert_eq(-a, -<span class="number">5</span>)
+assert_eq(<span class="number">10 </span>| <span class="number">3</span>, <span class="number">11</span>)
+assert_eq(<span class="number">10 </span>&amp; <span class="number">3</span>, <span class="number">2</span>)
+assert_eq(<span class="number">10 </span>^ <span class="number">3</span>, <span class="number">9</span>)
+assert_eq(~<span class="number">10</span>, -<span class="number">11</span>)
+assert_eq(<span class="number">10 </span>&lt;&lt; <span class="number">1</span>, <span class="number">20</span>)
+assert_eq(<span class="number">10 </span>&gt;&gt; <span class="number">1</span>, <span class="number">5</span>)</code></pre></div>
+<h4 id="comparison-operations"><a class="doc-anchor" href="#comparison-operations">§</a>Comparison Operations</h4>
+<p><code>mechylang</code> supports the following comparison operations:</p>
+<ul>
+<li>Equal (<code>==</code>)</li>
+<li>Not Equal (<code>!=</code>)</li>
+<li>Less Than (<code>&lt;</code>)</li>
+<li>Less Than Or Equal (<code>&lt;=</code>)</li>
+<li>Greater Than (<code>&gt;</code>)</li>
+<li>Greater Than Or Equal (<code>&gt;=</code>)</li>
+<li>Logical And (<code>&amp;&amp;</code>)</li>
+<li>Logical Or (<code>||</code>)</li>
+<li>Logical Not (<code>!</code>)</li>
+</ul>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>assert_eq(<span class="number">5 </span>== <span class="number">5</span>, <span class="bool-val">true</span>)
+assert_eq(<span class="number">5 </span>!= <span class="number">5</span>, <span class="bool-val">false</span>)
+assert_eq(<span class="number">5 </span>&lt; <span class="number">10</span>, <span class="bool-val">true</span>)
+assert_eq(<span class="number">5 </span>&lt;= <span class="number">10</span>, <span class="bool-val">true</span>)
+assert_eq(<span class="number">5 </span>&gt; <span class="number">10</span>, <span class="bool-val">false</span>)
+assert_eq(<span class="number">5 </span>&gt;= <span class="number">10</span>, <span class="bool-val">false</span>)
+assert_eq(<span class="bool-val">true </span>&amp;&amp; <span class="bool-val">false</span>, <span class="bool-val">false</span>)
+assert_eq(<span class="bool-val">false </span>|| <span class="bool-val">true</span>, <span class="bool-val">true</span>)
+assert_eq(!<span class="bool-val">true</span>, <span class="bool-val">false</span>)</code></pre></div>
+<h5 id="unit-"><a class="doc-anchor" href="#unit-">§</a>Unit <code>()</code></h5>
+<p><code>mechylang</code> has a special type <code>()</code> called <code>Unit</code>. It is the bottom type, and is used to represent the absence of a value.
+It is similar to <code>void</code> in C, or <code>()</code> in Rust.</p>
+<p><code>Unit</code> is the return type of a function that doesn’t return anything.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn </span>foo() {
+   <span class="comment">// This function returns unit
+</span>}
+
+assert_eq(foo(), ());</code></pre></div>
+<h4 id="functions"><a class="doc-anchor" href="#functions">§</a>Functions</h4>
+<p>In <code>mechylang</code>, functions are first class citizens. This means that they can be passed as arguments to other functions, and returned from other functions.</p>
+<p>Functions can be declared in 2 ways:</p>
+<ul>
+<li>As a function declaration using the <code>fn &lt;name&gt;(&lt;args&gt;) { &lt;body&gt; }</code> syntax</li>
+<li>As an anonymous function using the <code>fn(&lt;args&gt;) { &lt;body&gt; }</code> syntax, which can be assigned to a variable</li>
+</ul>
+<p>A function declaration looks like this:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn </span>add(a, b) {
+    a + b
+}
+
+assert_eq(add(<span class="number">5</span>, <span class="number">10</span>), <span class="number">15</span>)</code></pre></div>
+<p>An anonymous function looks like this:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn</span>(a, b) {
+   a + b
+}
+
+<span class="comment">// You can also assign an anonymous function to a variable
+</span><span class="kw">let </span>add = <span class="kw">fn</span>(a, b) {
+   a + b
+}
+
+assert_eq(add(<span class="number">5</span>, <span class="number">10</span>), <span class="number">15</span>)</code></pre></div>
+<p>The <code>return</code> keyword can be used to return early from a function.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>add = <span class="kw">fn</span>(a, b) {
+  <span class="kw">return </span>a + b
+  <span class="comment">// This line is never reached
+  </span>a - b
+}
+
+assert_eq(add(<span class="number">5</span>, <span class="number">10</span>), <span class="number">15</span>)</code></pre></div>
+<p>The last expression in a function is implicitly returned.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn </span>is_even(x) {
+  <span class="kw">if </span>x % <span class="number">2 </span>== <span class="number">0 </span>{
+    <span class="kw">return </span><span class="bool-val">true
+  </span>}
+  <span class="bool-val">false
+</span>}
+assert_eq(is_even(<span class="number">10</span>), <span class="bool-val">true</span>)
+assert_eq(is_even(<span class="number">11</span>), <span class="bool-val">false</span>)</code></pre></div>
+<p>Functions can be passed as arguments to other functions.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn </span>apply(f, a, b) {
+ f(a, b)
+}
+
+<span class="kw">let </span>add = <span class="kw">fn</span>(a, b) {
+ a + b
+}
+
+assert_eq(apply(add, <span class="number">5</span>, <span class="number">10</span>), <span class="number">15</span>)
+<span class="comment">// You can also use an anonymous function without binding it to a variable
+</span>assert_eq(apply(<span class="kw">fn</span>(a, b) { a - b }, <span class="number">5</span>, <span class="number">10</span>), -<span class="number">5</span>)</code></pre></div>
+<p>Functions can be returned from other functions.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">fn </span>make_adder(a) {
+    <span class="kw">return fn</span>(b) {
+        a + b
+    }
+}
+
+<span class="kw">let </span>add_five = make_adder(<span class="number">5</span>)
+<span class="kw">let </span>remove_five = make_adder(-<span class="number">5</span>)
+
+assert_eq(add_five(<span class="number">10</span>), <span class="number">15</span>)
+assert_eq(remove_five(<span class="number">10</span>), <span class="number">5</span>)</code></pre></div>
+<h2 id="function-declarations-are-hoisted"><a class="doc-anchor" href="#function-declarations-are-hoisted">§</a>Function declarations are hoisted</h2>
+<p>Functions declared with the <code>fn &lt;name&gt;(&lt;args&gt;) { &lt;body&gt; }</code> syntax are hoisted.</p>
+<p>This means that you can call a function before it is declared.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>assert_eq(add(<span class="number">5</span>, <span class="number">10</span>), <span class="number">15</span>)
+<span class="kw">fn </span>add(a, b) {
+   a + b
+}</code></pre></div>
+<p>Functions declared with the <code>let &lt;name&gt; = fn(&lt;args&gt;) { &lt;body&gt; }</code> syntax are not hoisted.</p>
+
+<div class="example-wrap should_panic"><a href="#" class="tooltip" title="This example panics">ⓘ</a><pre class="rust rust-example-rendered"><code>assert_eq(add(<span class="number">5</span>, <span class="number">10</span>), <span class="number">15</span>) <span class="comment">// Results in `Identifier not found: add`
+</span><span class="kw">let </span>add = <span class="kw">fn</span>(a, b) {
+  a + b
+}</code></pre></div>
+<h4 id="built-in-functions"><a class="doc-anchor" href="#built-in-functions">§</a>Built-in functions:</h4>
+<p><code>mechylang</code> has a few built-in functions, to learn more about them, check out the <a href="evaluator/runtime/builtins/index.html" title="mod mechylang::evaluator::runtime::builtins">builtins module</a>.</p>
+<p>Built-in functions can be called like any other function. And even passed as arguments to other functions.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>apply = <span class="kw">fn</span>(f, x) {
+    f(x)
+}
+
+assert_eq(apply(len, <span class="string">"Hello World!"</span>), <span class="number">12</span>)</code></pre></div>
+<h4 id="statements-and-expressions"><a class="doc-anchor" href="#statements-and-expressions">§</a>Statements and Expressions</h4>
+<p>In mechylang, almost all statements are expressions. This means that they return a value.</p>
+<h5 id="blocks"><a class="doc-anchor" href="#blocks">§</a>Blocks</h5>
+<p>Blocks are expressions and return the value of the last expression in the block.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = {
+   <span class="kw">let </span>y = <span class="number">5
+   </span>y * <span class="number">2
+</span>}
+
+assert_eq(x, <span class="number">10</span>)</code></pre></div>
+<h5 id="ifelse"><a class="doc-anchor" href="#ifelse">§</a>If/Else</h5>
+<p>The <code>if</code> statement is an expression and returns a value.
+The value of the <code>if</code> expression is the value of the last expression in the block that is executed.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="kw">if </span>(<span class="bool-val">true</span>) { <span class="number">5 </span>} <span class="kw">else </span>{ <span class="number">10 </span>}
+assert_eq(x, <span class="number">5</span>)</code></pre></div>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="kw">if </span>(<span class="bool-val">false</span>) { <span class="number">5 </span>} <span class="kw">else </span>{ <span class="number">10 </span>}
+assert_eq(x, <span class="number">10</span>)</code></pre></div>
+<p>If none of the branches are executed, the value of the <code>if</code> expression is <code>unit</code>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="kw">if </span>(<span class="bool-val">false</span>) { <span class="number">5 </span>} <span class="comment">// A false condition without an else branch returns unit
+</span>assert_eq(x, ())</code></pre></div>
+<h5 id="loops"><a class="doc-anchor" href="#loops">§</a>Loops</h5>
+<p>The <code>while</code> and <code>for</code> loops are also expressions and return a value.
+The value of the loop expression is the value of the last iteration.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">0
+</span><span class="kw">let </span>y = <span class="kw">while </span>(x &lt; <span class="number">5</span>) {
+    x = x + <span class="number">1
+    </span>x * <span class="number">2
+</span>}
+assert_eq(y, <span class="number">10</span>)</code></pre></div>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="number">5 </span>{
+   i * <span class="number">4
+   </span><span class="comment">// loops return the value of the last iteration
+</span>}
+
+assert_eq(x, <span class="number">16</span>)</code></pre></div>
+<h6 id="breaking-with-a-value"><a class="doc-anchor" href="#breaking-with-a-value">§</a>Breaking with a value</h6>
+<p>You can break out of a loop with a value using the <code>break</code> keyword.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..<span class="number">5 </span>{
+  <span class="kw">if </span>i == <span class="number">3 </span>{
+    <span class="kw">break </span>i
+  }
+  i * <span class="number">4
+</span>}
+
+assert_eq(x, <span class="number">3</span>)</code></pre></div>
+<p>Statements (like <code>let</code>) that do not produce a value return <code>unit</code> which is represented by <code>()</code>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = {
+  <span class="kw">let </span>y = <span class="number">5
+</span>}
+assert_eq(x, ())</code></pre></div>
+<h4 id="blocks-1"><a class="doc-anchor" href="#blocks-1">§</a>Blocks</h4>
+<p>Blocks are a list of expressions that are evaluated sequentially.
+Blocks themselves are expressions, and the last expression in a block is returned.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = {
+   <span class="kw">let </span>a = <span class="number">5
+   </span><span class="kw">let </span>b = <span class="number">10
+   </span>a + b
+}
+
+assert_eq(x, <span class="number">15</span>)</code></pre></div>
+<p>In blocks you can also use the <code>return</code> keyword to return early.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = {
+  <span class="kw">let </span>a = <span class="number">5
+  </span><span class="kw">let </span>b = <span class="number">10
+  </span><span class="kw">return </span>a + b
+  <span class="comment">// This line is never reached
+  </span>a - b
+};
+
+assert_eq(x, <span class="number">15</span>)</code></pre></div>
+<p>Returning from a bloct within a function will return from the function.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>add = <span class="kw">fn</span>(a, b) {
+    {
+        <span class="kw">return </span>a + b
+        <span class="comment">// This line is never reached
+        </span>a - b
+    } <span class="comment">// Since blocks are expressions and we want to evaluate this block as a statement
+    // we need to add a semicolon at the end.
+
+    // This line is never reached
+    </span><span class="number">2 </span>* (a + b)
+}
+
+assert_eq(add(<span class="number">5</span>, <span class="number">10</span>), <span class="number">15</span>)</code></pre></div>
+<h4 id="arrays"><a class="doc-anchor" href="#arrays">§</a>Arrays</h4>
+<p>Arrays are declared using the <code>[]</code> syntax.
+Arrays can contain any type of object, including other arrays and functions.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]
+<span class="kw">let </span>b = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, [<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>]]
+<span class="kw">let </span>c = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="kw">fn</span>(a, b) { a + b }]</code></pre></div>
+<p>Arrays can be accessed using the <code>[]</code> operator.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>assert_eq([<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>][<span class="number">0</span>], <span class="number">1</span>)
+assert_eq([<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>][<span class="number">1</span>], <span class="number">2</span>)
+assert_eq([<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>][<span class="number">2</span>], <span class="number">3</span>)</code></pre></div>
+<p>Array values can be reassigned using the <code>[]</code> operator.
+This will replace the value at the given index with the new value.
+If the index is out of bounds, an error will be returned.
+The index must be an integer.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]
+a[<span class="number">0</span>] = <span class="number">10
+</span>assert_eq(a, [<span class="number">10</span>, <span class="number">2</span>, <span class="number">3</span>])
+a[<span class="number">1</span>] = <span class="number">20
+</span>assert_eq(a, [<span class="number">10</span>, <span class="number">20</span>, <span class="number">3</span>])
+a[<span class="number">2</span>] = <span class="number">30
+</span>assert_eq(a, [<span class="number">10</span>, <span class="number">20</span>, <span class="number">30</span>])</code></pre></div>
+<p>To push an item to the end of an array, use the <code>push</code> method.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]
+a.push(<span class="number">4</span>)
+assert_eq(a, [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>])</code></pre></div>
+<p>Or to remove an item from the end of an array, use the <code>pop</code> method.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]
+assert_eq(a.pop(), <span class="number">3</span>)
+assert_eq(a, [<span class="number">1</span>, <span class="number">2</span>])
+assert_eq(a.pop(), <span class="number">2</span>)
+assert_eq(a, [<span class="number">1</span>])</code></pre></div>
+<p>To learn more about array methods, check out the <a href="crate::evaluator::methods::array_methods">array
+module</a></p>
+<h4 id="strings"><a class="doc-anchor" href="#strings">§</a>Strings</h4>
+<p>Strings are declared using the <code>""</code> syntax.
+Strings can contain any unicode character, including emojis.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>a = <span class="string">"Hello World!"
+</span><span class="kw">let </span>b = <span class="string">"👋🌎"
+</span><span class="kw">let </span>c = a + b
+assert_eq(c, <span class="string">"Hello World!👋🌎"</span>)</code></pre></div>
+<h4 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h4>
+<p>To see some examples, check out <a href="docs/examples/index.html" title="mod mechylang::docs::examples">examples</a></p>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.Lexer"><code>pub use lexer::<a class="struct" href="lexer/struct.Lexer.html" title="struct mechylang::lexer::Lexer">Lexer</a>;</code></dt><dt id="reexport.Token"><code>pub use lexer::<a class="struct" href="lexer/struct.Token.html" title="struct mechylang::lexer::Token">Token</a>;</code></dt><dt id="reexport.TokenKind"><code>pub use lexer::<a class="enum" href="lexer/enum.TokenKind.html" title="enum mechylang::lexer::TokenKind">TokenKind</a>;</code></dt><dt id="reexport.Span"><code>pub use lexer::<a class="struct" href="lexer/struct.Span.html" title="struct mechylang::lexer::Span">Span</a>;</code></dt><dt id="reexport.Parser"><code>pub use parser::<a class="struct" href="parser/struct.Parser.html" title="struct mechylang::parser::Parser">Parser</a>;</code></dt><dt id="reexport.Expression"><code>pub use parser::<a class="enum" href="parser/expressions/enum.Expression.html" title="enum mechylang::parser::expressions::Expression">Expression</a>;</code></dt><dt id="reexport.Statement"><code>pub use parser::<a class="enum" href="parser/statements/enum.Statement.html" title="enum mechylang::parser::statements::Statement">Statement</a>;</code></dt><dt id="reexport.Program"><code>pub use parser::<a class="struct" href="parser/struct.Program.html" title="struct mechylang::parser::Program">Program</a>;</code></dt><dt id="reexport.EvalConfig"><code>pub use evaluator::<a class="struct" href="evaluator/struct.EvalConfig.html" title="struct mechylang::evaluator::EvalConfig">EvalConfig</a>;</code></dt><dt id="reexport.Evaluator"><code>pub use evaluator::<a class="struct" href="evaluator/struct.Evaluator.html" title="struct mechylang::evaluator::Evaluator">Evaluator</a>;</code></dt><dt id="reexport.Object"><code>pub use evaluator::<a class="enum" href="evaluator/enum.Object.html" title="enum mechylang::evaluator::Object">Object</a>;</code></dt><dt id="reexport.Environment"><code>pub use evaluator::<a class="struct" href="evaluator/runtime/environment/struct.Environment.html" title="struct mechylang::evaluator::runtime::environment::Environment">Environment</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="docs/index.html" title="mod mechylang::docs">docs</a></dt><dd>A module containing docs specific to the <code>Mechylang</code> language itself.</dd><dt><a class="mod" href="evaluator/index.html" title="mod mechylang::evaluator">evaluator</a></dt><dt><a class="mod" href="lexer/index.html" title="mod mechylang::lexer">lexer</a></dt><dt><a class="mod" href="parser/index.html" title="mod mechylang::parser">parser</a></dt><dt><a class="mod" href="pretty_errors/index.html" title="mod mechylang::pretty_errors">pretty_<wbr>errors</a></dt><dt><a class="mod" href="test_utils/index.html" title="mod mechylang::test_utils">test_<wbr>utils</a></dt></dl><h2 id="macros" class="section-header">Macros<a href="#macros" class="anchor">§</a></h2><dl class="item-table"><dt><a class="macro" href="macro.trace.html" title="macro mechylang::trace">trace</a></dt></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.Error.html" title="enum mechylang::Error">Error</a></dt></dl><h2 id="types-1" class="section-header">Type Aliases<a href="#types-1" class="anchor">§</a></h2><dl class="item-table"><dt><a class="type" href="type.Result.html" title="type mechylang::Result">Result</a></dt></dl></section></div></main></body></html>

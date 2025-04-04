@@ -1,0 +1,52 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Builtins for `mechylang`"><title>mechylang::evaluator::runtime::builtins - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mechylang" data-themes="" data-resource-suffix="" data-rustdoc-version="1.86.0 (05f9846f8 2025-03-31)" data-channel="1.86.0" data-search-js="search-581efc7a.js" data-settings-js="settings-6dad6058.js" ><script src="../../../../static.files/storage-3a5871a4.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../../static.files/main-4d63596a.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../mechylang/index.html">mechylang</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module builtins</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#print" title="`print`"><code>print</code></a></li><li><a href="#println" title="`println`"><code>println</code></a></li><li><a href="#assert" title="`assert`"><code>assert</code></a></li><li><a href="#assert_eq" title="`assert_eq`"><code>assert_eq</code></a></li><li><a href="#input_read_all" title="`input_read_all`"><code>input_read_all</code></a></li><li><a href="#input_read_line" title="`input_read_line`"><code>input_read_line</code></a></li><li><a href="#parse_int" title="`parse_int`"><code>parse_int</code></a></li><li><a href="#parse_float" title="`parse_float`"><code>parse_float</code></a></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In mechylang::<wbr>evaluator::<wbr>runtime</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">mechylang</a>::<wbr><a href="../../index.html">evaluator</a>::<wbr><a href="../index.html">runtime</a></div><h1>Module <span>builtins</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../../src/mechylang/evaluator/runtime/builtins.rs.html#1-409">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Builtins for <code>mechylang</code></p>
+<h5 id="print"><a class="doc-anchor" href="#print">§</a><code>print</code></h5>
+<p>The <code>print</code> function can be used to print to stdout.
+It prints the string representation of the arguments passed to it, separated by spaces.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>print(<span class="string">"Hello"</span>, <span class="string">"World!"</span>); <span class="comment">// prints "Hello World!"</span></code></pre></div>
+<h5 id="println"><a class="doc-anchor" href="#println">§</a><code>println</code></h5>
+<p>The <code>println</code> function can be used to print to stdout with a newline at the end.
+It prints the string representation of the arguments passed to it, separated by spaces.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>println(<span class="string">"Hello"</span>, <span class="string">"World!"</span>); <span class="comment">// prints "Hello World!\n"</span></code></pre></div>
+<h5 id="assert"><a class="doc-anchor" href="#assert">§</a><code>assert</code></h5>
+<p>The <code>assert</code> function can be used to assert that a boolean is true.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>assert(<span class="bool-val">true</span>); <span class="comment">// ok</span></code></pre></div>
+
+<div class="example-wrap should_panic"><a href="#" class="tooltip" title="This example panics">ⓘ</a><pre class="rust rust-example-rendered"><code>assert(<span class="bool-val">false</span>); <span class="comment">// panics</span></code></pre></div>
+<h5 id="assert_eq"><a class="doc-anchor" href="#assert_eq">§</a><code>assert_eq</code></h5>
+<p>The <code>assert_eq</code> function can be used to assert that all arguments are equal.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>assert_eq(<span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>); <span class="comment">// ok</span></code></pre></div>
+
+<div class="example-wrap should_panic"><a href="#" class="tooltip" title="This example panics">ⓘ</a><pre class="rust rust-example-rendered"><code>assert_eq(<span class="number">1</span>, <span class="number">2</span>, <span class="number">1</span>); <span class="comment">// panics</span></code></pre></div>
+<h5 id="input_read_all"><a class="doc-anchor" href="#input_read_all">§</a><code>input_read_all</code></h5>
+<p>The <code>input_read_all</code> function can be used to read all input from stdin.
+It keeps reading until EOF is reached.</p>
+
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">let </span>input = input_read_all();
+assert_eq(input, <span class="string">"Hello\nWorld\n"</span>); <span class="comment">// ok</span></code></pre></div>
+<h5 id="input_read_line"><a class="doc-anchor" href="#input_read_line">§</a><code>input_read_line</code></h5>
+<p>The <code>input_read_line</code> function can be used to read a single line from stdin.
+It reads until a newline is reached.</p>
+
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">let </span>input = input_read_line();
+assert_eq(input, <span class="string">"Hello\n"</span>); <span class="comment">// ok</span></code></pre></div>
+<h5 id="parse_int"><a class="doc-anchor" href="#parse_int">§</a><code>parse_int</code></h5>
+<p>The <code>parse_int</code> function can be used to parse a string into an integer.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>num = parse_int(<span class="string">"123"</span>);
+assert_eq(num, <span class="number">123</span>); <span class="comment">// ok</span></code></pre></div>
+<p>It throws an error if the string is not a valid integer.</p>
+
+<div class="example-wrap should_panic"><a href="#" class="tooltip" title="This example panics">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">let </span>num = parse_int(<span class="string">"123a"</span>);</code></pre></div>
+<h5 id="parse_float"><a class="doc-anchor" href="#parse_float">§</a><code>parse_float</code></h5>
+<p>The <code>parse_float</code> function can be used to parse a string into a float.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>num = parse_float(<span class="string">"123.45"</span>);
+assert_eq(num, <span class="number">123.45</span>); <span class="comment">// ok</span></code></pre></div>
+<p>It throws an error if the string is not a valid float.</p>
+
+<div class="example-wrap should_panic"><a href="#" class="tooltip" title="This example panics">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">let </span>num = parse_float(<span class="string">"123.45a"</span>);</code></pre></div>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.BUILTINS.html" title="struct mechylang::evaluator::runtime::builtins::BUILTINS">BUILTINS</a></dt><dd>A list of all the builtin functions in <code>mechylang</code></dd><dt><a class="struct" href="struct.BuiltinFunction.html" title="struct mechylang::evaluator::runtime::builtins::BuiltinFunction">Builtin<wbr>Function</a></dt><dd>A builtin function that can be called from <code>mechylang</code></dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.BuiltinError.html" title="enum mechylang::evaluator::runtime::builtins::BuiltinError">Builtin<wbr>Error</a></dt></dl></section></div></main></body></html>

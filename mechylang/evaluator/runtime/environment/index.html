@@ -1,0 +1,116 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Environment"><title>mechylang::evaluator::runtime::environment - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="mechylang" data-themes="" data-resource-suffix="" data-rustdoc-version="1.86.0 (05f9846f8 2025-03-31)" data-channel="1.86.0" data-search-js="search-581efc7a.js" data-settings-js="settings-6dad6058.js" ><script src="../../../../static.files/storage-3a5871a4.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../../static.files/main-4d63596a.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../mechylang/index.html">mechylang</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module environment</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#environment" title="Environment">Environment</a><ul><li><a href="#scope" title="Scope">Scope</a></li><li><a href="#environment-1" title="Environment">Environment</a></li></ul></li><li><a href="#example" title="Example">Example</a></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In mechylang::<wbr>evaluator::<wbr>runtime</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">mechylang</a>::<wbr><a href="../../index.html">evaluator</a>::<wbr><a href="../index.html">runtime</a></div><h1>Module <span>environment</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../../src/mechylang/evaluator/runtime/environment.rs.html#1-556">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="environment"><a class="doc-anchor" href="#environment">§</a>Environment</h2>
+<p>The environment is a data structure that stores variables and their values for <code>mechylang</code>
+programs. The environment is a tree of scopes, where each scope has access to the variables
+in connected outer scopes. The environment is used to store variables and their values
+during the evaluation of a <code>mechylang</code> program.</p>
+<h3 id="scope"><a class="doc-anchor" href="#scope">§</a>Scope</h3>
+<p>A scope is a mapping of variable names to their values. A scope can be thought of as a
+dictionary or a hashmap. A scope can be empty, in which case it has no variables and
+no values. A scope can also be non-empty, in which case it has variables and values.
+A scope can also be nested inside another scope. A scope that is nested inside another
+scope is called an enclosed scope. An enclosed scope has access to the variables and
+values in the outer scope. A scope that is not nested inside another scope is called
+a global scope. A global scope has no access to any other scope.</p>
+<div class="example-wrap"><pre class="language-text"><code>Global Scope {
+   x: 1, y: 2, z: 3
+   // has access to x, y, z
+   Enclosed Scope {
+        foo: 4, bar: 5
+        // has access to x, y, z and foo, bar
+        Enclosed Scope {
+            baz: 6
+            // has access to x, y, z, foo, bar and baz
+        }
+         
+        Enclosed Scope {
+            qux: 7
+            // has access to x, y, z, foo, bar and qux
+        }
+   }
+   Enclosed Scope {
+        quux: 8
+        // has access to x, y, z and quux
+   }
+}</code></pre></div><h3 id="environment-1"><a class="doc-anchor" href="#environment-1">§</a>Environment</h3>
+<p>An environment is a representation of a scope, which also has access to any outer scopes.</p>
+<p>`mechylang uses one global heap to store all objects. Variables are stored per scope.
+This means that multiple scopes can have access to the same object on the heap, but
+each scope can only access the variables it has access to.</p>
+<h4 id="shadowing"><a class="doc-anchor" href="#shadowing">§</a>Shadowing</h4>
+<p>A scope can have a variable with the same name as a variable in an outer scope. In this
+case, the variable in the inner scope shadows the variable in the outer scope. This means
+that the variable in the outer scope is not accessible from the inner scope. Only the
+variable in the inner scope is accessible from the inner scope. This is called shadowing.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">1</span>;
+assert_eq(x, <span class="number">1</span>);
+{ <span class="comment">// This is a new scope
+    </span>assert_eq(x, <span class="number">1</span>); <span class="comment">// x is accessible from this scope
+    </span><span class="kw">let </span>x = <span class="number">2</span>;
+    assert_eq(x, <span class="number">2</span>);
+} <span class="comment">// The scope ends here
+// In the outer scope, x is still 1
+</span>assert_eq(x, <span class="number">1</span>);</code></pre></div>
+<p>How does this work? When a variable is set in a scope, it is simply added to, or overwritten
+in the current scope. Any potential outer scopes are ignored.</p>
+<h4 id="updating"><a class="doc-anchor" href="#updating">§</a>Updating</h4>
+<p>A scope can also update a variable in an outer scope. This means that the variable in the
+outer scope is updated to the new value. This is called updating.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>x = <span class="number">1</span>;
+assert_eq(x, <span class="number">1</span>);
+{ <span class="comment">// This is a new scope
+    </span>assert_eq(x, <span class="number">1</span>); <span class="comment">// x is accessible from this scope
+    </span>x = <span class="number">2</span>;
+    assert_eq(x, <span class="number">2</span>);
+    { <span class="comment">// This is a new scope
+        </span>assert_eq(x, <span class="number">2</span>); <span class="comment">// x is accessible from this scope
+        </span>x = <span class="number">3</span>;
+        assert_eq(x, <span class="number">3</span>);
+    } <span class="comment">// The scope ends here
+    // In the outer scope, x is now 3
+    </span>assert_eq(x, <span class="number">3</span>);
+} <span class="comment">// The scope ends here
+// In the outer scope, x is now 3
+</span>assert_eq(x, <span class="number">3</span>);</code></pre></div>
+<p>How does this work? When a variable is updated in a scope, the variable is first searched
+for in the current scope. If the variable is found in the current scope, then the variable
+is updated in the current scope. If the variable is not found in the current scope, then
+the variable is searched for in the outer scopes recursively. The value is updated in the
+first scope where the variable is found. If the variable is not found in any scope, then
+an error is returned.</p>
+<p>For more info on updating see <a href="struct.Environment.html#method.update" title="method mechylang::evaluator::runtime::environment::Environment::update"><code>Environment::update</code></a></p>
+<h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>mechylang::Environment;
+<span class="kw">use </span>mechylang::Object;
+
+<span class="kw">let </span><span class="kw-2">mut </span>env = Environment::new();
+env.set(<span class="string">"x"</span>, Object::Integer(<span class="number">1</span>));
+<span class="macro">assert_eq!</span>(env.get(<span class="string">"x"</span>), <span class="prelude-val">Some</span>(Object::Integer(<span class="number">1</span>)));
+
+<span class="comment">// The enclosed env also has access to the value
+</span><span class="kw">let </span><span class="kw-2">mut </span>enclosed_env = Environment::new_enclosed(<span class="kw-2">&amp;</span>env);
+<span class="macro">assert_eq!</span>(enclosed_env.get(<span class="string">"x"</span>), <span class="prelude-val">Some</span>(Object::Integer(<span class="number">1</span>)));
+
+<span class="comment">// The value can be set in the enclosed environment
+</span>enclosed_env.set(<span class="string">"x"</span>, Object::Integer(<span class="number">2</span>));
+<span class="comment">// Now this new value for x shadows the old value for x
+</span><span class="macro">assert_eq!</span>(enclosed_env.get(<span class="string">"x"</span>), <span class="prelude-val">Some</span>(Object::Integer(<span class="number">2</span>)));
+<span class="macro">assert_eq!</span>(env.get(<span class="string">"x"</span>), <span class="prelude-val">Some</span>(Object::Integer(<span class="number">1</span>)));
+
+<span class="comment">// If we want to update the first value found (by searching outwards from the current scope)
+// we can use Environment::update
+</span>env.set(<span class="string">"y"</span>, Object::Integer(<span class="number">1</span>)); <span class="comment">// Set a new variable as `x` is currently shadowed
+</span><span class="macro">assert_eq!</span>(env.get(<span class="string">"y"</span>), <span class="prelude-val">Some</span>(Object::Integer(<span class="number">1</span>)));
+<span class="macro">assert_eq!</span>(enclosed_env.get(<span class="string">"y"</span>), <span class="prelude-val">Some</span>(Object::Integer(<span class="number">1</span>)));
+
+<span class="comment">// Update the value of `y` in the enclosed environment
+</span>enclosed_env.update(<span class="string">"y"</span>, Object::Integer(<span class="number">2</span>)).unwrap();
+<span class="comment">// Now the value of `y` is updated in the outer environment
+// which the enclosed environment has access to
+</span><span class="macro">assert_eq!</span>(env.get(<span class="string">"y"</span>), <span class="prelude-val">Some</span>(Object::Integer(<span class="number">2</span>)));
+<span class="macro">assert_eq!</span>(enclosed_env.get(<span class="string">"y"</span>), <span class="prelude-val">Some</span>(Object::Integer(<span class="number">2</span>)));</code></pre></div>
+<p>For more info on <a href="struct.Environment.html#method.set" title="method mechylang::evaluator::runtime::environment::Environment::set"><code>Environment::set</code></a>, <a href="struct.Environment.html#method.update" title="method mechylang::evaluator::runtime::environment::Environment::update"><code>Environment::update</code></a>,
+<a href="struct.Environment.html#method.get" title="method mechylang::evaluator::runtime::environment::Environment::get"><code>Environment::get</code></a> and <a href="struct.Environment.html#method.new_enclosed" title="associated function mechylang::evaluator::runtime::environment::Environment::new_enclosed"><code>Environment::new_enclosed</code></a>
+see their respective documentation.</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.Environment.html" title="struct mechylang::evaluator::runtime::environment::Environment">Environment</a></dt><dd>An environment is a representation of a scope, which also has access to any outer scopes.</dd><dt><a class="struct" href="struct.HeapObject.html" title="struct mechylang::evaluator::runtime::environment::HeapObject">Heap<wbr>Object</a></dt><dt><a class="struct" href="struct.InnerEnvironment.html" title="struct mechylang::evaluator::runtime::environment::InnerEnvironment">Inner<wbr>Environment</a></dt></dl></section></div></main></body></html>
